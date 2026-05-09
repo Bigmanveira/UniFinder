@@ -727,6 +727,19 @@ export function getDeterministicMatches(
   const levelStr  = (profile.level || profile.degreeLevel || profile.targetDegreeLevel || "").toLowerCase();
   const isPhd = levelStr.includes("phd") || levelStr.includes("doctorate");
 
+  // Seed for the personalization tiebreaker. Two applicants with the SAME
+  // exact profile see the same ordering; applicants with different profiles
+  // see slightly different ones. This prevents the "everyone keeps seeing
+  // Stanford / MIT / Berkeley at the top" repetition without violating the
+  // determinism contract (same input -> same output).
+  const profileSeed = [
+    profile?.field, profile?.intendedMajor, profile?.gpa, profile?.gradingSystem,
+    profile?.funding, profile?.destination,
+    profile?.level, profile?.degreeLevel, profile?.targetDegreeLevel,
+    (profile as any)?.satScore, (profile as any)?.actScore,
+    (profile as any)?.greScore, (profile as any)?.gmatScore,
+  ].map((v) => String(v ?? "")).join("|");
+
   for (const school of schools) {
     // -- Hard eligibility check 0: verified-program gate -----
     // When the caller passes a non-null set, the school's unitId MUST
@@ -758,10 +771,21 @@ export function getDeterministicMatches(
 
     let rawScore = 0;
 
-    // 1. Budget Fit (15%)
-    // Top universities are usually expensive - but elite-stats students often
-    // get need-based or merit aid. "Out of budget" gets partial credit so it
-    // doesn't drag a true Strong Fit school below the threshold.
+    // ── Score weights (must sum to 100) ───────────────────────────────────
+    // Rebalanced from the original PhD-CS-tuned config so masters and
+    // undergrad reports differentiate properly between fields:
+    //   - Major Fit went 7 -> 15: a CS applicant and a Biology applicant
+    //     should not see nearly identical school lists. Field signal now
+    //     carries real weight.
+    //   - Academic Fit 40 -> 42: profile stats matter slightly more.
+    //   - Admission Likelihood 25 -> 22: a touch less, since field+academic
+    //     already encode prestige indirectly.
+    //   - Budget 15 -> 10: cost-of-attendance varies less between top
+    //     schools than the old weight implied; "Out of budget" was
+    //     dragging strong fits below threshold for non-CS fields.
+    //   - Location 10 -> 8, International 3 -> 3.
+
+    // 1. Budget Fit (10%)
     const knownCost = school.averageCost ?? school.outOfStateTuition ?? school.inStateTuition;
     const cost = knownCost ?? 40000;
     let budgetFit: SchoolMatch["budgetFit"] = "Good";
@@ -770,10 +794,10 @@ export function getDeterministicMatches(
     else if (cost <= maxBudget)        { budgetFit = "Good";         budgetWeight = 0.85; }
     else if (cost <= maxBudget * 1.2)  { budgetFit = "Stretch";      budgetWeight = 0.55; }
     else                               { budgetFit = "Out of Budget"; budgetWeight = 0.30; }
-    rawScore += budgetWeight * 15;
-    if (knownCost === null || knownCost === undefined) rawScore -= 2;
+    rawScore += budgetWeight * 10;
+    if (knownCost === null || knownCost === undefined) rawScore -= 1.5;
 
-    // 2. Academic Fit (40%) - your stats vs the school's selectivity
+    // 2. Academic Fit (42%) — your stats vs the school's selectivity.
     let academic;
     if (isUndergrad) {
       academic = scoreUndergraduateAcademicFit(profile, school);
@@ -782,32 +806,32 @@ export function getDeterministicMatches(
     } else {
       academic = scoreUndergraduateAcademicFit(profile, school);
     }
-    rawScore += (academic.score / 100) * 40;
+    rawScore += (academic.score / 100) * 42;
 
-    // 3. Admission Likelihood (25%) - your chance given the school's admit
+    // 3. Admission Likelihood (22%) — your chance given the school's admit
     // rate and your profile strength. Differentiates Reach/Target/Safety.
     const admissionLikelihood = getAdmissionLikelihood(profile, school);
-    rawScore += (admissionLikelihood / 100) * 25;
+    rawScore += (admissionLikelihood / 100) * 22;
     const admissionBucket = bucketForLikelihood(admissionLikelihood);
 
     // Data-confidence penalty: schools without an admissions-rate record
-    // shouldn't outrank schools with verified Target/Safety admit rates,
-    // even when they win on every other dimension. Knock matchScore down
-    // a few points so they sort BELOW similar schools with confirmed data.
+    // shouldn't outrank schools with verified Target/Safety admit rates.
     if (school.admissionRate == null || school.admissionRate === 0) {
       rawScore -= 6;
     }
 
-    // 4. Location Fit (10%)
+    // 4. Location Fit (8%)
     let locationFit: SchoolMatch["locationFit"] = "No";
     if (targetCountry.includes("us") || targetCountry.includes("united states")) {
       locationFit = "Yes";
-      rawScore += 10;
+      rawScore += 8;
     }
 
-    // 5. Major Fit (7%)
+    // 5. Major Fit (15%) — the BIG rebalance. Field/program alignment is
+    // now a primary driver, not a tiebreaker. Two applicants with the same
+    // GPA but different majors will see materially different school lists.
     const fieldFit = getFieldMatchScore(school, fieldStr);
-    rawScore += (fieldFit.score / 100) * 7;
+    rawScore += (fieldFit.score / 100) * 15;
     const majorFitLabel = fieldFit.label;
 
     // 6. International Fit (3%)
@@ -842,9 +866,20 @@ export function getDeterministicMatches(
       penalty += 25;
     }
 
-    let finalScore = rawScore - penalty;
+    // Personalization tiebreaker: small deterministic jitter (-1.5 to +1.5)
+    // seeded by (profile, school). Tied schools shuffle slightly between
+    // different profiles without changing the broader ranking.
+    const seed = profileSeed + "::" + String(school.unitId ?? school.name ?? "");
+    let h = 2166136261 >>> 0;
+    for (let i = 0; i < seed.length; i++) {
+      h ^= seed.charCodeAt(i);
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    const personalization = ((h % 30) - 15) / 10;
+
+    let finalScore = rawScore - penalty + personalization;
     finalScore = Math.min(finalScore, cap);
-    
+
     // Clamp and round
     finalScore = Math.max(0, Math.min(100, Math.round(finalScore)));
 

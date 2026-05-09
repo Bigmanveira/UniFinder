@@ -191,9 +191,15 @@ export async function generateOfficerTurn(args: {
       messages.push({ role: "user", content: "(Begin the interview with the very first question.)" });
     }
 
+    // Haiku is the right tool for officer turns: short questions, simple JSON
+    // output, and we run a fresh inference on every student answer. Sonnet
+    // takes 3-6s per turn which feels laggy on mobile; haiku-4-5 returns in
+    // 1-2s with quality that's plenty for short interview prompts. The
+    // post-interview *scoring* pass keeps using sonnet — that's a one-shot
+    // analytical task where quality matters more than latency.
     const response = await anthropic.messages.create({
-      model: "claude-sonnet-4-5",
-      max_tokens: 400,
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 350,
       temperature: 0.4,
       system: OFFICER_SYSTEM_PROMPT + wrappingHint + documentsContext,
       messages,

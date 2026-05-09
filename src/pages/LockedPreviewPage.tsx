@@ -107,9 +107,15 @@ export default function LockedPreviewPage() {
     setUnlocking(true);
     setUnlockError("");
     try {
-      const recommendedMatches = allMatches.filter(
-        m => m.category === "Strong Fit" || m.category === "Good Fit" || m.category === "Exploratory Fit"
-      );
+      // For ungated fields the recommended set can balloon into the
+      // thousands; mobile networks occasionally drop the request mid-flight
+      // and surface an opaque "internal" error. Cap the payload to the
+      // top-200 by match score — the server-side program gate + bucketize
+      // both prefer high-scorers anyway, so this doesn't change the report.
+      const recommendedMatches = allMatches
+        .filter(m => m.category === "Strong Fit" || m.category === "Good Fit" || m.category === "Exploratory Fit")
+        .sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0))
+        .slice(0, 200);
       const unlockFn = httpsCallable(functions, "unlockMatchReport", { timeout: 240_000 });
       const result = await unlockFn({ profile, matches: recommendedMatches });
       const data = result.data as any;
