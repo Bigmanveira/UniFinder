@@ -162,7 +162,7 @@ export default function DashboardPage() {
                 <StatTile
                   label="Match reports"
                   value={matchReports.length}
-                  accent="bg-violet-500"
+                  accent="bg-cyan-500"
                   icon={<FileText size={15} />}
                   action={matchReports.length > 0 ? "Jump to list" : undefined}
                   onAction={() => document.getElementById("recent-reports")?.scrollIntoView({ behavior: "smooth" })}
@@ -188,7 +188,7 @@ export default function DashboardPage() {
                   className="group w-full text-left bg-gradient-to-br from-slate-900 via-slate-900 to-blue-900 text-white rounded-3xl p-6 sm:p-7 relative overflow-hidden hover:shadow-xl hover:shadow-slate-900/20 transition-shadow"
                 >
                   <div className="absolute -top-16 -right-16 w-48 h-48 bg-blue-500/20 rounded-full blur-3xl" aria-hidden />
-                  <div className="absolute -bottom-12 -left-12 w-40 h-40 bg-violet-500/15 rounded-full blur-3xl" aria-hidden />
+                  <div className="absolute -bottom-12 -left-12 w-40 h-40 bg-cyan-500/15 rounded-full blur-3xl" aria-hidden />
                   <div className="relative flex items-center gap-4">
                     <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center text-white flex-shrink-0">
                       <Map size={20} />
@@ -894,7 +894,7 @@ function ReportRow({ report, onClick }: { report: any; onClick: () => void }) {
       onClick={onClick}
       className="w-full text-left bg-white rounded-2xl border border-slate-200 hover:border-slate-300 p-4 sm:p-5 transition-colors group flex items-center gap-4"
     >
-      <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white flex items-center justify-center flex-shrink-0">
+      <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-600 to-cyan-600 text-white flex items-center justify-center flex-shrink-0">
         <GraduationCap size={18} />
       </div>
       <div className="flex-1 min-w-0">
@@ -907,7 +907,7 @@ function ReportRow({ report, onClick }: { report: any; onClick: () => void }) {
         </p>
       </div>
       <div className="hidden sm:flex items-center gap-1 text-xs text-slate-500 mr-1">
-        {reach > 0  && <span className="inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-violet-500" />{reach}</span>}
+        {reach > 0  && <span className="inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-rose-500" />{reach}</span>}
         {target > 0 && <span className="inline-flex items-center gap-1 ml-1"><span className="w-1.5 h-1.5 rounded-full bg-blue-500" />{target}</span>}
         {safety > 0 && <span className="inline-flex items-center gap-1 ml-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />{safety}</span>}
       </div>

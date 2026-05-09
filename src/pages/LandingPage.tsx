@@ -57,7 +57,7 @@ export default function LandingPage() {
           </h1>
 
           <p className="text-lg md:text-xl text-slate-500 font-medium max-w-2xl mx-auto lg:mx-0 mb-10 leading-relaxed">
-            We match your academic profile, funding opportunities, and goals against verified university data — and rehearse the F-1 visa interview that decides whether you actually get there.
+            AI-powered university matching, grounded in verified program data — plus a realistic F-1 visa interview simulator for the moment that actually decides whether you get there.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center gap-5 justify-center lg:justify-start">
@@ -145,78 +145,65 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* F-1 Visa Interview — our differentiator */}
-      <section className="py-20 md:py-24 bg-gradient-to-br from-blue-50 via-slate-50 to-white relative z-20 overflow-hidden">
-        <div className="hidden md:block absolute top-1/2 left-0 -translate-y-1/2 w-[400px] h-[400px] bg-primary-200/40 rounded-full blur-[100px] pointer-events-none" />
-        <div className="hidden md:block absolute bottom-0 right-0 w-[400px] h-[400px] bg-accent-500/20 rounded-full blur-[100px] pointer-events-none" />
+      {/* F-1 Visa Interview — the differentiator. Tight copy, visual-led. */}
+      <section className="py-20 md:py-24 bg-gradient-to-br from-slate-50 via-white to-slate-50 relative z-20 overflow-hidden">
+        {/* Mobile: no decorative blurs (kept getting flagged for paint cost) */}
+        <div className="hidden md:block absolute top-1/2 left-[-10%] -translate-y-1/2 w-[420px] h-[420px] bg-primary-200/30 rounded-full blur-[120px] pointer-events-none" />
+        <div className="hidden md:block absolute bottom-[-15%] right-[-5%] w-[420px] h-[420px] bg-accent-500/15 rounded-full blur-[120px] pointer-events-none" />
 
-        <div className="max-w-6xl mx-auto px-6 relative z-10 flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
-          <div className="flex-1">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-black tracking-widest uppercase mb-6">
-              <ShieldAlert size={12} /> Unifinder exclusive
-            </div>
-            <h2 className="text-3xl md:text-5xl font-black tracking-tight text-slate-900 mb-6 leading-[1.05]">
-              Practice your F-1 visa interview <span className="text-primary-600">with a live AI consular officer.</span>
-            </h2>
-            <p className="text-lg text-slate-500 font-medium leading-relaxed mb-8 max-w-xl">
-              The university acceptance is only half the journey. Most rejections at the consulate happen in 90 seconds — for nerves, vague answers, or finance gaps the student didn't expect. Unifinder's interview simulator puts you in the chair: a live AI avatar reads your I-20 and DS-160, asks the questions a real officer would, listens to your spoken answers, and returns a written score on every dimension that matters.
-            </p>
-
-            <ul className="space-y-3 mb-10">
-              <li className="flex items-start gap-3 text-slate-700 font-semibold">
-                <CheckCircle2 className="text-emerald-500 flex-shrink-0 mt-0.5" size={20} />
-                Live video avatar that asks realistic, profile-specific questions in real time
-              </li>
-              <li className="flex items-start gap-3 text-slate-700 font-semibold">
-                <CheckCircle2 className="text-emerald-500 flex-shrink-0 mt-0.5" size={20} />
-                Reads your real I-20 and DS-160 — no redundant questions, no generic interview script
-              </li>
-              <li className="flex items-start gap-3 text-slate-700 font-semibold">
-                <CheckCircle2 className="text-emerald-500 flex-shrink-0 mt-0.5" size={20} />
-                Speak your answers out loud, just like the real consulate
-              </li>
-              <li className="flex items-start gap-3 text-slate-700 font-semibold">
-                <CheckCircle2 className="text-emerald-500 flex-shrink-0 mt-0.5" size={20} />
-                Detailed written feedback across 9 dimensions, with sample improved answers
-              </li>
-            </ul>
-
-            <Link to="/intake" className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold px-8 py-4 rounded-full transition-colors shadow-xl shadow-slate-900/20">
-              Try the simulator <ArrowRight size={18} />
-            </Link>
-            <p className="text-xs text-slate-400 mt-3 font-semibold">Practice only. Not affiliated with any government or consular service.</p>
-          </div>
-
-          {/* Visual: stylized interview frame */}
-          <div className="flex-1 w-full max-w-md">
-            <div className="bg-slate-950 text-white rounded-[40px] p-6 sm:p-7 shadow-2xl shadow-slate-950/40 relative aspect-[3/4] sm:aspect-[4/5] overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-600/30 via-slate-900 to-slate-950" />
-              <div className="absolute top-4 left-4 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-slate-900/70 text-[10px] font-bold uppercase tracking-widest border border-white/10">
-                <ShieldAlert size={11} className="text-amber-300" /> Simulation
+        <div className="max-w-6xl mx-auto px-6 relative z-10 flex flex-col lg:flex-row items-center gap-10 lg:gap-16">
+          {/* Visual first on lg, second on mobile */}
+          <div className="flex-1 w-full max-w-md order-2 lg:order-1">
+            <div className="bg-slate-950 text-white rounded-[36px] p-6 shadow-2xl shadow-slate-950/30 relative aspect-[4/5] overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary-700/40 via-slate-900 to-slate-950" />
+              {/* Live indicator chip */}
+              <div className="absolute top-4 left-4 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-rose-500/20 border border-rose-400/40 text-rose-300 text-[10px] font-bold uppercase tracking-widest">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" /> Live
               </div>
+              <div className="absolute top-4 right-4 inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-900/70 text-[10px] font-bold uppercase tracking-widest border border-white/10 text-white/70">
+                <ShieldAlert size={10} className="text-amber-300" /> Simulation
+              </div>
+              {/* Avatar with breathing animation — pure CSS transform, GPU-cheap */}
               <div className="relative h-full flex flex-col items-center justify-center text-center px-4">
-                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-violet-500 mb-6 ring-4 ring-white/10 shadow-2xl flex items-center justify-center text-3xl font-black">A</div>
-                <p className="text-xs font-bold tracking-widest text-blue-300 uppercase mb-2">Anna · Consular Officer</p>
-                <p className="text-base font-semibold leading-snug text-white/90 mb-6">"Tell me — why have you chosen this particular program over the ones offered in your home country?"</p>
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold">
-                  <Mic size={12} className="animate-pulse" /> Listening
+                <div className="relative mb-5">
+                  <div className="absolute inset-0 rounded-full bg-primary-500/30 animate-ping" style={{ animationDuration: "2.5s" }} />
+                  <div className="relative w-28 h-28 rounded-full bg-gradient-to-br from-primary-400 via-primary-500 to-accent-500 ring-4 ring-white/10 shadow-2xl flex items-center justify-center text-4xl font-black animate-pulse-slow">
+                    A
+                  </div>
+                </div>
+                <p className="text-[10px] font-bold tracking-widest text-primary-300 uppercase mb-3">Anna · Consular Officer</p>
+                <p className="text-[15px] font-semibold leading-snug text-white/95 mb-5 max-w-[16rem]">
+                  "Why this program over the ones in your home country?"
+                </p>
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 text-[11px] font-bold">
+                  <Mic size={11} className="animate-pulse" /> Your turn
                 </div>
               </div>
             </div>
-            <div className="grid grid-cols-3 gap-2 mt-3">
-              <div className="bg-white border border-slate-200 rounded-2xl p-3 text-center">
-                <Video size={16} className="text-blue-600 mx-auto mb-1" />
-                <p className="text-[10px] font-bold text-slate-600">Live avatar</p>
-              </div>
-              <div className="bg-white border border-slate-200 rounded-2xl p-3 text-center">
-                <Mic size={16} className="text-emerald-600 mx-auto mb-1" />
-                <p className="text-[10px] font-bold text-slate-600">Voice answers</p>
-              </div>
-              <div className="bg-white border border-slate-200 rounded-2xl p-3 text-center">
-                <Sparkles size={16} className="text-amber-500 mx-auto mb-1" />
-                <p className="text-[10px] font-bold text-slate-600">Scored feedback</p>
-              </div>
+          </div>
+
+          {/* Copy second on lg, first on mobile */}
+          <div className="flex-1 order-1 lg:order-2">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-black tracking-widest uppercase mb-5">
+              <ShieldAlert size={12} /> Unifinder exclusive
             </div>
+            <h2 className="text-3xl md:text-5xl font-black tracking-tight text-slate-900 mb-5 leading-[1.05]">
+              Rehearse the interview <span className="text-primary-600">that decides everything.</span>
+            </h2>
+            <p className="text-lg text-slate-500 font-medium leading-relaxed mb-8 max-w-lg">
+              The acceptance is only half the journey. A live AI consular officer reads your I-20, asks the questions a real officer would, and scores how you answer.
+            </p>
+
+            <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-8 max-w-lg">
+              <FeaturePill icon={<Video size={18} />}    label="Live avatar"    color="text-primary-600" />
+              <FeaturePill icon={<Mic size={18} />}      label="Voice answers"  color="text-emerald-600" />
+              <FeaturePill icon={<Sparkles size={18} />} label="Scored feedback" color="text-amber-500" />
+            </div>
+
+            <Link to="/intake" className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold px-7 py-3.5 rounded-full transition-colors shadow-xl shadow-slate-900/20">
+              Try the simulator <ArrowRight size={18} />
+            </Link>
+            <p className="text-[11px] text-slate-400 mt-3 font-semibold">Practice only. Not affiliated with any government or consular service.</p>
           </div>
         </div>
       </section>
@@ -291,6 +278,15 @@ function FeatureCard({ icon, title, desc }: { icon: React.ReactNode, title: stri
       </div>
       <h3 className="text-xl font-black text-slate-900 mb-3">{title}</h3>
       <p className="text-slate-500 font-medium leading-relaxed">{desc}</p>
+    </div>
+  );
+}
+
+function FeaturePill({ icon, label, color }: { icon: React.ReactNode; label: string; color: string }) {
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl px-2 py-3 text-center hover:shadow-md transition-shadow">
+      <div className={`flex items-center justify-center mb-1 ${color}`}>{icon}</div>
+      <p className="text-[10px] sm:text-[11px] font-bold text-slate-700">{label}</p>
     </div>
   );
 }

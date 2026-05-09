@@ -47,7 +47,7 @@ export default function InterviewReportView({ report, onRetry, onBack }: Props) 
       {/* Hero — overall + meta scores */}
       <section className="bg-slate-950 text-white rounded-3xl p-7 sm:p-8 relative overflow-hidden">
         <div className="absolute -top-24 -right-24 w-72 h-72 bg-blue-500/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-violet-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
 
         <div className="relative flex items-start gap-6 flex-wrap">
           {/* Score ring */}

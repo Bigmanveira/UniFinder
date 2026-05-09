@@ -44,7 +44,7 @@ const STAGES: { until: number; label: string }[] = [
 function progressFor(s: number) { return Math.min(95, 100 - 100 * Math.exp(-s / 30)); }
 
 const BUCKETS = {
-  reach:  { title: "Reach",  desc: "Selective programs where you're competitive but not guaranteed.", dot: "bg-violet-500" },
+  reach:  { title: "Reach",  desc: "Selective programs where you're competitive but not guaranteed.", dot: "bg-rose-500" },
   target: { title: "Target", desc: "Realistic matches — your profile aligns with their typical admit.", dot: "bg-blue-500" },
   safety: { title: "Safety", desc: "High admission probability. Solid backups for your shortlist.",     dot: "bg-emerald-500" },
 } as const;
@@ -146,7 +146,7 @@ export default function LockedPreviewPage() {
     <div className="min-h-screen text-slate-900 antialiased pb-40 relative overflow-hidden bg-gradient-to-b from-white via-blue-50/30 to-white">
       {/* Decorative soft glow blobs in the hero */}
       <div className="pointer-events-none absolute top-[-80px] right-[-120px] w-[420px] h-[420px] bg-blue-200/40 rounded-full blur-[120px]" aria-hidden />
-      <div className="pointer-events-none absolute top-[180px] left-[-100px] w-[360px] h-[360px] bg-violet-200/30 rounded-full blur-[120px]" aria-hidden />
+      <div className="pointer-events-none absolute top-[180px] left-[-100px] w-[360px] h-[360px] bg-cyan-200/30 rounded-full blur-[120px]" aria-hidden />
 
       {/* Header — logo + avatar */}
       <header className="relative px-5 py-5 max-w-6xl mx-auto flex items-center justify-between">
@@ -157,7 +157,7 @@ export default function LockedPreviewPage() {
           <span className="text-lg font-bold tracking-tight">Unifinder</span>
         </Link>
         {user ? (
-          <Link to="/app" className="w-10 h-10 rounded-full ring-2 ring-white shadow-md bg-gradient-to-br from-blue-500 to-indigo-700 text-white flex items-center justify-center font-bold">
+          <Link to="/app" className="w-10 h-10 rounded-full ring-2 ring-white shadow-md bg-gradient-to-br from-blue-500 to-cyan-600 text-white flex items-center justify-center font-bold">
             {initial}
           </Link>
         ) : (

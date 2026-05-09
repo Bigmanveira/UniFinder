@@ -185,7 +185,7 @@ export default function RoadmapPage() {
   return (
     <div className="min-h-screen text-slate-900 antialiased pb-32 relative overflow-hidden bg-gradient-to-b from-white via-blue-50/30 to-white">
       <div className="pointer-events-none absolute top-[-100px] right-[-100px] w-[440px] h-[440px] bg-blue-200/40 rounded-full blur-[120px]" aria-hidden />
-      <div className="pointer-events-none absolute top-[120px] left-[-120px] w-[380px] h-[380px] bg-violet-200/30 rounded-full blur-[120px]" aria-hidden />
+      <div className="pointer-events-none absolute top-[120px] left-[-120px] w-[380px] h-[380px] bg-cyan-200/30 rounded-full blur-[120px]" aria-hidden />
 
       {/* Sticky header */}
       <header className="border-b border-slate-200 sticky top-0 z-40 bg-white/85 backdrop-blur supports-[backdrop-filter]:bg-white/70">
@@ -199,7 +199,7 @@ export default function RoadmapPage() {
               Stage {stageIndex + 1} of {totalStages} · {Math.round(stageCompletion[stageIndex] * 100)}% complete
             </p>
           </div>
-          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-indigo-700 text-white flex items-center justify-center">
+          <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-500 to-cyan-600 text-white flex items-center justify-center">
             <GraduationCap size={15} />
           </div>
         </div>
@@ -221,9 +221,9 @@ export default function RoadmapPage() {
 
         {/* Stage hero — gradient feature card with stage progress */}
         <FadeIn delay={0.05} className="mt-8">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white p-7 sm:p-9">
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-950 via-blue-950 to-slate-900 text-white p-7 sm:p-9">
             <div className="absolute -top-24 -right-24 w-72 h-72 bg-blue-500/15 rounded-full blur-3xl pointer-events-none" aria-hidden />
-            <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-violet-500/10 rounded-full blur-3xl pointer-events-none" aria-hidden />
+            <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" aria-hidden />
 
             <div className="relative">
               <div className="flex items-center gap-2 mb-3">

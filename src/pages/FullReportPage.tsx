@@ -72,10 +72,10 @@ const BUCKETS = {
   reach: {
     title: "Reach",
     desc:  "Selective programs where you're competitive but not guaranteed.",
-    dot:   "bg-violet-500",
-    accent: "text-violet-700",
-    chip:   "bg-violet-50 text-violet-700 border-violet-200",
-    rule:   "from-violet-300 to-transparent",
+    dot:   "bg-rose-500",
+    accent: "text-rose-700",
+    chip:   "bg-rose-50 text-rose-700 border-rose-200",
+    rule:   "from-rose-300 to-transparent",
   },
   target: {
     title: "Target",
@@ -111,9 +111,9 @@ function AiHero({ ai }: { ai: AiReportExplanation }) {
       initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
       className="relative overflow-hidden rounded-[28px] bg-slate-950 text-white"
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 via-slate-900 to-slate-950" />
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-900 via-slate-900 to-slate-950" />
       <div className="absolute -top-32 -right-32 w-80 h-80 bg-blue-500/15 rounded-full blur-3xl" />
-      <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-violet-500/10 rounded-full blur-3xl" />
+      <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-cyan-500/10 rounded-full blur-3xl" />
 
       <div className="relative p-7 sm:p-8">
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-[11px] font-semibold mb-4">
@@ -659,7 +659,7 @@ export default function FullReportPage() {
     <div className="min-h-screen text-slate-900 antialiased pb-24 relative overflow-hidden bg-gradient-to-b from-white via-blue-50/30 to-white">
       {/* Decorative soft glow blobs */}
       <div className="pointer-events-none absolute top-[-100px] right-[-100px] w-[440px] h-[440px] bg-blue-200/40 rounded-full blur-[120px]" aria-hidden />
-      <div className="pointer-events-none absolute top-[120px] left-[-120px] w-[380px] h-[380px] bg-violet-200/30 rounded-full blur-[120px]" aria-hidden />
+      <div className="pointer-events-none absolute top-[120px] left-[-120px] w-[380px] h-[380px] bg-cyan-200/30 rounded-full blur-[120px]" aria-hidden />
 
       {/* Sticky header — back, title, run-new-match, avatar */}
       <header className="border-b border-slate-200 sticky top-0 z-40 bg-white/85 backdrop-blur supports-[backdrop-filter]:bg-white/70">
@@ -687,7 +687,7 @@ export default function FullReportPage() {
           >
             <RefreshCw size={14} />
           </button>
-          <div className="w-9 h-9 rounded-full ring-2 ring-white shadow-sm bg-gradient-to-br from-blue-500 to-indigo-700 text-white flex items-center justify-center font-bold text-sm">
+          <div className="w-9 h-9 rounded-full ring-2 ring-white shadow-sm bg-gradient-to-br from-blue-500 to-cyan-600 text-white flex items-center justify-center font-bold text-sm">
             {initial}
           </div>
         </div>
@@ -726,7 +726,7 @@ export default function FullReportPage() {
             className="group w-full text-left bg-gradient-to-br from-slate-900 via-slate-900 to-blue-900 text-white rounded-3xl p-6 sm:p-7 relative overflow-hidden hover:shadow-xl hover:shadow-slate-900/20 transition-shadow"
           >
             <div className="absolute -top-16 -right-16 w-48 h-48 bg-blue-500/20 rounded-full blur-3xl" aria-hidden />
-            <div className="absolute -bottom-12 -left-12 w-40 h-40 bg-violet-500/15 rounded-full blur-3xl" aria-hidden />
+            <div className="absolute -bottom-12 -left-12 w-40 h-40 bg-cyan-500/15 rounded-full blur-3xl" aria-hidden />
             <div className="relative flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center text-white flex-shrink-0">
                 <Sparkles size={20} className="text-amber-300" />

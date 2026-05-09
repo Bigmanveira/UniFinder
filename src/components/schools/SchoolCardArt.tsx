@@ -12,17 +12,20 @@ import { logoUrl, faviconUrl } from "../../lib/schools/schoolLogo";
 // initial in a large letter mark.
 // ─────────────────────────────────────────────────────────────────────────────
 
+// Professional palette — cool, corporate-leaning. Picked deliberately to feel
+// like institutional brand colors rather than generic AI/SaaS. Excludes
+// purple / violet / fuchsia per design feedback.
 const GRADIENTS: { from: string; to: string }[] = [
-  { from: "from-indigo-600",   to: "to-violet-700"   },
-  { from: "from-blue-600",     to: "to-indigo-800"   },
-  { from: "from-emerald-600",  to: "to-teal-700"     },
-  { from: "from-rose-600",     to: "to-pink-700"     },
-  { from: "from-amber-500",    to: "to-orange-700"   },
-  { from: "from-cyan-600",     to: "to-blue-700"     },
-  { from: "from-purple-600",   to: "to-fuchsia-700"  },
-  { from: "from-slate-700",    to: "to-slate-900"    },
-  { from: "from-red-600",      to: "to-rose-800"     },
-  { from: "from-teal-600",     to: "to-emerald-800"  },
+  { from: "from-blue-700",     to: "to-blue-900"     },
+  { from: "from-cyan-600",     to: "to-blue-800"     },
+  { from: "from-slate-700",    to: "to-blue-900"     },
+  { from: "from-emerald-700",  to: "to-teal-900"     },
+  { from: "from-teal-600",     to: "to-cyan-800"     },
+  { from: "from-slate-800",    to: "to-slate-950"    },
+  { from: "from-amber-600",    to: "to-orange-800"   },
+  { from: "from-rose-700",     to: "to-rose-900"     },
+  { from: "from-blue-600",     to: "to-cyan-700"     },
+  { from: "from-slate-600",    to: "to-blue-800"     },
 ];
 
 function hashString(s: string): number {
