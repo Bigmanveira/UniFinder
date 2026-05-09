@@ -175,8 +175,16 @@ export default function LandingPage() {
               <div className="relative h-full flex flex-col items-center justify-center text-center px-4">
                 <div className="relative mb-5">
                   <div className="absolute inset-0 rounded-full bg-primary-500/30 animate-ping" style={{ animationDuration: "2.5s" }} />
-                  <div className="relative w-28 h-28 rounded-full bg-gradient-to-br from-primary-400 via-primary-500 to-accent-500 ring-4 ring-white/10 shadow-2xl flex items-center justify-center text-4xl font-black animate-pulse-slow">
-                    A
+                  <div className="relative w-28 h-28 rounded-full bg-gradient-to-br from-primary-400 via-primary-500 to-accent-500 ring-4 ring-white/10 shadow-2xl overflow-hidden">
+                    <img
+                      src="/anna.webp"
+                      alt="Anna, your AI consular officer"
+                      loading="lazy"
+                      decoding="async"
+                      width={112}
+                      height={112}
+                      className="w-full h-full object-cover object-top"
+                    />
                   </div>
                 </div>
                 <p className="text-[10px] font-bold tracking-widest text-primary-300 uppercase mb-3">Anna · Consular Officer</p>

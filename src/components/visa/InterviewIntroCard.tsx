@@ -41,8 +41,15 @@ export default function InterviewIntroCard({
             {/* Anna avatar — same breathing animation as dashboard CTA */}
             <div className="relative flex-shrink-0">
               <div className="absolute inset-0 rounded-full bg-primary-500/30 animate-ping" style={{ animationDuration: "2.5s" }} aria-hidden />
-              <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-primary-400 via-primary-500 to-accent-500 ring-2 ring-white/20 shadow-2xl flex items-center justify-center text-3xl sm:text-4xl font-black animate-pulse-slow">
-                A
+              <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-primary-400 via-primary-500 to-accent-500 ring-2 ring-white/20 shadow-2xl overflow-hidden">
+                <img
+                  src="/anna.webp"
+                  alt="Anna, your AI consular officer"
+                  decoding="async"
+                  width={96}
+                  height={96}
+                  className="w-full h-full object-cover object-top"
+                />
               </div>
             </div>
             <div className="flex-1 min-w-0 text-center sm:text-left">

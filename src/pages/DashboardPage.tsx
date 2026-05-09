@@ -235,7 +235,9 @@ export default function DashboardPage() {
                   <ShieldAlert size={10} className="text-amber-300" /> Simulation
                 </div>
 
-                {/* Avatar — large, centered (mobile: top-half) / left (desktop) */}
+                {/* Avatar — Anna's actual headshot (87 KB WebP served from /public).
+                    Same image as the live HeyGen avatar so the brand is
+                    consistent between this preview and the real interview. */}
                 <div className="absolute inset-0 flex items-center justify-center sm:justify-start sm:pl-[10%]" style={{ paddingBottom: "min(35%, 7rem)" }}>
                   <div className="relative">
                     {/* Outer breathing ring */}
@@ -243,8 +245,15 @@ export default function DashboardPage() {
                     {/* Mid ring */}
                     <div className="absolute -inset-3 rounded-full ring-1 ring-white/10" aria-hidden />
                     {/* Avatar disk */}
-                    <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-gradient-to-br from-primary-300 via-primary-500 to-accent-500 ring-2 ring-white/20 shadow-[0_20px_50px_rgba(59,130,246,0.45)] flex items-center justify-center text-4xl sm:text-5xl font-black animate-pulse-slow">
-                      A
+                    <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-gradient-to-br from-primary-300 via-primary-500 to-accent-500 ring-2 ring-white/20 shadow-[0_20px_50px_rgba(59,130,246,0.45)] overflow-hidden">
+                      <img
+                        src="/anna.webp"
+                        alt="Anna, your AI consular officer"
+                        decoding="async"
+                        width={112}
+                        height={112}
+                        className="w-full h-full object-cover object-top"
+                      />
                     </div>
                   </div>
                 </div>
