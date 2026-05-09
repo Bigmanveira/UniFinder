@@ -93,7 +93,7 @@ export default function DashboardPage() {
           <DesktopNavItem icon={<Home size={18} />} label="Home" active={activeTab === "matches"} onClick={() => setActiveTab("matches")} badge={matchReports.length} />
           <DesktopNavItem icon={<Bookmark size={18} />} label="Saved Schools" active={activeTab === "saved"} onClick={() => setActiveTab("saved")} badge={savedSchools.length} />
           <DesktopNavItem icon={<Map size={18} />} label="Roadmap" active={false} onClick={() => navigate("/app/roadmap")} />
-          <DesktopNavItem icon={<ShieldAlert size={18} />} label="Visa Practice" active={false} onClick={() => navigate("/app/visa-interview")} />
+          <DesktopNavItem icon={<ShieldAlert size={18} />} label="Live interview practice" active={false} onClick={() => navigate("/app/visa-interview")} />
           <DesktopNavItem icon={<Wallet size={18} />} label="Credits & Billing" active={activeTab === "billing"} onClick={() => setActiveTab("billing")} />
           <DesktopNavItem icon={<User size={18} />} label="Profile" active={activeTab === "profile"} onClick={() => setActiveTab("profile")} />
         </nav>
@@ -208,56 +208,77 @@ export default function DashboardPage() {
               </FadeIn>
             )}
 
-            {/* Visa Interview Practice CTA — premium card matching the
-                landing page's F-1 section: dark hero, live avatar mock,
-                pulsing "Live" indicator. Hardware-accelerated CSS only,
-                so no mobile lag. */}
+            {/* F-1 visa interview tile — cinematic, now-playing feel.
+                Avatar dominates the visual space, title overlays at the
+                bottom against a fade-up gradient. Pure CSS animation
+                (transform + opacity), no extra assets, no mobile lag. */}
             <FadeIn>
               <button
                 onClick={() => navigate("/app/visa-interview")}
-                className="group w-full text-left bg-slate-950 text-white rounded-3xl p-6 sm:p-7 relative overflow-hidden shadow-xl shadow-slate-950/30 hover:shadow-2xl hover:shadow-slate-950/40 transition-shadow"
+                className="group block w-full text-left rounded-[28px] overflow-hidden relative aspect-[4/3] sm:aspect-[2.6/1] shadow-2xl shadow-slate-950/30 hover:shadow-[0_24px_60px_rgba(15,23,42,0.35)] transition-shadow active:scale-[0.995]"
               >
-                {/* Background gradient + soft glows */}
-                <div className="absolute inset-0 bg-gradient-to-br from-blue-900 via-slate-900 to-slate-950" aria-hidden />
-                <div className="absolute -top-16 -right-16 w-56 h-56 bg-blue-500/20 rounded-full blur-3xl pointer-events-none" aria-hidden />
-                <div className="absolute -bottom-12 -left-12 w-44 h-44 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none" aria-hidden />
+                {/* Layered background — gradient + soft color blooms.
+                    The blooms are absolute-positioned blurred divs (CSS,
+                    not SVG filters), which mobile GPUs handle efficiently. */}
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-950 via-slate-950 to-slate-900" aria-hidden />
+                <div className="absolute top-1/2 -translate-y-1/2 -right-[15%] w-[55%] aspect-square bg-blue-500/30 rounded-full blur-[80px] pointer-events-none" aria-hidden />
+                <div className="absolute -bottom-[20%] -left-[10%] w-[55%] aspect-square bg-cyan-500/25 rounded-full blur-[80px] pointer-events-none" aria-hidden />
 
-                {/* Live + simulation chips */}
-                <div className="absolute top-4 left-4 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/20 border border-rose-400/40 text-rose-300 text-[10px] font-bold uppercase tracking-widest z-10">
+                {/* Subtle radial spotlight behind the avatar */}
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[60%] sm:-translate-y-1/2 sm:left-[28%] w-72 h-72 bg-[radial-gradient(circle,rgba(255,255,255,0.18),transparent_70%)] pointer-events-none" aria-hidden />
+
+                {/* Top status chips */}
+                <div className="absolute top-4 left-4 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/20 border border-rose-400/40 text-rose-300 text-[10px] font-bold uppercase tracking-widest z-10 backdrop-blur-sm">
                   <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" /> Live
                 </div>
-                <div className="absolute top-4 right-4 inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-900/70 border border-white/10 text-white/70 text-[10px] font-bold uppercase tracking-widest z-10">
+                <div className="absolute top-4 right-4 inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-900/60 border border-white/10 text-white/70 text-[10px] font-bold uppercase tracking-widest z-10 backdrop-blur-sm">
                   <ShieldAlert size={10} className="text-amber-300" /> Simulation
                 </div>
 
-                <div className="relative flex items-center gap-5 sm:gap-6 pt-6 sm:pt-4">
-                  {/* Animated avatar with breathing ring */}
-                  <div className="relative flex-shrink-0">
-                    <div className="absolute inset-0 rounded-full bg-primary-500/30 animate-ping" style={{ animationDuration: "2.5s" }} aria-hidden />
-                    <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-primary-400 via-primary-500 to-accent-500 ring-2 ring-white/20 shadow-2xl flex items-center justify-center text-2xl sm:text-3xl font-black animate-pulse-slow">
+                {/* Avatar — large, centered (mobile: top-half) / left (desktop) */}
+                <div className="absolute inset-0 flex items-center justify-center sm:justify-start sm:pl-[10%]" style={{ paddingBottom: "min(35%, 7rem)" }}>
+                  <div className="relative">
+                    {/* Outer breathing ring */}
+                    <div className="absolute inset-0 rounded-full bg-primary-400/25 animate-ping" style={{ animationDuration: "2.5s" }} aria-hidden />
+                    {/* Mid ring */}
+                    <div className="absolute -inset-3 rounded-full ring-1 ring-white/10" aria-hidden />
+                    {/* Avatar disk */}
+                    <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full bg-gradient-to-br from-primary-300 via-primary-500 to-accent-500 ring-2 ring-white/20 shadow-[0_20px_50px_rgba(59,130,246,0.45)] flex items-center justify-center text-4xl sm:text-5xl font-black animate-pulse-slow">
                       A
                     </div>
                   </div>
+                </div>
 
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] font-bold tracking-widest text-primary-300 uppercase mb-1">F-1 visa interview practice</p>
-                    <h3 className="text-lg sm:text-xl font-bold tracking-tight leading-snug text-white">
-                      Rehearse with a live AI consular officer
-                    </h3>
-                    <p className="text-sm text-white/70 mt-1.5 leading-relaxed line-clamp-2">
-                      Anna reads your I-20 and DS-160, asks realistic questions, and scores your answers across nine dimensions.
-                    </p>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-[11px] text-white/60 font-semibold">
-                      <span>1 credit</span>
-                      <span>·</span>
-                      <span>~5 minutes</span>
-                      <span>·</span>
-                      <span>Voice-only</span>
+                {/* Decorative voice-wave hint behind the avatar (3 thin bars) */}
+                <div className="hidden sm:flex absolute right-[12%] top-1/2 -translate-y-1/2 items-end gap-1.5 opacity-50" aria-hidden>
+                  <span className="w-1 bg-primary-300 rounded-full animate-pulse-slow" style={{ height: "20%" }} />
+                  <span className="w-1 bg-primary-300 rounded-full animate-pulse-slow" style={{ height: "55%", animationDelay: "0.2s" }} />
+                  <span className="w-1 bg-primary-300 rounded-full animate-pulse-slow" style={{ height: "35%", animationDelay: "0.4s" }} />
+                  <span className="w-1 bg-primary-300 rounded-full animate-pulse-slow" style={{ height: "70%", animationDelay: "0.1s" }} />
+                  <span className="w-1 bg-primary-300 rounded-full animate-pulse-slow" style={{ height: "30%", animationDelay: "0.3s" }} />
+                  <span className="w-1 bg-primary-300 rounded-full animate-pulse-slow" style={{ height: "50%", animationDelay: "0.5s" }} />
+                </div>
+
+                {/* Bottom overlay — kicker + title + CTA */}
+                <div className="absolute inset-x-0 bottom-0 p-5 sm:p-6 bg-gradient-to-t from-slate-950 via-slate-950/85 to-transparent">
+                  <div className="flex items-end justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[10px] font-bold tracking-widest text-primary-300 uppercase mb-1.5">F-1 visa interview practice</p>
+                      <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-white leading-tight mb-1.5">
+                        Rehearse with Anna<span className="hidden sm:inline">, your AI consular officer</span>
+                      </h3>
+                      <div className="flex items-center gap-2 text-[11px] sm:text-xs text-white/65 font-semibold">
+                        <span>1 credit</span>
+                        <span className="opacity-50">·</span>
+                        <span>~5 min</span>
+                        <span className="opacity-50">·</span>
+                        <span>Voice-only</span>
+                      </div>
                     </div>
-                  </div>
-
-                  <div className="hidden sm:flex w-11 h-11 rounded-full bg-white/10 group-hover:bg-white/20 ring-1 ring-white/15 transition-colors items-center justify-center text-white flex-shrink-0">
-                    <ArrowRight size={16} />
+                    {/* Hero "play" CTA */}
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white text-slate-900 flex items-center justify-center shadow-lg group-hover:scale-110 group-hover:shadow-xl transition-all flex-shrink-0">
+                      <ArrowRight size={20} strokeWidth={2.5} />
+                    </div>
                   </div>
                 </div>
               </button>
@@ -479,7 +500,7 @@ export default function DashboardPage() {
                 <DesktopNavItem icon={<Home size={18} />}        label="Home"               active={activeTab === "matches"} onClick={() => { setActiveTab("matches"); setMobileNavOpen(false); }} badge={matchReports.length} />
                 <DesktopNavItem icon={<Bookmark size={18} />}    label="Saved Schools"      active={activeTab === "saved"}   onClick={() => { setActiveTab("saved");   setMobileNavOpen(false); }} badge={savedSchools.length} />
                 <DesktopNavItem icon={<Map size={18} />}         label="Roadmap"            active={false} onClick={() => { navigate("/app/roadmap");        setMobileNavOpen(false); }} />
-                <DesktopNavItem icon={<ShieldAlert size={18} />} label="Visa Practice"      active={false} onClick={() => { navigate("/app/visa-interview"); setMobileNavOpen(false); }} />
+                <DesktopNavItem icon={<ShieldAlert size={18} />} label="Live interview practice" active={false} onClick={() => { navigate("/app/visa-interview"); setMobileNavOpen(false); }} />
                 <DesktopNavItem icon={<Wallet size={18} />}      label="Credits & Billing"  active={activeTab === "billing"} onClick={() => { setActiveTab("billing"); setMobileNavOpen(false); }} />
                 <DesktopNavItem icon={<User size={18} />}        label="Profile"            active={activeTab === "profile"} onClick={() => { setActiveTab("profile"); setMobileNavOpen(false); }} />
               </nav>
