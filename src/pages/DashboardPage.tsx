@@ -208,24 +208,55 @@ export default function DashboardPage() {
               </FadeIn>
             )}
 
-            {/* Visa Interview Practice CTA */}
+            {/* Visa Interview Practice CTA — premium card matching the
+                landing page's F-1 section: dark hero, live avatar mock,
+                pulsing "Live" indicator. Hardware-accelerated CSS only,
+                so no mobile lag. */}
             <FadeIn>
               <button
                 onClick={() => navigate("/app/visa-interview")}
-                className="group w-full text-left bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 relative overflow-hidden hover:shadow-lg hover:border-slate-300 transition-all"
+                className="group w-full text-left bg-slate-950 text-white rounded-3xl p-6 sm:p-7 relative overflow-hidden shadow-xl shadow-slate-950/30 hover:shadow-2xl hover:shadow-slate-950/40 transition-shadow"
               >
-                <div className="relative flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-200 text-amber-700 flex items-center justify-center flex-shrink-0">
-                    <ShieldAlert size={20} />
+                {/* Background gradient + soft glows */}
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-900 via-slate-900 to-slate-950" aria-hidden />
+                <div className="absolute -top-16 -right-16 w-56 h-56 bg-blue-500/20 rounded-full blur-3xl pointer-events-none" aria-hidden />
+                <div className="absolute -bottom-12 -left-12 w-44 h-44 bg-cyan-500/15 rounded-full blur-3xl pointer-events-none" aria-hidden />
+
+                {/* Live + simulation chips */}
+                <div className="absolute top-4 left-4 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/20 border border-rose-400/40 text-rose-300 text-[10px] font-bold uppercase tracking-widest z-10">
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-400 animate-pulse" /> Live
+                </div>
+                <div className="absolute top-4 right-4 inline-flex items-center gap-1 px-2 py-1 rounded-full bg-slate-900/70 border border-white/10 text-white/70 text-[10px] font-bold uppercase tracking-widest z-10">
+                  <ShieldAlert size={10} className="text-amber-300" /> Simulation
+                </div>
+
+                <div className="relative flex items-center gap-5 sm:gap-6 pt-6 sm:pt-4">
+                  {/* Animated avatar with breathing ring */}
+                  <div className="relative flex-shrink-0">
+                    <div className="absolute inset-0 rounded-full bg-primary-500/30 animate-ping" style={{ animationDuration: "2.5s" }} aria-hidden />
+                    <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-gradient-to-br from-primary-400 via-primary-500 to-accent-500 ring-2 ring-white/20 shadow-2xl flex items-center justify-center text-2xl sm:text-3xl font-black animate-pulse-slow">
+                      A
+                    </div>
                   </div>
+
                   <div className="flex-1 min-w-0">
-                    <p className="text-[11px] font-semibold tracking-wide text-blue-600 mb-1">NEW · PRACTICE ONLY</p>
-                    <h3 className="text-xl sm:text-2xl font-bold tracking-tight leading-tight text-slate-900">F-1 visa interview practice</h3>
-                    <p className="text-sm text-slate-600 mt-1 leading-relaxed">
-                      A coaching simulator that asks realistic questions, scores your answers, and shows what to improve. <span className="text-slate-400">1 credit · ~10 minutes</span>
+                    <p className="text-[10px] font-bold tracking-widest text-primary-300 uppercase mb-1">F-1 visa interview practice</p>
+                    <h3 className="text-lg sm:text-xl font-bold tracking-tight leading-snug text-white">
+                      Rehearse with a live AI consular officer
+                    </h3>
+                    <p className="text-sm text-white/70 mt-1.5 leading-relaxed line-clamp-2">
+                      Anna reads your I-20 and DS-160, asks realistic questions, and scores your answers across nine dimensions.
                     </p>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-[11px] text-white/60 font-semibold">
+                      <span>1 credit</span>
+                      <span>·</span>
+                      <span>~5 minutes</span>
+                      <span>·</span>
+                      <span>Voice-only</span>
+                    </div>
                   </div>
-                  <div className="hidden sm:flex w-10 h-10 rounded-full bg-slate-100 group-hover:bg-slate-200 transition-colors items-center justify-center text-slate-600 flex-shrink-0">
+
+                  <div className="hidden sm:flex w-11 h-11 rounded-full bg-white/10 group-hover:bg-white/20 ring-1 ring-white/15 transition-colors items-center justify-center text-white flex-shrink-0">
                     <ArrowRight size={16} />
                   </div>
                 </div>

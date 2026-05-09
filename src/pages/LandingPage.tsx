@@ -200,7 +200,7 @@ export default function LandingPage() {
               <FeaturePill icon={<Sparkles size={18} />} label="Scored feedback" color="text-amber-500" />
             </div>
 
-            <Link to="/intake" className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold px-7 py-3.5 rounded-full transition-colors shadow-xl shadow-slate-900/20">
+            <Link to="/app/visa-interview" className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold px-7 py-3.5 rounded-full transition-colors shadow-xl shadow-slate-900/20">
               Try the simulator <ArrowRight size={18} />
             </Link>
             <p className="text-[11px] text-slate-400 mt-3 font-semibold">Practice only. Not affiliated with any government or consular service.</p>
