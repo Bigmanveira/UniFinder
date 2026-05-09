@@ -1,96 +1,88 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, GraduationCap, CheckCircle2, Sparkles, BrainCircuit, Target, ShieldCheck } from "lucide-react";
-import { motion } from "framer-motion";
+
+// Performance notes for future-me:
+//   - We deliberately do NOT use framer-motion here — first-paint entry
+//     fades aren't worth the ~150 KB JS overhead on mobile. A simple
+//     CSS keyframe (defined in index.css) handles the same effect.
+//   - The big blurred decoration circles are gated on `md:block` so they
+//     never render on phones. CSS blur of large surfaces is one of the
+//     most expensive paint operations on mobile GPUs.
+//   - backdrop-blur is expensive too; we use solid colors with opacity
+//     fallbacks and only switch to backdrop-blur on `md+` breakpoints.
 
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans selection:bg-primary-500 selection:text-white relative overflow-hidden">
-      
-      {/* Abstract Background Elements */}
-      <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-primary-200/50 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute top-[40%] left-[-10%] w-[500px] h-[500px] bg-accent-500/20 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute -bottom-32 right-1/4 w-[800px] h-[400px] bg-primary-600/10 rounded-full blur-[120px] pointer-events-none" />
+
+      {/* Abstract background blobs — desktop only. Mobile would burn CPU on the blur. */}
+      <div className="hidden md:block absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-primary-200/50 rounded-full blur-[120px] pointer-events-none" />
+      <div className="hidden md:block absolute top-[40%] left-[-10%] w-[500px] h-[500px] bg-accent-500/20 rounded-full blur-[120px] pointer-events-none" />
+      <div className="hidden md:block absolute -bottom-32 right-1/4 w-[800px] h-[400px] bg-primary-600/10 rounded-full blur-[120px] pointer-events-none" />
 
       {/* Navigation */}
-      <header className="fixed top-0 left-0 right-0 p-6 z-50">
-        <div className="max-w-6xl mx-auto bg-white/80 backdrop-blur-xl border border-white/50 shadow-sm rounded-full px-6 py-4 flex items-center justify-between">
+      <header className="fixed top-0 left-0 right-0 p-4 md:p-6 z-50">
+        <div className="max-w-6xl mx-auto bg-white md:bg-white/80 md:backdrop-blur-xl border border-slate-100 md:border-white/50 shadow-sm rounded-full px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-[12px] bg-primary-600 flex items-center justify-center text-white shadow-lg shadow-primary-500/30">
-              <GraduationCap size={22} />
+            <div className="w-9 h-9 md:w-10 md:h-10 rounded-[12px] bg-primary-600 flex items-center justify-center text-white shadow-lg shadow-primary-500/30">
+              <GraduationCap size={20} />
             </div>
-            <span className="text-2xl font-black tracking-tight text-slate-900">Unifinder</span>
+            <span className="text-xl md:text-2xl font-black tracking-tight text-slate-900">Unifinder</span>
           </div>
           <nav className="hidden md:flex items-center gap-8">
             <a href="#how-it-works" className="text-sm font-bold text-slate-500 hover:text-primary-600 transition-colors">How it Works</a>
             <a href="#pricing" className="text-sm font-bold text-slate-500 hover:text-primary-600 transition-colors">Pricing</a>
             <Link to="/faq" className="text-sm font-bold text-slate-500 hover:text-primary-600 transition-colors">FAQ</Link>
           </nav>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 md:gap-4">
             <Link to="/login" className="text-sm font-bold text-slate-900 hover:text-primary-600 transition-colors">Log In</Link>
-            <Link to="/intake" className="bg-slate-900 text-white px-5 py-2.5 rounded-full text-sm font-bold hover:bg-slate-800 transition-transform active:scale-95 shadow-md">
+            <Link to="/intake" className="bg-slate-900 text-white px-4 md:px-5 py-2 md:py-2.5 rounded-full text-sm font-bold hover:bg-slate-800 transition-transform active:scale-95 shadow-md">
               Start Free
             </Link>
           </div>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="pt-40 pb-20 px-6 max-w-6xl mx-auto relative z-20 flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
-        <div className="flex-1 text-center lg:text-left">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 text-slate-600 text-xs font-bold tracking-widest uppercase mb-8 shadow-sm"
-          >
+      {/* Hero */}
+      <section className="pt-32 md:pt-40 pb-16 md:pb-20 px-6 max-w-6xl mx-auto relative z-20 flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
+        <div className="flex-1 text-center lg:text-left animate-fade-up">
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 text-slate-600 text-xs font-bold tracking-widest uppercase mb-8 shadow-sm">
             <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse"></span>
             Profile-Based Match Estimate
-          </motion.div>
-          
-          <motion.h1 
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }}
-            className="text-5xl md:text-7xl font-black text-slate-900 tracking-tight leading-[1.05] mb-6"
-          >
+          </div>
+
+          <h1 className="text-5xl md:text-7xl font-black text-slate-900 tracking-tight leading-[1.05] mb-6">
             Find your potential <br className="hidden md:block"/>
             <span className="text-transparent bg-clip-text bg-gradient-to-br from-primary-600 to-accent-500">U.S. University</span> fit.
-          </motion.h1>
-          
-          <motion.p 
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}
-            className="text-lg md:text-xl text-slate-500 font-medium max-w-2xl mx-auto lg:mx-0 mb-10 leading-relaxed"
-          >
+          </h1>
+
+          <p className="text-lg md:text-xl text-slate-500 font-medium max-w-2xl mx-auto lg:mx-0 mb-10 leading-relaxed">
             We analyze your GPA, budget, and major against our growing database of U.S. schools to give you guidance, not a guarantee.
-          </motion.p>
-          
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.3 }}
-            className="flex flex-col sm:flex-row items-center gap-5 justify-center lg:justify-start"
-          >
+          </p>
+
+          <div className="flex flex-col sm:flex-row items-center gap-5 justify-center lg:justify-start">
             <Link to="/intake" className="w-full sm:w-auto px-8 py-5 bg-primary-600 text-white rounded-full font-bold text-base hover:bg-primary-700 transition-transform active:scale-95 flex items-center justify-center gap-2 shadow-xl shadow-primary-500/25">
               Find My Matches
               <ArrowRight size={20} />
             </Link>
             <div className="flex items-center gap-3">
+              {/* Inline SVG avatar pile — zero network requests, scales perfectly. */}
               <div className="flex -space-x-3">
-                <img src="https://i.pravatar.cc/100?img=3" className="w-10 h-10 rounded-full border-2 border-white shadow-sm" alt="User" />
-                <img src="https://i.pravatar.cc/100?img=12" className="w-10 h-10 rounded-full border-2 border-white shadow-sm" alt="User" />
-                <img src="https://i.pravatar.cc/100?img=47" className="w-10 h-10 rounded-full border-2 border-white shadow-sm" alt="User" />
+                <AvatarPip color="#3b82f6" letter="A" />
+                <AvatarPip color="#a855f7" letter="J" />
+                <AvatarPip color="#10b981" letter="M" />
               </div>
               <div className="text-left">
                 <div className="flex text-amber-400 text-xs">★★★★★</div>
                 <p className="text-[10px] font-black tracking-widest text-slate-400 uppercase">Trusted by 10k+</p>
               </div>
             </div>
-          </motion.div>
+          </div>
         </div>
 
         {/* Hero Visual Mockup */}
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.95, rotateY: 10 }}
-          animate={{ opacity: 1, scale: 1, rotateY: 0 }}
-          transition={{ duration: 0.7, delay: 0.2 }}
-          className="flex-1 w-full max-w-lg relative perspective-1000"
-        >
-          {/* Main App Card Mockup */}
-          <div className="bg-white/90 backdrop-blur-2xl border border-white p-6 md:p-8 rounded-[40px] shadow-2xl shadow-slate-300/50 relative z-20">
+        <div className="flex-1 w-full max-w-lg relative animate-fade-up-slow">
+          <div className="bg-white md:bg-white/90 md:backdrop-blur-2xl border border-slate-100 md:border-white p-6 md:p-8 rounded-[40px] shadow-2xl shadow-slate-300/50 relative z-20">
             <div className="absolute -top-4 -right-4 bg-slate-900 text-white text-xs font-black tracking-widest uppercase px-4 py-2 rounded-full shadow-lg rotate-6 flex items-center gap-1">
               <Sparkles size={14} className="text-amber-400" /> 98% Match
             </div>
@@ -98,10 +90,10 @@ export default function LandingPage() {
             <div className="w-16 h-16 bg-primary-50 rounded-2xl flex items-center justify-center mb-6 border border-primary-100">
               <span className="text-3xl">🏛️</span>
             </div>
-            
+
             <h3 className="text-2xl font-black text-slate-900 mb-1">Stanford University</h3>
             <p className="text-slate-500 font-medium text-sm mb-6 pb-6 border-b border-slate-100">MS Computer Science</p>
-            
+
             <div className="space-y-4 mb-6">
               <div className="flex justify-between items-center bg-slate-50 p-3 rounded-2xl">
                 <span className="text-xs font-bold tracking-widest text-slate-400 uppercase">Tuition</span>
@@ -119,32 +111,32 @@ export default function LandingPage() {
               </p>
             </div>
           </div>
-          
-          {/* Decorative Depth Cards */}
-          <div className="absolute -bottom-8 -left-8 w-full h-full bg-white/40 backdrop-blur-md border border-white rounded-[40px] shadow-xl z-10 -rotate-3 transform scale-95 pointer-events-none"></div>
-        </motion.div>
+
+          {/* Decorative depth card — desktop only (mobile already feels mocky enough). */}
+          <div className="hidden md:block absolute -bottom-8 -left-8 w-full h-full bg-white/40 backdrop-blur-md border border-white rounded-[40px] shadow-xl z-10 -rotate-3 transform scale-95 pointer-events-none" />
+        </div>
       </section>
 
       {/* Feature Section */}
-      <section id="how-it-works" className="py-24 bg-white relative z-20">
+      <section id="how-it-works" className="py-20 md:py-24 bg-white relative z-20">
         <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center mb-16">
+          <div className="text-center mb-12 md:mb-16">
             <h2 className="text-3xl md:text-5xl font-black text-slate-900 tracking-tight mb-4">Not just AI. <br/><span className="text-primary-600">Data-driven certainty.</span></h2>
             <p className="text-lg text-slate-500 font-medium max-w-2xl mx-auto">We don't let AI hallucinate schools. Our deterministic engine maps your profile against verified IPEDS and SEVP databases first.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <FeatureCard 
+            <FeatureCard
               icon={<Target className="text-accent-500" size={28} />}
               title="Profile Mapping"
               desc="Input your GPA, budget, major, and funding needs. We treat this as the ultimate filter."
             />
-            <FeatureCard 
+            <FeatureCard
               icon={<ShieldCheck className="text-emerald-500" size={28} />}
               title="Verified Data"
               desc="Matches are pulled strictly from our growing database of U.S. accredited universities."
             />
-            <FeatureCard 
+            <FeatureCard
               icon={<BrainCircuit className="text-primary-500" size={28} />}
               title="AI Reasoning"
               desc="Our AI acts as an advisor, reading your transcript to explain exactly *why* a school is a fit."
@@ -153,11 +145,11 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Pricing / Credit Model */}
-      <section id="pricing" className="py-24 bg-slate-900 text-white relative z-20 overflow-hidden">
-        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary-600/20 rounded-full blur-[100px] pointer-events-none" />
-        
-        <div className="max-w-6xl mx-auto px-6 relative z-10 flex flex-col lg:flex-row items-center gap-16">
+      {/* Pricing — solid background, no expensive blur on mobile */}
+      <section id="pricing" className="py-20 md:py-24 bg-slate-900 text-white relative z-20 overflow-hidden">
+        <div className="hidden md:block absolute top-0 right-0 w-[500px] h-[500px] bg-primary-600/20 rounded-full blur-[100px] pointer-events-none" />
+
+        <div className="max-w-6xl mx-auto px-6 relative z-10 flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
           <div className="flex-1">
             <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-6">Pay per match.<br/>No hidden subscriptions.</h2>
             <p className="text-slate-400 text-lg mb-8 leading-relaxed">
@@ -223,6 +215,22 @@ function FeatureCard({ icon, title, desc }: { icon: React.ReactNode, title: stri
       </div>
       <h3 className="text-xl font-black text-slate-900 mb-3">{title}</h3>
       <p className="text-slate-500 font-medium leading-relaxed">{desc}</p>
+    </div>
+  );
+}
+
+/**
+ * Inline SVG avatar circle — replaces external pravatar.cc URLs, which were
+ * blocking first-paint with three uncached HTTPS round trips.
+ */
+function AvatarPip({ color, letter }: { color: string; letter: string }) {
+  return (
+    <div
+      className="w-10 h-10 rounded-full border-2 border-white shadow-sm flex items-center justify-center text-white text-sm font-black"
+      style={{ backgroundColor: color }}
+      aria-hidden
+    >
+      {letter}
     </div>
   );
 }

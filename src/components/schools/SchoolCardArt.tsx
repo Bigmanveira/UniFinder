@@ -46,9 +46,9 @@ interface Props {
   /** Used for the letter-mark fallback when no logo source resolves. */
   name:      string | null | undefined;
   /**
-   * Pixel size to request from the logo CDN. Logos render larger than this
-   * via CSS but we ask the CDN for a high-res copy so it stays crisp on
-   * retina screens. Defaults to 400.
+   * Pixel size to request from the logo CDN. Logos render at most ~150px
+   * wide via CSS, so 200px is plenty even on retina screens. The previous
+   * default of 400 was burning bytes on mobile for no visible benefit.
    */
   logoSize?: number;
   /**
@@ -62,12 +62,12 @@ interface Props {
 type Stage = "clearbit" | "favicon" | "letter";
 
 export default function SchoolCardArt({
-  unitId, schoolUrl, name, logoSize = 400, className = "",
+  unitId, schoolUrl, name, logoSize = 200, className = "",
 }: Props) {
   const seed = String(unitId ?? name ?? "default");
   const grad = useMemo(() => gradientFor(seed), [seed]);
   const clearbit = useMemo(() => logoUrl(schoolUrl, logoSize),  [schoolUrl, logoSize]);
-  const favicon  = useMemo(() => faviconUrl(schoolUrl, 256),    [schoolUrl]);
+  const favicon  = useMemo(() => faviconUrl(schoolUrl, 128),    [schoolUrl]);
 
   // We progressively degrade: clearbit → favicon → letter.
   const [stage, setStage] = useState<Stage>(() =>
@@ -93,6 +93,7 @@ export default function SchoolCardArt({
             src={stage === "clearbit" ? clearbit! : favicon!}
             alt={name ?? "School logo"}
             loading="lazy"
+            decoding="async"
             // Sit the logo on a soft white tile so dark monogram logos don't
             // disappear into a dark gradient. Aspect-square keeps wide and
             // tall logos from getting weirdly stretched.
