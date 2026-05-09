@@ -1,0 +1,100 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Public Read Data (University database)
+    match /schools/{schoolId} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+    match /programs/{programId} {
+      allow read: if true;
+    }
+
+    // Protected Owner-Only Data
+    match /users/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow update: if request.auth != null && request.auth.uid == userId
+        && !("role" in request.resource.data.diff(resource.data).changedKeys());
+      allow delete: if false;
+    }
+    match /studentProfiles/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    match /creditWallets/{userId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if false; // Protected. Modified only by Cloud Functions
+    }
+    match /creditTransactions/{transactionId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow write: if false; // Protected. Modified only by Cloud Functions
+    }
+    match /savedSchools/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    match /roadmapProgress/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    match /matchReports/{reportId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow write: if false; // Protected. Modified only by Cloud Functions
+    }
+    match /aiRuns/{aiRunId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow write: if false; // Protected. Written only by Cloud Functions via Admin SDK
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // F-1 Visa Interview Simulator (practice-only feature)
+    // ─────────────────────────────────────────────────────────────────────
+    // Sessions, messages, and reports are written exclusively by Cloud
+    // Functions (Admin SDK). Users can read their own.
+    match /visaInterviewSessions/{sessionId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow write: if false;
+    }
+    match /visaInterviewMessages/{messageId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow write: if false;
+    }
+    match /visaInterviewReports/{reportId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow write: if false;
+    }
+
+    // Document upload metadata. Users CAN create entries themselves
+    // because the actual upload goes straight to Storage from the client;
+    // metadata fields are validated below to prevent tampering.
+    match /visaInterviewDocuments/{documentId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.documentType in [
+          'i20', 'ds160_confirmation',
+          'bank_statement', 'employment_letter', 'sponsor_letter', 'transcript'
+        ]
+        && request.resource.data.status in ['uploaded', 'processing', 'ready', 'failed'];
+      // Only Cloud Functions update / delete (e.g. mark as processed)
+      allow update, delete: if false;
+    }
+
+    // Referral codes: small reverse-lookup docs from code → userId.
+    // - Any logged-in user can read (needed to verify a code on signup).
+    // - A user can only CREATE a code that maps to their own uid, and only
+    //   if the code doc does not already exist (prevents claim hijacking).
+    // - No updates or deletes from clients; only Cloud Functions touch these later.
+    match /referralCodes/{code} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
+    }
+  }
+}

@@ -1,0 +1,79 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Secrets — never commit, never push
+# ──────────────────────────────────────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+# Firebase service-account JSON (never check these in)
+*serviceAccount*.json
+*service-account*.json
+*-firebase-adminsdk-*.json
+google-services.json
+GoogleService-Info.plist
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Build outputs
+# ──────────────────────────────────────────────────────────────────────────────
+node_modules
+dist
+dist-ssr
+build
+out
+functions/lib
+*.tsbuildinfo
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Local dev artifacts — kept on the developer's disk, not in the repo
+# ──────────────────────────────────────────────────────────────────────────────
+functions_old/
+functions_backup/
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Firebase tooling
+# ──────────────────────────────────────────────────────────────────────────────
+.firebase/
+.firebaserc.local
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+database-debug.log*
+pubsub-debug.log*
+functions-debug.log*
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Logs / runtime artifacts
+# ──────────────────────────────────────────────────────────────────────────────
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+.pnp.*
+.yarn/cache
+.yarn/install-state.gz
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Editor / OS
+# ──────────────────────────────────────────────────────────────────────────────
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.example.json
+.idea
+.DS_Store
+Thumbs.db
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.local
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Test coverage
+# ──────────────────────────────────────────────────────────────────────────────
+coverage
+.nyc_output

@@ -1,0 +1,32 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Default deny everything that isn't explicitly allowed below.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    // F-1 visa interview document uploads — strictly per-user.
+    // Path format: users/{uid}/visa-interviews/{sessionId}/{docType}/{fileName}
+    //   docType is one of: i20, ds160_confirmation, bank_statement,
+    //                       employment_letter, sponsor_letter, transcript
+    //   fileName cannot contain a slash (single segment)
+    //   max 10 MB, only PDF / PNG / JPEG content types
+    match /users/{uid}/visa-interviews/{sessionId}/{docType}/{fileName} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null
+        && request.auth.uid == uid
+        && docType in ["i20", "ds160_confirmation", "bank_statement",
+                       "employment_letter", "sponsor_letter", "transcript"]
+        && request.resource.size < 10 * 1024 * 1024
+        && (
+          request.resource.contentType == "application/pdf" ||
+          request.resource.contentType == "image/png" ||
+          request.resource.contentType == "image/jpeg" ||
+          request.resource.contentType == "image/jpg"
+        );
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}
