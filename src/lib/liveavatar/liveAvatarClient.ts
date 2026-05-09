@@ -63,10 +63,13 @@ export interface LiveAvatarHandle {
 const STREAM_READY_TIMEOUT_MS = 30_000;
 
 export async function connectLiveAvatar(args: LiveAvatarConnectArgs): Promise<LiveAvatarHandle> {
-  // Dynamic import keeps the SDK out of the main bundle. The @ts-ignore lets
-  // this file typecheck even before `npm install @heygen/liveavatar-web-sdk`.
-  // @ts-ignore - resolved at runtime
-  const sdk: any = await import(/* @vite-ignore */ "@heygen/liveavatar-web-sdk")
+  // Dynamic import keeps the SDK (~1 MB with LiveKit + WebRTC) out of the
+  // main bundle — Vite emits it as its own chunk and only fetches it when a
+  // user actually opens the visa-interview page. We deliberately let Vite
+  // resolve this specifier (no /* @vite-ignore */); a previous version of
+  // this file used @vite-ignore and broke the production build because the
+  // browser can't resolve bare npm specifiers at runtime.
+  const sdk: any = await import("@heygen/liveavatar-web-sdk")
     .catch((err) => {
       console.error("[liveAvatar] SDK package not installed:", err?.message);
       throw new Error(
