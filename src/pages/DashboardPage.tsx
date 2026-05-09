@@ -39,7 +39,7 @@ export default function DashboardPage() {
 
     const qReports = query(collection(db, "matchReports"), where("userId", "==", user.uid));
     const unsubReports = onSnapshot(qReports, (snapshot) => {
-      const reports = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const reports: any[] = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       // Sort in memory since we might not have an index for orderBy("createdAt", "desc") yet
       reports.sort((a, b) => {
         const tA = a.createdAt?.toMillis?.() || 0;

@@ -33,15 +33,6 @@ const THEOLOGY_PATTERNS = [
   /\bscripture\b/i,
 ];
 
-// Names that strongly imply primarily religious undergraduate education
-// (heuristic — only used when combined with other signals)
-const RELIGIOUS_COLLEGE_PATTERNS = [
-  /\bchristian college\b/i,
-  /\bbaptist college\b/i,
-  /\bcatholic college\b/i,
-  /\bjesus college\b/i,
-];
-
 // Art / music conservatories — not suitable for STEM graduate programs
 const ARTS_CONSERVATORY_PATTERNS = [
   /\bconservatory\b/i,
