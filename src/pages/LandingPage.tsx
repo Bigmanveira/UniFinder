@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, GraduationCap, CheckCircle2, Sparkles, BrainCircuit, Target, ShieldCheck, Mic, Video, ShieldAlert } from "lucide-react";
+import { useAuth } from "../hooks/useAuth";
 
 // Performance notes for future-me:
 //   - We deliberately do NOT use framer-motion here — first-paint entry
@@ -12,6 +13,13 @@ import { ArrowRight, GraduationCap, CheckCircle2, Sparkles, BrainCircuit, Target
 //     fallbacks and only switch to backdrop-blur on `md+` breakpoints.
 
 export default function LandingPage() {
+  const { user } = useAuth();
+  // /app/visa-interview is protected — sending a signed-out visitor there
+  // bounces them through ProtectedRoute back to "/" (the landing page),
+  // which felt like a dead button. Route signed-out users to signup so
+  // they actually progress; signed-in users go straight to the simulator.
+  const simulatorHref = user ? "/app/visa-interview" : "/signup";
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans selection:bg-primary-500 selection:text-white relative overflow-hidden">
 
@@ -200,7 +208,7 @@ export default function LandingPage() {
               <FeaturePill icon={<Sparkles size={18} />} label="Scored feedback" color="text-amber-500" />
             </div>
 
-            <Link to="/app/visa-interview" className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold px-7 py-3.5 rounded-full transition-colors shadow-xl shadow-slate-900/20">
+            <Link to={simulatorHref} className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold px-7 py-3.5 rounded-full transition-colors shadow-xl shadow-slate-900/20">
               Try the simulator <ArrowRight size={18} />
             </Link>
             <p className="text-[11px] text-slate-400 mt-3 font-semibold">Practice only. Not affiliated with any government or consular service.</p>
