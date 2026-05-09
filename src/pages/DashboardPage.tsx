@@ -4,7 +4,7 @@ import { useAuth } from "../hooks/useAuth";
 import { auth, db } from "../lib/firebase";
 import { signOut } from "firebase/auth";
 import { doc, onSnapshot, updateDoc } from "firebase/firestore";
-import { LogOut, Plus, Wallet, Bookmark, FileText, ChevronRight, User, GraduationCap, MapPin, Sparkles, Camera, Globe, Trash2, ChevronDown, ChevronUp, ArrowRight, Heart, Map, Gift, Copy, Check, Send, Mail, Home, ShieldAlert } from "lucide-react";
+import { LogOut, Plus, Wallet, Bookmark, FileText, ChevronRight, User, GraduationCap, MapPin, Sparkles, Camera, Globe, Trash2, ChevronDown, ChevronUp, ArrowRight, Heart, Map, Gift, Copy, Check, Send, Mail, Home, ShieldAlert, Menu, X, Bell } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { collection, query, where } from "firebase/firestore";
 import { FadeIn, FadeInItem } from "../components/FadeIn";
@@ -18,6 +18,9 @@ export default function DashboardPage() {
   const [matchReports, setMatchReports] = useState<any[]>([]);
   const [savedSchools, setSavedSchools] = useState<any[]>([]);
   const [showAllReports, setShowAllReports] = useState(false);
+  // Mobile drawer (the new top navbar uses a hamburger that opens this).
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
 
   // Number of reports visible by default before "View all" is clicked
   const REPORTS_COLLAPSED_LIMIT = 3;
@@ -109,7 +112,7 @@ export default function DashboardPage() {
       {/* 
         MAIN CONTENT 
       */}
-      <main className="flex-1 p-6 md:p-10 lg:p-12 pb-28 md:pb-12 max-w-5xl w-full mx-auto h-screen overflow-y-auto">
+      <main className="flex-1 p-6 md:p-10 lg:p-12 pt-24 md:pt-10 max-w-5xl w-full mx-auto h-screen overflow-y-auto">
         
         {/* Other-tab page header (matches tab gets the image hero instead) */}
         {activeTab !== "matches" && (
@@ -354,28 +357,121 @@ export default function DashboardPage() {
       </main>
 
       {/*
-        MOBILE BOTTOM NAVIGATION — light glass pill, blue active state
+        MOBILE TOP NAVIGATION — hamburger | logo | bell
+        Replaces the old floating bottom-pill so the user has standard
+        top-of-screen orientation. Drawer slides from the left, dismissable
+        via backdrop tap or Escape.
       */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 px-4 pb-5 pt-2 bg-gradient-to-t from-white via-white/90 to-transparent pointer-events-none">
-        <div className="bg-white/95 backdrop-blur-xl rounded-[28px] p-1.5 flex justify-between items-center shadow-[0_12px_40px_rgba(15,23,42,0.12)] border border-slate-200 pointer-events-auto">
-          <MobileNavItem icon={<Home />} label="Home" active={activeTab === "matches"} onClick={() => setActiveTab("matches")} />
-          <MobileNavItem icon={<Bookmark />} label="Saved" active={activeTab === "saved"} onClick={() => setActiveTab("saved")} />
-
-          <div className="relative -top-6 px-1">
-            <motion.button
-              whileTap={{ scale: 0.88 }}
-              onClick={() => navigate("/intake")}
-              className="w-14 h-14 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-full flex items-center justify-center text-white shadow-[0_10px_28px_rgba(37,99,235,0.45)] ring-4 ring-white"
-              aria-label="New match report"
-            >
-              <Plus size={24} strokeWidth={2.5} />
-            </motion.button>
+      <header className="md:hidden fixed top-0 left-0 right-0 z-50 px-4 pt-3 pb-3 bg-white/95 backdrop-blur-md border-b border-slate-100">
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => setMobileNavOpen(true)}
+            className="w-10 h-10 rounded-2xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 active:scale-95 transition-transform"
+            aria-label="Open menu"
+          >
+            <Menu size={20} />
+          </button>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-primary-600 flex items-center justify-center text-white shadow-md shadow-primary-600/30">
+              <GraduationCap size={18} />
+            </div>
+            <span className="text-lg font-black tracking-tight text-slate-900">Unifinder</span>
           </div>
-
-          <MobileNavItem icon={<Wallet />} label="Wallet" active={activeTab === "billing"} onClick={() => setActiveTab("billing")} />
-          <MobileNavItem icon={<User />} label="Profile" active={activeTab === "profile"} onClick={() => setActiveTab("profile")} />
+          <button
+            onClick={() => setNotifOpen((v) => !v)}
+            className="w-10 h-10 rounded-2xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 active:scale-95 transition-transform relative"
+            aria-label="Notifications"
+          >
+            <Bell size={18} />
+          </button>
         </div>
-      </div>
+
+        {/* Notifications popover (placeholder until real notifs ship) */}
+        <AnimatePresence>
+          {notifOpen && (
+            <motion.div
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.15 }}
+              className="absolute right-4 top-16 w-72 bg-white rounded-2xl shadow-xl border border-slate-200 p-4"
+            >
+              <p className="text-sm font-bold text-slate-900 mb-1">Notifications</p>
+              <p className="text-xs text-slate-500 leading-relaxed">You're all caught up. We'll notify you here when a match report finishes processing or your visa interview score is ready.</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </header>
+
+      {/*
+        MOBILE DRAWER — slides in from the left on hamburger tap.
+        Mirrors the desktop sidebar items so feature parity is the same
+        on both viewports.
+      */}
+      <AnimatePresence>
+        {mobileNavOpen && (
+          <>
+            {/* Backdrop */}
+            <motion.div
+              key="backdrop"
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              onClick={() => setMobileNavOpen(false)}
+              className="md:hidden fixed inset-0 z-50 bg-slate-950/40"
+              aria-hidden
+            />
+            {/* Drawer */}
+            <motion.aside
+              key="drawer"
+              initial={{ x: "-100%" }} animate={{ x: 0 }} exit={{ x: "-100%" }}
+              transition={{ type: "spring", stiffness: 300, damping: 32 }}
+              className="md:hidden fixed top-0 left-0 bottom-0 z-50 w-[82%] max-w-xs bg-white shadow-2xl flex flex-col"
+              role="dialog"
+              aria-modal="true"
+            >
+              <div className="flex items-center justify-between p-5 border-b border-slate-100">
+                <div className="flex items-center gap-2">
+                  <div className="w-9 h-9 rounded-xl bg-primary-600 flex items-center justify-center text-white shadow-md shadow-primary-600/30">
+                    <GraduationCap size={18} />
+                  </div>
+                  <span className="text-xl font-black tracking-tight text-slate-900">Unifinder</span>
+                </div>
+                <button
+                  onClick={() => setMobileNavOpen(false)}
+                  className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700"
+                  aria-label="Close menu"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
+                <DesktopNavItem icon={<Home size={18} />}        label="Home"               active={activeTab === "matches"} onClick={() => { setActiveTab("matches"); setMobileNavOpen(false); }} badge={matchReports.length} />
+                <DesktopNavItem icon={<Bookmark size={18} />}    label="Saved Schools"      active={activeTab === "saved"}   onClick={() => { setActiveTab("saved");   setMobileNavOpen(false); }} badge={savedSchools.length} />
+                <DesktopNavItem icon={<Map size={18} />}         label="Roadmap"            active={false} onClick={() => { navigate("/app/roadmap");        setMobileNavOpen(false); }} />
+                <DesktopNavItem icon={<ShieldAlert size={18} />} label="Visa Practice"      active={false} onClick={() => { navigate("/app/visa-interview"); setMobileNavOpen(false); }} />
+                <DesktopNavItem icon={<Wallet size={18} />}      label="Credits & Billing"  active={activeTab === "billing"} onClick={() => { setActiveTab("billing"); setMobileNavOpen(false); }} />
+                <DesktopNavItem icon={<User size={18} />}        label="Profile"            active={activeTab === "profile"} onClick={() => { setActiveTab("profile"); setMobileNavOpen(false); }} />
+              </nav>
+
+              <div className="p-4 border-t border-slate-100 space-y-3">
+                <button
+                  onClick={() => { navigate("/intake"); setMobileNavOpen(false); }}
+                  className="w-full inline-flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white font-bold text-sm py-3.5 rounded-2xl transition-colors active:scale-[0.99] shadow-lg shadow-primary-600/20"
+                >
+                  <Plus size={16} /> New match report
+                </button>
+                <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Logged in as</p>
+                  <p className="text-sm font-bold text-slate-900 truncate">@{username}</p>
+                </div>
+                <button onClick={handleSignOut} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-rose-500 hover:bg-rose-50 font-bold text-sm transition-colors">
+                  <LogOut size={16} /> Sign Out
+                </button>
+              </div>
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
 
     </div>
   );
@@ -530,30 +626,6 @@ function DesktopNavItem({ icon, label, active, onClick, badge }: { icon: React.R
   );
 }
 
-function MobileNavItem({ icon, label, active, onClick }: { icon: React.ReactNode, label: string, active: boolean, onClick: () => void }) {
-  return (
-    <motion.button
-      whileTap={{ scale: 0.85 }}
-      onClick={onClick}
-      className={`flex flex-col items-center justify-center w-16 h-12 rounded-2xl relative transition-colors ${
-        active ? 'text-blue-700' : 'text-slate-500 hover:text-slate-900'
-      }`}
-    >
-      {active && (
-        <motion.div
-          layoutId="mobileNavBubble"
-          className="absolute inset-x-1 inset-y-0.5 bg-blue-50 rounded-2xl"
-          transition={{ type: "spring", stiffness: 320, damping: 28 }}
-        />
-      )}
-      <div className="relative z-10 flex flex-col items-center gap-0.5">
-        {icon && <div className="w-[18px] h-[18px] [&>svg]:w-full [&>svg]:h-full">{icon}</div>}
-        <span className={`text-[10px] tracking-wide ${active ? 'font-bold' : 'font-semibold'}`}>{label}</span>
-      </div>
-    </motion.button>
-  );
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Dashboard pieces — image-led hero + refined stats + report rows
 // ─────────────────────────────────────────────────────────────────────────────
@@ -619,7 +691,7 @@ function DashboardHero({
         <div className="min-w-0 max-w-xl">
           <p className="text-white/70 text-xs font-semibold mb-1 tracking-wide">{timeOfDay}</p>
           <h1 className="text-white text-3xl sm:text-4xl font-bold tracking-tight leading-[1.1] mb-2">
-            {displayName} <span className="inline-block">👋</span>
+            {displayName}
           </h1>
           <p className="text-white/80 text-sm sm:text-[15px] leading-relaxed mb-5 hidden sm:block">
             Ready to find your next school match?

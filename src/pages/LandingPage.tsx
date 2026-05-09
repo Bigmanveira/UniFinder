@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, GraduationCap, CheckCircle2, Sparkles, BrainCircuit, Target, ShieldCheck } from "lucide-react";
+import { ArrowRight, GraduationCap, CheckCircle2, Sparkles, BrainCircuit, Target, ShieldCheck, Mic, Video, ShieldAlert } from "lucide-react";
 
 // Performance notes for future-me:
 //   - We deliberately do NOT use framer-motion here — first-paint entry
@@ -48,16 +48,16 @@ export default function LandingPage() {
         <div className="flex-1 text-center lg:text-left animate-fade-up">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 text-slate-600 text-xs font-bold tracking-widest uppercase mb-8 shadow-sm">
             <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse"></span>
-            Profile-Based Match Estimate
+            AI-Powered University Match Engine
           </div>
 
           <h1 className="text-5xl md:text-7xl font-black text-slate-900 tracking-tight leading-[1.05] mb-6">
-            Find your potential <br className="hidden md:block"/>
-            <span className="text-transparent bg-clip-text bg-gradient-to-br from-primary-600 to-accent-500">U.S. University</span> fit.
+            Find the university <br className="hidden md:block"/>
+            <span className="text-transparent bg-clip-text bg-gradient-to-br from-primary-600 to-accent-500">that actually fits you.</span>
           </h1>
 
           <p className="text-lg md:text-xl text-slate-500 font-medium max-w-2xl mx-auto lg:mx-0 mb-10 leading-relaxed">
-            We analyze your GPA, budget, and major against our growing database of U.S. schools to give you guidance, not a guarantee.
+            We match your academic profile, funding opportunities, and goals against verified university data — and rehearse the F-1 visa interview that decides whether you actually get there.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center gap-5 justify-center lg:justify-start">
@@ -121,26 +121,102 @@ export default function LandingPage() {
       <section id="how-it-works" className="py-20 md:py-24 bg-white relative z-20">
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-12 md:mb-16">
-            <h2 className="text-3xl md:text-5xl font-black text-slate-900 tracking-tight mb-4">Not just AI. <br/><span className="text-primary-600">Data-driven certainty.</span></h2>
-            <p className="text-lg text-slate-500 font-medium max-w-2xl mx-auto">We don't let AI hallucinate schools. Our deterministic engine maps your profile against verified IPEDS and SEVP databases first.</p>
+            <h2 className="text-3xl md:text-5xl font-black text-slate-900 tracking-tight mb-4">AI matching, <br/><span className="text-primary-600">grounded in real data.</span></h2>
+            <p className="text-lg text-slate-500 font-medium max-w-2xl mx-auto">No hallucinated schools, no generic lists. Every match is filtered through verified institutional records before our AI ever sees it.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <FeatureCard
               icon={<Target className="text-accent-500" size={28} />}
-              title="Profile Mapping"
-              desc="Input your GPA, budget, major, and funding needs. We treat this as the ultimate filter."
+              title="Precision Profile Matching"
+              desc="Your GPA, test scores, intended field, and funding opportunities are weighed against thousands of programs to surface the ones you can actually get into and afford."
             />
             <FeatureCard
               icon={<ShieldCheck className="text-emerald-500" size={28} />}
-              title="Verified Data"
-              desc="Matches are pulled strictly from our growing database of U.S. accredited universities."
+              title="Verified Programs Only"
+              desc="Every recommended school is cross-checked against accredited program data — no AI invention, no out-of-date listings, no programs that don't exist."
             />
             <FeatureCard
               icon={<BrainCircuit className="text-primary-500" size={28} />}
-              title="AI Reasoning"
-              desc="Our AI acts as an advisor, reading your transcript to explain exactly *why* a school is a fit."
+              title="Personalized AI Reasoning"
+              desc="For each match you get a written explanation of why this program fits your profile, what funding paths exist, and what to strengthen before applying."
             />
+          </div>
+        </div>
+      </section>
+
+      {/* F-1 Visa Interview — our differentiator */}
+      <section className="py-20 md:py-24 bg-gradient-to-br from-blue-50 via-slate-50 to-white relative z-20 overflow-hidden">
+        <div className="hidden md:block absolute top-1/2 left-0 -translate-y-1/2 w-[400px] h-[400px] bg-primary-200/40 rounded-full blur-[100px] pointer-events-none" />
+        <div className="hidden md:block absolute bottom-0 right-0 w-[400px] h-[400px] bg-accent-500/20 rounded-full blur-[100px] pointer-events-none" />
+
+        <div className="max-w-6xl mx-auto px-6 relative z-10 flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
+          <div className="flex-1">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-black tracking-widest uppercase mb-6">
+              <ShieldAlert size={12} /> Unifinder exclusive
+            </div>
+            <h2 className="text-3xl md:text-5xl font-black tracking-tight text-slate-900 mb-6 leading-[1.05]">
+              Practice your F-1 visa interview <span className="text-primary-600">with a live AI consular officer.</span>
+            </h2>
+            <p className="text-lg text-slate-500 font-medium leading-relaxed mb-8 max-w-xl">
+              The university acceptance is only half the journey. Most rejections at the consulate happen in 90 seconds — for nerves, vague answers, or finance gaps the student didn't expect. Unifinder's interview simulator puts you in the chair: a live AI avatar reads your I-20 and DS-160, asks the questions a real officer would, listens to your spoken answers, and returns a written score on every dimension that matters.
+            </p>
+
+            <ul className="space-y-3 mb-10">
+              <li className="flex items-start gap-3 text-slate-700 font-semibold">
+                <CheckCircle2 className="text-emerald-500 flex-shrink-0 mt-0.5" size={20} />
+                Live video avatar that asks realistic, profile-specific questions in real time
+              </li>
+              <li className="flex items-start gap-3 text-slate-700 font-semibold">
+                <CheckCircle2 className="text-emerald-500 flex-shrink-0 mt-0.5" size={20} />
+                Reads your real I-20 and DS-160 — no redundant questions, no generic interview script
+              </li>
+              <li className="flex items-start gap-3 text-slate-700 font-semibold">
+                <CheckCircle2 className="text-emerald-500 flex-shrink-0 mt-0.5" size={20} />
+                Speak your answers out loud, just like the real consulate
+              </li>
+              <li className="flex items-start gap-3 text-slate-700 font-semibold">
+                <CheckCircle2 className="text-emerald-500 flex-shrink-0 mt-0.5" size={20} />
+                Detailed written feedback across 9 dimensions, with sample improved answers
+              </li>
+            </ul>
+
+            <Link to="/intake" className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold px-8 py-4 rounded-full transition-colors shadow-xl shadow-slate-900/20">
+              Try the simulator <ArrowRight size={18} />
+            </Link>
+            <p className="text-xs text-slate-400 mt-3 font-semibold">Practice only. Not affiliated with any government or consular service.</p>
+          </div>
+
+          {/* Visual: stylized interview frame */}
+          <div className="flex-1 w-full max-w-md">
+            <div className="bg-slate-950 text-white rounded-[40px] p-6 sm:p-7 shadow-2xl shadow-slate-950/40 relative aspect-[3/4] sm:aspect-[4/5] overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-600/30 via-slate-900 to-slate-950" />
+              <div className="absolute top-4 left-4 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-slate-900/70 text-[10px] font-bold uppercase tracking-widest border border-white/10">
+                <ShieldAlert size={11} className="text-amber-300" /> Simulation
+              </div>
+              <div className="relative h-full flex flex-col items-center justify-center text-center px-4">
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-blue-400 to-violet-500 mb-6 ring-4 ring-white/10 shadow-2xl flex items-center justify-center text-3xl font-black">A</div>
+                <p className="text-xs font-bold tracking-widest text-blue-300 uppercase mb-2">Anna · Consular Officer</p>
+                <p className="text-base font-semibold leading-snug text-white/90 mb-6">"Tell me — why have you chosen this particular program over the ones offered in your home country?"</p>
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold">
+                  <Mic size={12} className="animate-pulse" /> Listening
+                </div>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2 mt-3">
+              <div className="bg-white border border-slate-200 rounded-2xl p-3 text-center">
+                <Video size={16} className="text-blue-600 mx-auto mb-1" />
+                <p className="text-[10px] font-bold text-slate-600">Live avatar</p>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-2xl p-3 text-center">
+                <Mic size={16} className="text-emerald-600 mx-auto mb-1" />
+                <p className="text-[10px] font-bold text-slate-600">Voice answers</p>
+              </div>
+              <div className="bg-white border border-slate-200 rounded-2xl p-3 text-center">
+                <Sparkles size={16} className="text-amber-500 mx-auto mb-1" />
+                <p className="text-[10px] font-bold text-slate-600">Scored feedback</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -153,12 +229,12 @@ export default function LandingPage() {
           <div className="flex-1">
             <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-6">Pay per match.<br/>No hidden subscriptions.</h2>
             <p className="text-slate-400 text-lg mb-8 leading-relaxed">
-              We operate on a transparent credit system. Generate exactly what you need, when you need it. Every new account starts with 2 free credits.
+              We operate on a transparent credit system — generate exactly what you need, when you need it. Every new account starts with free credits to try the engine before you ever pay.
             </p>
             <ul className="space-y-4 mb-10">
-              <li className="flex items-center gap-3 font-bold text-slate-300"><CheckCircle2 className="text-primary-500"/> Full Match Report = 1 Credit</li>
-              <li className="flex items-center gap-3 font-bold text-slate-300"><CheckCircle2 className="text-primary-500"/> Transcript AI Analysis = 2 Credits</li>
-              <li className="flex items-center gap-3 font-bold text-slate-300"><CheckCircle2 className="text-primary-500"/> Deep School Dive = 1 Credit</li>
+              <li className="flex items-center gap-3 font-bold text-slate-300"><CheckCircle2 className="text-primary-500"/> Full match report = 1 credit</li>
+              <li className="flex items-center gap-3 font-bold text-slate-300"><CheckCircle2 className="text-primary-500"/> F-1 visa interview practice = 1 credit</li>
+              <li className="flex items-center gap-3 font-bold text-slate-300"><CheckCircle2 className="text-primary-500"/> Personalized application roadmap = included</li>
             </ul>
             <Link to="/intake" className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-500 text-white font-bold px-8 py-4 rounded-full transition-colors">
               Claim Your Free Credits <ArrowRight size={18} />
@@ -198,7 +274,7 @@ export default function LandingPage() {
             <a href="#" className="hover:text-primary-600 transition-colors">Contact</a>
           </div>
           <p className="text-xs font-medium text-slate-400">
-            © 2026 Unifinder. Not affiliated with the U.S. Government.
+            © 2026 Unifinder. Practice tools only. Not affiliated with any government, embassy, or consular service.
           </p>
         </div>
       </footer>
