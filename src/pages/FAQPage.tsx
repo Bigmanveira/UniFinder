@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 const FAQS = [
   {
     question: "How does the AI Matching Engine work?",
-    answer: "Our deterministic matching engine compares your specific academic profile (GPA, test scores, field of study) and funding requirements against our growing database of U.S. universities. It provides a profile-based match estimate to guide your search."
+    answer: "Our deterministic matching engine compares your specific academic profile (GPA, test scores, field of study) and funding requirements against our growing database of U.S. colleges. It provides a profile-based match estimate to guide your search."
   },
   {
     question: "What are Credits and how do I use them?",
@@ -14,7 +14,7 @@ const FAQS = [
   },
   {
     question: "Does College Ready guarantee my admission?",
-    answer: "No platform can guarantee university admission, as admissions committees consider subjective factors like essays and interviews. However, College Ready dramatically improves your odds by strictly filtering out programs where you do not meet the minimum objective thresholds, saving you thousands of dollars in wasted application fees."
+    answer: "No platform can guarantee college admission, as admissions committees consider subjective factors like essays and interviews. However, College Ready dramatically improves your odds by strictly filtering out programs where you do not meet the minimum objective thresholds, saving you thousands of dollars in wasted application fees."
   },
   {
     question: "Do credits expire?",

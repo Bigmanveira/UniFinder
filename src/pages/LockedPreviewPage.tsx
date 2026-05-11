@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import {
   Lock, ArrowRight, Sparkles, AlertTriangle, Info,
-  MapPin, GraduationCap, Loader2, Star, ChevronRight, Send,
+  MapPin, GraduationCap, Star, ChevronRight, Send,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
@@ -31,7 +31,7 @@ const STUDY_TIPS = [
   "A strong Statement of Purpose names specific faculty and research labs you want to work with.",
   "GRE policies vary — some programs have made it optional, others still require it. Check each program directly.",
   "TOEFL/IELTS waivers are often available if your prior degree was taught in English.",
-  "Out-of-state tuition can be waived through teaching or research assistantships at most public universities.",
+  "Out-of-state tuition can be waived through teaching or research assistantships at most public colleges.",
 ];
 
 const STAGES: { until: number; label: string }[] = [
@@ -52,12 +52,12 @@ const BUCKETS = {
 // ─────────────────────────────────────────────────────────────────────────────
 export default function LockedPreviewPage() {
   const [profile, setProfile] = useState<StudentProfile | null>(null);
-  const [allMatches, setAllMatches] = useState<SchoolMatch[]>([]);
   const [bucketed, setBucketed] = useState<ReturnType<typeof bucketizeMatches> | null>(null);
   const [advice, setAdvice] = useState<ProfileAdvice[]>([]);
   const [loading, setLoading] = useState(true);
   const [programGate, setProgramGate] = useState<GateState>("not-enforced");
   const [activeFilter, setActiveFilter] = useState<BucketKey>("all");
+  const [aiError, setAiError] = useState<string | null>(null);
   const { user } = useAuth();
   const navigate = useNavigate();
   const [unlocking, setUnlocking] = useState(false);
@@ -78,97 +78,92 @@ export default function LockedPreviewPage() {
           getEligibleUnitIds(parsed),
         ]);
 
-        // Step 1 — deterministic matcher gives us a pre-scored candidate set
-        // we can hand to the AI ranker. The deterministic algo is still
-        // load-bearing for: hard filters (community-college exclusion,
-        // theology-incompat exclusion), program-gate enforcement, and as a
-        // fallback if Claude is down or returns garbage.
+        // Deterministic matcher is now ONLY used as a hard-filter
+        // pre-pass: community-college exclusion, theology-incompat
+        // exclusion, and program-gate enforcement. Its scoring and
+        // ranking are NOT shown to the user — all matches come from
+        // the AI ranker.
         const computedMatches = getDeterministicMatches(schools, parsed, gate.eligibleUnitIds);
         const recommended = computedMatches.filter(
           m => m.category === "Strong Fit" || m.category === "Good Fit" || m.category === "Exploratory Fit"
         );
-        setAllMatches(computedMatches);
         setAdvice(getProfileImprovementAdvice(parsed));
 
-        // Step 2 — set gate state based on the pre-filter (independent of AI).
         if (gate.eligibleUnitIds === null) setProgramGate("not-enforced");
         else if (recommended.length === 0) setProgramGate("no-eligible");
         else setProgramGate("enforced");
 
-        // Step 3 — short-circuit if the gate left us nothing. AI can't
-        // invent schools that aren't in our verified-program set.
+        // Short-circuit if the gate left us nothing. AI can't invent
+        // schools that aren't in our verified-program set.
         if (recommended.length === 0) {
           setBucketed({ top10: [], reach: [], target: [], safety: [] });
           return;
         }
 
-        // Step 4 — show deterministic results IMMEDIATELY so the user
-        // sees something while Claude is ranking. ~5-15s delay for the
-        // AI call would feel like a hung loading screen otherwise.
-        const fallbackBucketed = bucketizeMatches(recommended);
-        setBucketed(fallbackBucketed);
+        // Call the AI ranker. No deterministic fallback display — if AI
+        // fails, we surface a clear error so the user can retry, rather
+        // than showing them a different list of schools than what they'd
+        // unlock.
+        const aiCandidates = recommended.slice(0, 100).map((m) => ({
+          unitId:        m.school.unitId,
+          name:          m.school.name,
+          state:         m.school.state,
+          city:          m.school.city,
+          admissionRate: m.school.admissionRate,
+          averageCost:   m.school.averageCost,
+          ownership:     m.school.ownership,
+        }));
+        const fn = httpsCallable(functions, "aiMatchSchoolsCallable", { timeout: 90_000 });
+        const res = await fn({ profile: parsed, candidates: aiCandidates });
+        const data = res.data as {
+          matches: Array<{
+            unitId: string; matchScore: number;
+            category: "Strong Fit" | "Good Fit" | "Exploratory Fit";
+            admissionBucket: "reach" | "target" | "safety";
+            admissionLikelihood: number;
+            budgetFit: "Excellent" | "Good" | "Stretch" | "Out of Budget";
+            academicFit: "Likely" | "Target" | "Reach" | "High Reach" | "Limited Data";
+          }>;
+          status: "completed" | "failed";
+          errorMessage?: string | null;
+        };
 
-        // Step 5 — call AI matcher with the top 100 deterministic
-        // candidates. Replace the displayed bucketing if AI succeeds.
-        try {
-          const aiCandidates = recommended.slice(0, 100).map((m) => ({
-            unitId:        m.school.unitId,
-            name:          m.school.name,
-            state:         m.school.state,
-            city:          m.school.city,
-            admissionRate: m.school.admissionRate,
-            averageCost:   m.school.averageCost,
-            ownership:     m.school.ownership,
-          }));
-          const fn = httpsCallable(functions, "aiMatchSchoolsCallable", { timeout: 90_000 });
-          const res = await fn({ profile: parsed, candidates: aiCandidates });
-          const data = res.data as {
-            matches: Array<{
-              unitId: string; matchScore: number;
-              category: "Strong Fit" | "Good Fit" | "Exploratory Fit";
-              admissionBucket: "reach" | "target" | "safety";
-              admissionLikelihood: number;
-              budgetFit: "Excellent" | "Good" | "Stretch" | "Out of Budget";
-              academicFit: "Likely" | "Target" | "Reach" | "High Reach" | "Limited Data";
-            }>;
-            status: "completed" | "failed";
-          };
-          if (data.status === "completed" && data.matches.length > 0) {
-            const schoolById = new Map(recommended.map((m) => [m.school.unitId, m.school]));
-            const aiMatches: SchoolMatch[] = [];
-            for (const m of data.matches) {
-              const school = schoolById.get(m.unitId);
-              if (!school) continue;
-              aiMatches.push({
-                school,
-                matchScore:          m.matchScore,
-                category:            m.category,
-                budgetFit:           m.budgetFit,
-                academicFit:         m.academicFit,
-                locationFit:         "Yes",
-                majorFit:            "Likely Available",
-                internationalFit:    "Likely Yes",
-                admissionLikelihood: m.admissionLikelihood,
-                admissionBucket:     m.admissionBucket,
-              });
-            }
-
-            // Preserve AI's intra-bucket ordering (don't pass through
-            // bucketizeMatches, which would re-sort by admit rate).
-            setBucketed({
-              top10:  aiMatches.slice(0, 10),
-              reach:  aiMatches.filter((m) => m.admissionBucket === "reach"),
-              target: aiMatches.filter((m) => m.admissionBucket === "target"),
-              safety: aiMatches.filter((m) => m.admissionBucket === "safety"),
-            });
-          }
-          // If status === "failed", we silently keep the deterministic
-          // bucketing already on screen. The fallback path is invisible
-          // to the user — they see something, just not the AI ranking.
-        } catch (aiErr) {
-          console.warn("[ai-match] ranker failed, keeping deterministic top-10:", aiErr);
+        if (data.status !== "completed" || data.matches.length === 0) {
+          setAiError(data.errorMessage ?? "AI matcher returned no results.");
+          return;
         }
-      } catch (err) { console.error("Error matching:", err); }
+
+        const schoolById = new Map(recommended.map((m) => [m.school.unitId, m.school]));
+        const aiMatches: SchoolMatch[] = [];
+        for (const m of data.matches) {
+          const school = schoolById.get(m.unitId);
+          if (!school) continue;
+          aiMatches.push({
+            school,
+            matchScore:          m.matchScore,
+            category:            m.category,
+            budgetFit:           m.budgetFit,
+            academicFit:         m.academicFit,
+            locationFit:         "Yes",
+            majorFit:            "Likely Available",
+            internationalFit:    "Likely Yes",
+            admissionLikelihood: m.admissionLikelihood,
+            admissionBucket:     m.admissionBucket,
+          });
+        }
+        // Preserve AI's intra-bucket ordering. The server enforces 3/4/3
+        // by sorting on admissionLikelihood, so each bucket comes back
+        // with proper schools assigned.
+        setBucketed({
+          top10:  aiMatches.slice(0, 10),
+          reach:  aiMatches.filter((m) => m.admissionBucket === "reach"),
+          target: aiMatches.filter((m) => m.admissionBucket === "target"),
+          safety: aiMatches.filter((m) => m.admissionBucket === "safety"),
+        });
+      } catch (err: any) {
+        console.error("Error matching:", err);
+        setAiError(err?.message ?? "Could not generate matches. Please try again.");
+      }
       finally { setLoading(false); }
     }
     loadMatches();
@@ -184,20 +179,19 @@ export default function LockedPreviewPage() {
 
   const handleUnlock = async () => {
     if (!user) { navigate("/signup?from=results"); return; }
+    if (!bucketed || bucketed.top10.length === 0) {
+      setUnlockError("No matches to unlock. Please regenerate your report.");
+      return;
+    }
     setUnlocking(true);
     setUnlockError("");
     try {
-      // For ungated fields the recommended set can balloon into the
-      // thousands; mobile networks occasionally drop the request mid-flight
-      // and surface an opaque "internal" error. Cap the payload to the
-      // top-200 by match score — the server-side program gate + bucketize
-      // both prefer high-scorers anyway, so this doesn't change the report.
-      const recommendedMatches = allMatches
-        .filter(m => m.category === "Strong Fit" || m.category === "Good Fit" || m.category === "Exploratory Fit")
-        .sort((a, b) => (b.matchScore ?? 0) - (a.matchScore ?? 0))
-        .slice(0, 200);
+      // Send the AI-ranked top-10 — the same schools the user saw in the
+      // preview. The server preserves these buckets (no re-ranking) so
+      // the unlocked report renders identical schools to the preview.
+      const matchesToUnlock = bucketed.top10;
       const unlockFn = httpsCallable(functions, "unlockMatchReport", { timeout: 240_000 });
-      const result = await unlockFn({ profile, matches: recommendedMatches });
+      const result = await unlockFn({ profile, matches: matchesToUnlock });
       const data = result.data as any;
       if (data.noEligiblePrograms) { setUnlockError("no_eligible_programs"); return; }
       navigate(`/app/reports/${data.reportId}`);
@@ -211,7 +205,11 @@ export default function LockedPreviewPage() {
     } finally { setUnlocking(false); }
   };
 
-  if (loading) return <PageLoader label="Running matching algorithm" />;
+  if (loading) return <PageLoader label="Sit tight while we find your top matches…" />;
+
+  // AI ranker failed and there's nothing to show. No deterministic
+  // fallback — surface a clear error with a retry path.
+  if (aiError) return <MatchErrorScreen message={aiError} onRetry={() => window.location.reload()} />;
 
   const top10Count = bucketed?.top10.length ?? 0;
   const counts = {
@@ -332,10 +330,38 @@ export default function LockedPreviewPage() {
 // ─────────────────────────────────────────────────────────────────────────────
 function PageLoader({ label }: { label: string }) {
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center">
-      <div className="text-center">
-        <Loader2 size={20} className="text-slate-400 mx-auto mb-3 animate-spin" />
-        <p className="text-sm text-slate-500">{label}…</p>
+    <div className="min-h-screen bg-white flex items-center justify-center px-6">
+      <div className="text-center max-w-md">
+        <div className="relative w-16 h-16 mx-auto mb-5">
+          <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
+          <div className="absolute inset-0 rounded-full border-4 border-t-primary-600 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
+          <Sparkles size={20} className="absolute inset-0 m-auto text-primary-600" />
+        </div>
+        <p className="text-base font-semibold text-slate-900 mb-1">{label}</p>
+        <p className="text-xs text-slate-500">This usually takes 10–20 seconds.</p>
+      </div>
+    </div>
+  );
+}
+
+function MatchErrorScreen({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-6">
+      <div className="max-w-md w-full bg-white rounded-3xl border border-slate-200 shadow-sm p-7 text-center">
+        <div className="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-700 mx-auto mb-4">
+          <AlertTriangle size={22} />
+        </div>
+        <h2 className="text-xl font-bold tracking-tight text-slate-900 mb-2">We couldn't generate matches</h2>
+        <p className="text-sm text-slate-600 leading-relaxed mb-5">{message}</p>
+        <button
+          onClick={onRetry}
+          className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm py-3.5 rounded-2xl transition-colors active:scale-[0.99]"
+        >
+          Try again
+        </button>
+        <Link to="/intake" className="block mt-3 text-xs font-semibold text-slate-500 hover:text-slate-700">
+          Or edit your profile and retry
+        </Link>
       </div>
     </div>
   );
@@ -450,80 +476,115 @@ function UnlockDock({
   );
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 px-4 pb-5 pointer-events-none">
-      <motion.div
-        initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}
-        className="max-w-xl mx-auto pointer-events-auto"
-      >
-        {!unlocking ? (
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-[0_12px_50px_rgba(15,23,42,0.12)] p-4">
-            {unlockError && <UnlockErrorBanner kind={unlockError} />}
-            <button onClick={onUnlock}
-              className="flex items-center justify-center gap-2 w-full bg-slate-900 hover:bg-slate-800 text-white text-base font-semibold py-4 rounded-2xl transition-all active:scale-[0.99]">
-              {user ? <>Unlock report · 1 credit <Send size={15} /></>
-                    : <>Create free account <ArrowRight size={15} /></>}
-            </button>
-            {!user && (
-              <p className="mt-3 text-center text-[11px] text-slate-500">
-                Includes 2 free credits · Save schools · No card required
-              </p>
-            )}
-          </div>
-        ) : (
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-[0_12px_50px_rgba(15,23,42,0.12)] p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-2xl bg-slate-100 flex items-center justify-center flex-shrink-0">
-                <Loader2 size={16} className="text-slate-700 animate-spin" />
+    <>
+      {/* Sticky bottom CTA when NOT unlocking. Same as before. */}
+      {!unlocking && (
+        <div className="fixed inset-x-0 bottom-0 z-40 px-4 pb-5 pointer-events-none">
+          <motion.div
+            initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}
+            className="max-w-xl mx-auto pointer-events-auto"
+          >
+            <div className="bg-white rounded-3xl border border-slate-200 shadow-[0_12px_50px_rgba(15,23,42,0.12)] p-4">
+              {unlockError && <UnlockErrorBanner kind={unlockError} />}
+              <button onClick={onUnlock}
+                className="flex items-center justify-center gap-2 w-full bg-slate-900 hover:bg-slate-800 text-white text-base font-semibold py-4 rounded-2xl transition-all active:scale-[0.99]">
+                {user ? <>Unlock report · 1 credit <Send size={15} /></>
+                      : <>Create free account <ArrowRight size={15} /></>}
+              </button>
+              {!user && (
+                <p className="mt-3 text-center text-[11px] text-slate-500">
+                  Includes 2 free credits · Save schools · No card required
+                </p>
+              )}
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* POPUP OVERLAY during unlock. Sits over the locked-schools page
+          with a translucent dark backdrop so the user can still see the
+          shortlist behind it — keeps the unlock moment connected to the
+          schools they're paying to reveal. */}
+      {unlocking && (
+        <motion.div
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+          className="fixed inset-0 z-50 flex items-center justify-center px-5 py-8 bg-slate-950/60 backdrop-blur-sm"
+        >
+          <motion.div
+            initial={{ scale: 0.94, opacity: 0, y: 8 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            transition={{ type: "spring", stiffness: 300, damping: 26 }}
+            className="relative w-full max-w-sm bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 rounded-[28px] shadow-2xl shadow-slate-950/40 border border-white/10 overflow-hidden"
+          >
+            {/* Subtle background blooms inside the card */}
+            <div className="absolute -top-12 -right-12 w-48 h-48 bg-blue-500/25 rounded-full blur-[90px] pointer-events-none" />
+            <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-cyan-500/20 rounded-full blur-[90px] pointer-events-none" />
+
+            <div className="relative px-6 py-7 text-center">
+              {/* Hero spinner with pulsing ring */}
+              <div className="relative w-20 h-20 mx-auto mb-5">
+                <div className="absolute inset-0 rounded-full bg-blue-500/20 animate-ping" style={{ animationDuration: "2s" }} />
+                <div className="absolute inset-1 rounded-full border-[3px] border-white/15" />
+                <div className="absolute inset-1 rounded-full border-[3px] border-t-blue-400 border-r-transparent border-b-transparent border-l-transparent animate-spin" style={{ animationDuration: "1.4s" }} />
+                <div className="absolute inset-0 m-auto w-10 h-10 flex items-center justify-center">
+                  <Sparkles size={26} className="text-blue-300" />
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
+
+              <h2 className="text-xl font-black tracking-tight text-white mb-1">
+                Building your match report
+              </h2>
+              <p className="text-xs text-blue-200/75 font-medium mb-5">
+                Sit tight while we write personalised tips for each school.
+              </p>
+
+              {/* Stage label */}
+              <div className="bg-white/5 rounded-xl border border-white/10 px-3 py-2.5 mb-4">
                 <AnimatePresence mode="wait">
                   <motion.p
                     key={stageLabel}
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4 }}
+                    initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
                     transition={{ duration: 0.25 }}
-                    className="text-sm font-semibold text-slate-900 truncate"
+                    className="text-sm font-semibold text-white"
                   >
                     {stageLabel}
                   </motion.p>
                 </AnimatePresence>
-                <p className="text-[11px] text-slate-500 mt-0.5">Usually 30–60 seconds · {unlockElapsed}s</p>
+                <p className="text-[10px] text-blue-200/60 mt-0.5 tabular-nums">{unlockElapsed}s elapsed · usually 30–60s</p>
               </div>
-              <span className="text-sm font-bold text-slate-900 tabular-nums">{Math.round(progress)}%</span>
-            </div>
 
-            <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden mb-4">
-              <motion.div
-                className="h-full bg-slate-900 rounded-full"
-                initial={false}
-                animate={{ width: `${progress}%` }}
-                transition={{ duration: 0.6, ease: "easeOut" }}
-              />
-            </div>
-
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 min-h-[88px]">
-              <div className="flex items-center gap-1.5 mb-2">
-                <Sparkles size={12} className="text-amber-500" />
-                <p className="text-[11px] font-semibold text-slate-500">Did you know</p>
+              {/* Progress bar */}
+              <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden mb-5">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-blue-400 to-cyan-300 rounded-full"
+                  initial={false}
+                  animate={{ width: `${progress}%` }}
+                  transition={{ duration: 0.6, ease: "easeOut" }}
+                />
               </div>
-              <AnimatePresence mode="wait">
-                <motion.p
-                  key={tip}
-                  initial={{ opacity: 0, y: 4 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.3 }}
-                  className="text-[13px] text-slate-700 leading-relaxed"
-                >
-                  {tip}
-                </motion.p>
-              </AnimatePresence>
+
+              {/* Did you know card */}
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-left min-h-[96px]">
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Sparkles size={11} className="text-amber-300" />
+                  <p className="text-[10px] font-bold tracking-widest text-amber-200 uppercase">Did you know</p>
+                </div>
+                <AnimatePresence mode="wait">
+                  <motion.p
+                    key={tip}
+                    initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.3 }}
+                    className="text-[13px] text-white/90 leading-relaxed"
+                  >
+                    {tip}
+                  </motion.p>
+                </AnimatePresence>
+              </div>
             </div>
-          </div>
-        )}
-      </motion.div>
-    </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </>
   );
 }
 

@@ -61,7 +61,7 @@ DOCUMENT REQUESTS
   · "transcript"         — when academic preparation is in question
   · null                 — default; no upload requested this turn
 
-- NEVER re-request a document that already appears in the STUDENT-PROVIDED DOCUMENTS section — those have been verified. If you doubt a specific field on an already-uploaded document, ask a verbal clarifying question instead of asking for a re-upload.
+- NEVER re-request a document type that appears in the STUDENT-PROVIDED DOCUMENTS section. This is an absolute rule, with no exceptions. The student has already uploaded that document type — whether or not the extraction was readable. If the section says a document was "not readable" or "attempted but not readable", treat that as a normal real-world situation (blurry phone photo, wrong file, scan glare) and probe VERBALLY for the specific facts you'd want (SEVIS ID, school name, cost of attendance, etc.). Asking the student to upload the same document type a second time is a hard failure of the simulation.
 - Don't request a document at random. Only ask if the student's spoken answer leaves a gap that the document would close.
 - CRITICAL: Set requiresDocumentUpload to a non-null value ONLY when your "text" field literally asks the student to upload, share, send, or provide that document. If your text is just a clarifying question ("Who is he?", "How much exactly?", etc.), requiresDocumentUpload MUST be null. The student should be able to read your text and immediately know they're being asked for a file.
 - If the student says they don't have a requested document with them, accept it gracefully and probe verbally on the same topic instead. NEVER request the same document type a second time within one interview.
@@ -107,7 +107,7 @@ const VALID_STAGES = new Set([
 function safeOfficerFallback(turnIndex: number, lastUser: string | undefined): OfficerTurnResult {
   // Deterministic fallback so the practice can continue if Claude is unreachable.
   const fallbackBank: { text: string; stage: string }[] = [
-    { text: "Thank you. Could you tell me which university you'll be attending and why you chose it?",     stage: "school_choice" },
+    { text: "Thank you. Could you tell me which college you'll be attending and why you chose it?",       stage: "school_choice" },
     { text: "What programme will you be studying, and how does it fit your career plans?",                  stage: "study_plan" },
     { text: "How are you funding your studies? Please walk me through the sources of your tuition and living costs.", stage: "finances" },
     { text: "What do you plan to do after graduation? Where do you see yourself working, and in which country?", stage: "career_plan" },
@@ -247,18 +247,19 @@ export async function generateOfficerTurn(args: {
         requiresDocumentUpload = null;
       }
     }
-    // Sanity check 2: hard dedup against already-extracted documents.
-    // If Claude asks for an I-20 that's already been uploaded and parsed
-    // (it's in extractedDocuments), null it. The prompt forbids this but
-    // we don't trust LLMs to never slip up — and the bug it causes
-    // (re-prompting for an already-uploaded doc) is jarring on a fresh
-    // user's first run.
+    // Sanity check 2: hard dedup against any prior upload ATTEMPT, regardless
+    // of whether extraction succeeded. If the student already tried to upload
+    // an I-20 — even a wrong file that Claude couldn't read — we MUST NOT ask
+    // them to upload it again. Re-requesting after a failed extraction was
+    // the bug that made Anna feel like she "restarted" the interview when a
+    // user uploaded a random doc. The prompt forbids it; this is the
+    // belt-and-braces check.
     if (requiresDocumentUpload && extractedDocuments) {
-      const alreadyHave = extractedDocuments.some(
-        (d) => d.status === "completed" && d.documentType === requiresDocumentUpload,
+      const alreadyAttempted = extractedDocuments.some(
+        (d) => d.documentType === requiresDocumentUpload,
       );
-      if (alreadyHave) {
-        console.warn("[visaInterview] dropping requiresDocumentUpload — already extracted:", requiresDocumentUpload);
+      if (alreadyAttempted) {
+        console.warn("[visaInterview] dropping requiresDocumentUpload — already attempted:", requiresDocumentUpload);
         requiresDocumentUpload = null;
       }
     }

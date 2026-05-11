@@ -6,7 +6,7 @@ import Anthropic from "@anthropic-ai/sdk";
 
 export interface SchoolExplanation {
   schoolName: string;
-  tagline: string;               // e.g. "A top public research university in Texas"
+  tagline: string;               // e.g. "A top public research college in Texas"
   programAvailability: "yes" | "likely" | "check" | "unknown"; // does it offer the user's major?
   programNote: string;           // e.g. "Offers a highly-ranked Computer Science program"
   whyYouFit: string;             // 1-2 sentence personalised reason for this student
@@ -26,7 +26,7 @@ export interface AiReportExplanation {
 // System prompt — enthusiastic, helpful, no scary disclaimers
 // ============================================================
 
-const SYSTEM_PROMPT = `You are College Ready's enthusiastic university admissions advisor. Your job is to excite and empower students by explaining why the schools they have been matched with are great opportunities for them — and exactly how to put their best foot forward.
+const SYSTEM_PROMPT = `You are College Ready's enthusiastic college admissions advisor. Your job is to excite and empower students by explaining why the schools they have been matched with are great opportunities for them — and exactly how to put their best foot forward.
 
 PROGRAM AVAILABILITY IS ALREADY VERIFIED:
 Every school in this list has been confirmed by College Ready's verified program database (College Scorecard field-of-study data) to offer the student's intended program at the correct degree level. Do NOT infer, question, or re-evaluate program availability. Do NOT add schools. Do NOT remove schools. Explain ONLY the matches provided.
@@ -38,7 +38,7 @@ Each match has an "admissionBucket" of "reach", "target", or "safety" — alread
 - safety  → "Excellent backup with high admit probability." — emphasise security, funding upside, and how to convert it into a great offer (assistantships, honours college, scholarships).
 
 YOUR TONE:
-- Positive, warm, motivating. Think of a brilliant friend who went to a top university and is genuinely excited to help you.
+- Positive, warm, motivating. Think of a brilliant friend who went to a top college and is genuinely excited to help you.
 - Avoid corporate hedging like "may", "might", "could potentially". Be direct.
 - Use "you" and "your" to speak directly to the student.
 - Program availability is confirmed — speak with confidence about it.
@@ -82,7 +82,7 @@ function buildFallbackExplanation(profile: any, matches: any[]): AiReportExplana
 
   return {
     headline: `🎉 You have ${topMatches.length} potential schools to explore!`,
-    summary: `We matched you with ${topMatches.length} universities based on your academic profile, budget, and goals. ${strongCount > 0 ? `${strongCount} of them are a Strong or Good Fit — great news!` : "These schools offer real opportunities worth exploring."} Start by visiting the ones that excite you most.`,
+    summary: `We matched you with ${topMatches.length} colleges based on your academic profile, budget, and goals. ${strongCount > 0 ? `${strongCount} of them are a Strong or Good Fit — great news!` : "These schools offer real opportunities worth exploring."} Start by visiting the ones that excite you most.`,
     topStrengths: [
       profile.gpa ? `Your GPA of ${profile.gpa} makes you a competitive applicant` : "Your academic profile has been considered in the match",
       `We filtered for schools that align with your ${profile.funding || "funding"} preference`,
@@ -96,7 +96,7 @@ function buildFallbackExplanation(profile: any, matches: any[]): AiReportExplana
     ],
     schoolExplanations: topMatches.map((m) => ({
       schoolName: m.school?.name || "Unknown School",
-      tagline: `A ${m.school?.ownership || ""} university in ${m.school?.city || ""}, ${m.school?.state || "the US"}.`,
+      tagline: `A ${m.school?.ownership || ""} college in ${m.school?.city || ""}, ${m.school?.state || "the US"}.`,
       programAvailability: "check" as const,
       programNote: `Confirm program details for ${field} at the ${level} level on the school's official site.`,
       whyYouFit: `${m.matchScore}% overall match — your profile aligns with this school's typical admit and your stated budget.`,
@@ -214,7 +214,7 @@ export async function generateClaudeMatchExplanation({
     const anthropic = new Anthropic({ apiKey });
 
     const userPayload = JSON.stringify({
-      task: "Write enthusiastic, personalised university match explanations for this student. Program availability has already been verified by College Ready's database — every school listed is confirmed to offer the student's program. Return JSON only.",
+      task: "Write enthusiastic, personalised college match explanations for this student. Program availability has already been verified by College Ready's database — every school listed is confirmed to offer the student's program. Return JSON only.",
       studentProfile: prepareProfileSummary(profile),
       confirmedProgramField: normalisedField ?? null,
       confirmedCredentialLevel: normalisedLevel ?? null,

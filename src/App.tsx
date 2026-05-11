@@ -23,6 +23,10 @@ const BrowseSchoolsPage  = lazy(() => import("./pages/BrowseSchoolsPage"));
 const FullReportPage     = lazy(() => import("./pages/FullReportPage"));
 const RoadmapPage        = lazy(() => import("./pages/RoadmapPage"));
 const VisaInterviewPage  = lazy(() => import("./pages/VisaInterviewPage"));
+const InterviewReportDetailPage = lazy(() => import("./pages/InterviewReportDetailPage"));
+const PrivacyPage        = lazy(() => import("./pages/PrivacyPage"));
+const TermsPage          = lazy(() => import("./pages/TermsPage"));
+const ContactPage        = lazy(() => import("./pages/ContactPage"));
 
 function PageLoader() {
   return (
@@ -46,6 +50,9 @@ function App() {
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/faq" element={<FAQPage />} />
             <Route path="/schools" element={<BrowseSchoolsPage />} />
+            <Route path="/privacy" element={<PrivacyPage />} />
+            <Route path="/terms" element={<TermsPage />} />
+            <Route path="/contact" element={<ContactPage />} />
 
             {/* Protected Routes */}
             <Route element={<ProtectedRoute />}>
@@ -53,6 +60,7 @@ function App() {
               <Route path="/app/reports/:reportId" element={<FullReportPage />} />
               <Route path="/app/roadmap" element={<RoadmapPage />} />
               <Route path="/app/visa-interview" element={<VisaInterviewPage />} />
+              <Route path="/app/interview-reports/:reportId" element={<InterviewReportDetailPage />} />
             </Route>
           </Routes>
         </Suspense>

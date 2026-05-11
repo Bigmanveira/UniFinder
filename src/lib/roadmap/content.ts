@@ -66,9 +66,9 @@ export const POSTGRAD_ROADMAP: Roadmap = {
           id: "s1-assistantships",
           emoji: "💡",
           title: "Assistantships: the real path to a paid degree",
-          subtitle: "Universities pay you to study when you take on a graduate-level work role alongside your coursework.",
+          subtitle: "Colleges pay you to study when you take on a graduate-level work role alongside your coursework.",
           bullets: [
-            "Graduate Assistantships (GA): administrative or programme-support work for the university — tuition is waived and you receive a monthly stipend",
+            "Graduate Assistantships (GA): administrative or programme-support work for the college — tuition is waived and you receive a monthly stipend",
             "Teaching Assistantships (TA): you teach lab sections, run office hours, or grade for an undergrad course — typically requires you've taken a comparable class before",
             "Research Assistantships (RA): you join a professor's funded lab and contribute to active research — usually the most stable, multi-year form of support",
             "A typical full-time package: 100% tuition waiver, monthly stipend in the $1,000–$2,500 range, and student health insurance",
@@ -135,7 +135,7 @@ export const POSTGRAD_ROADMAP: Roadmap = {
           title: "Spot the programmes that actually fund internationals",
           subtitle: "Funding-friendly programmes aren't always obvious from the surface. Here's how to identify them quickly.",
           bullets: [
-            "Skip the university homepage. Open the actual department site and search for 'Financial Support', 'Funding', or 'Assistantships' — usually under 'Prospective Students'",
+            "Skip the college homepage. Open the actual department site and search for 'Financial Support', 'Funding', or 'Assistantships' — usually under 'Prospective Students'",
             "Send a one-line email to the graduate coordinator: 'Are international applicants eligible for assistantships in this programme?' Their reply (or silence) tells you everything",
             "Find current international graduate students on the department's people page. If they hold research roles or 'Teaching Fellow' titles, the programme funds them. If they're absent entirely, that's a red flag",
             "Stay clear of huge international cohorts in popular Master's programmes — those cohorts are designed around full-fee tuition, not assistantships",
@@ -247,7 +247,7 @@ export const POSTGRAD_ROADMAP: Roadmap = {
           subtitle: "Short, specific, and personal. Three sentences referencing actual work beats three paragraphs of general enthusiasm.",
           bullets: [
             "Subject line: 'Prospective {Master's | PhD} applicant — interested in {their specific research area}'",
-            "Sentence one: who you are in 12 words or less — your degree, your university, and your graduation year",
+            "Sentence one: who you are in 12 words or less — your degree, your college, and your graduation year",
             "Sentence two: cite a specific paper, talk, or recent project of theirs and explain what about it caught your attention",
             "Sentence three: ask the actual question — 'Will you be accepting students for Fall 202X?' or 'May I share my CV for your consideration?'",
             "Attach only your 2-page CV. Don't attach SOPs, transcripts, or test scores unless the professor explicitly asks",
@@ -376,26 +376,26 @@ export const UNDERGRAD_ROADMAP: Roadmap = {
           id: "u1-holistic",
           emoji: "🎓",
           title: "Holistic admissions, explained",
-          subtitle: "Universities here weigh far more than grades. Every part of your file does work.",
+          subtitle: "Colleges here weigh far more than grades. Every part of your file does work.",
           bullets: [
             "Your grades and test scores establish baseline academic competency — they get you into the conversation, not over the line",
             "Essays, recommendations, and extracurriculars reveal who you are beyond the numbers",
             "Demonstrated interest, leadership, and measurable impact separate strong applicants from average ones",
             "The most selective schools admit shaped students, not perfect students. Depth of one or two passions beats a long shallow list",
-            "Your story matters. Universities build an incoming class, not a leaderboard — you're competing on what you bring to the cohort",
+            "Your story matters. Colleges build an incoming class, not a leaderboard — you're competing on what you bring to the cohort",
           ],
         },
         {
           id: "u1-funding",
           emoji: "💰",
           title: "Need-aware vs need-blind for internationals",
-          subtitle: "Most U.S. universities fund international students through merit aid rather than need-based aid. Knowing the distinction matters.",
+          subtitle: "Most U.S. colleges fund international students through merit aid rather than need-based aid. Knowing the distinction matters.",
           bullets: [
             "Need-blind for internationals (a small group: Harvard, Yale, Princeton, MIT, Amherst, Bowdoin, plus a few more): your finances do not affect your admission decision",
             "Need-aware for internationals (almost everywhere else): applying for aid can lower your odds. Read each school's policy carefully before checking the aid box",
-            "Many universities offer merit-based scholarships up to full tuition. Search by school and apply early — scholarship deadlines often fall before admission deadlines",
+            "Many colleges offer merit-based scholarships up to full tuition. Search by school and apply early — scholarship deadlines often fall before admission deadlines",
             "Liberal arts colleges (Amherst, Williams, Pomona, Swarthmore) frequently offer the most generous international aid",
-            "State flagship universities rarely give significant aid to internationals. Plan for full out-of-state tuition unless you have an explicit merit award in writing",
+            "State flagship colleges rarely give significant aid to internationals. Plan for full out-of-state tuition unless you have an explicit merit award in writing",
           ],
           callouts: [
             { tone: "warn", body: "Read each school's international aid policy line by line. Phrases like 'generous aid' often refer to U.S. domestic students only." },
@@ -415,7 +415,7 @@ export const UNDERGRAD_ROADMAP: Roadmap = {
           title: "Picking a major (or going undecided)",
           subtitle: "You don't need a final answer, but a clear lean helps your application read coherently.",
           bullets: [
-            "Most U.S. universities allow you to switch majors after enrolling. The pressure to declare is far lower than in most other systems",
+            "Most U.S. colleges allow you to switch majors after enrolling. The pressure to declare is far lower than in most other systems",
             "Apply undecided if you genuinely don't know — for most schools it does not hurt your odds",
             "Strong applicants name 2–3 fields of interest and connect them with a clear narrative thread",
             "Engineering, business, and computer science are often capped majors. Applying directly is harder than applying undecided and transferring in once on campus",
@@ -535,7 +535,7 @@ export const UNDERGRAD_ROADMAP: Roadmap = {
           bullets: [
             "'Why us?' essays must name specific programmes, professors, courses, or traditions. Generic answers get tossed aside",
             "'Why this major?' essays should connect your background to your future plans, not just describe a passion",
-            "Don't recycle essays without rewriting. Admissions officers can tell when a 'Why University X' essay was originally written for University Y",
+            "Don't recycle essays without rewriting. Admissions officers can tell when a 'Why College X' essay was originally written for College Y",
             "Most schools have 1–4 supplements each. Budget your time honestly — supplements take longer to write well than the main personal statement",
             "Start supplements early. Drafts get better the longer you sit with them",
           ],
@@ -569,7 +569,7 @@ export const UNDERGRAD_ROADMAP: Roadmap = {
           bullets: [
             "Early Decision (ED): binding. If admitted, you must enrol. Higher admit rate but you can only apply ED to one school",
             "Early Action (EA): non-binding. You apply early, hear back early, and have no commitment to enrol",
-            "Restrictive Early Action (REA / SCEA): apply early to one private school plus only public-university early apps",
+            "Restrictive Early Action (REA / SCEA): apply early to one private school plus only public-college early apps",
             "Regular Decision (RD): the standard track most students use. Decisions arrive in March or April",
             "Apply EA wherever you can. Earlier answers reduce stress and let you compare offers in time to make decisions",
           ],

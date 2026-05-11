@@ -14,11 +14,14 @@ import { useAuth } from "../hooks/useAuth";
 
 export default function LandingPage() {
   const { user } = useAuth();
-  // /app/visa-interview is protected — sending a signed-out visitor there
-  // bounces them through ProtectedRoute back to "/" (the landing page),
-  // which felt like a dead button. Route signed-out users to signup so
-  // they actually progress; signed-in users go straight to the simulator.
-  const simulatorHref = user ? "/app/visa-interview" : "/signup";
+  // /app/visa-interview is protected. Signed-in users go straight there.
+  // Signed-out users land on /signup with `next` set so that ProtectedRoute
+  // honours their original intent post-auth and drops them at the simulator
+  // instead of the dashboard. Same `next` carries over if they click "Log in"
+  // on the signup page.
+  const simulatorHref = user
+    ? "/app/visa-interview"
+    : "/signup?next=/app/visa-interview";
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans selection:bg-primary-500 selection:text-white relative overflow-hidden">
@@ -56,16 +59,16 @@ export default function LandingPage() {
         <div className="flex-1 text-center lg:text-left animate-fade-up">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 text-slate-600 text-xs font-bold tracking-widest uppercase mb-8 shadow-sm">
             <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse"></span>
-            AI-Powered University Match Engine
+            AI-Powered College Match Engine
           </div>
 
           <h1 className="text-5xl md:text-7xl font-black text-slate-900 tracking-tight leading-[1.05] mb-6">
-            Find the university <br className="hidden md:block"/>
+            Find the college <br className="hidden md:block"/>
             <span className="text-transparent bg-clip-text bg-gradient-to-br from-primary-600 to-accent-500">that actually fits you.</span>
           </h1>
 
           <p className="text-lg md:text-xl text-slate-500 font-medium max-w-2xl mx-auto lg:mx-0 mb-10 leading-relaxed">
-            AI-powered university matching, grounded in verified program data — plus a realistic F-1 visa interview simulator for the moment that actually decides whether you get there.
+            AI-powered college matching, grounded in verified program data — plus a realistic F-1 visa interview simulator for the moment that actually decides whether you get there.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center gap-5 justify-center lg:justify-start">
@@ -88,35 +91,49 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Hero Visual Mockup */}
+        {/* Hero Visual Mockup — example match preview.
+            Header uses a real Stanford campus photo (the Memorial Arch /
+            Main Quad area on Unsplash) so the card looks like an actual
+            school match instead of a generic emoji placeholder. */}
         <div className="flex-1 w-full max-w-lg relative animate-fade-up-slow">
-          <div className="bg-white md:bg-white/90 md:backdrop-blur-2xl border border-slate-100 md:border-white p-6 md:p-8 rounded-[40px] shadow-2xl shadow-slate-300/50 relative z-20">
-            <div className="absolute -top-4 -right-4 bg-slate-900 text-white text-xs font-black tracking-widest uppercase px-4 py-2 rounded-full shadow-lg rotate-6 flex items-center gap-1">
+          <div className="bg-white md:bg-white/90 md:backdrop-blur-2xl border border-slate-100 md:border-white rounded-[40px] shadow-2xl shadow-slate-300/50 relative z-20 overflow-hidden">
+            <div className="absolute top-4 right-4 z-10 bg-slate-900 text-white text-xs font-black tracking-widest uppercase px-4 py-2 rounded-full shadow-lg rotate-6 flex items-center gap-1">
               <Sparkles size={14} className="text-amber-400" /> 98% Match
             </div>
 
-            <div className="w-16 h-16 bg-primary-50 rounded-2xl flex items-center justify-center mb-6 border border-primary-100">
-              <span className="text-3xl">🏛️</span>
+            {/* Stock photo of Stanford's campus. The gradient overlay keeps
+                the badge legible and gives the card a magazine-cover feel. */}
+            <div className="relative h-44 md:h-52 -mb-8 overflow-hidden">
+              <img
+                src="https://images.unsplash.com/photo-1607237138185-eedd9c632b0b?auto=format&fit=crop&w=1200&q=80"
+                alt="Stanford University campus"
+                loading="lazy"
+                decoding="async"
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-white to-transparent pointer-events-none" />
             </div>
 
-            <h3 className="text-2xl font-black text-slate-900 mb-1">Stanford University</h3>
-            <p className="text-slate-500 font-medium text-sm mb-6 pb-6 border-b border-slate-100">MS Computer Science</p>
+            <div className="relative px-6 md:px-8 pb-6 md:pb-8 pt-2">
+              <h3 className="text-2xl font-black text-slate-900 mb-1">Stanford University</h3>
+              <p className="text-slate-500 font-medium text-sm mb-6 pb-6 border-b border-slate-100">MS Computer Science</p>
 
-            <div className="space-y-4 mb-6">
-              <div className="flex justify-between items-center bg-slate-50 p-3 rounded-2xl">
-                <span className="text-xs font-bold tracking-widest text-slate-400 uppercase">Tuition</span>
-                <span className="font-black text-slate-900">$57,000/yr</span>
+              <div className="space-y-4 mb-6">
+                <div className="flex justify-between items-center bg-slate-50 p-3 rounded-2xl">
+                  <span className="text-xs font-bold tracking-widest text-slate-400 uppercase">Tuition</span>
+                  <span className="font-black text-slate-900">$57,000/yr</span>
+                </div>
+                <div className="flex justify-between items-center bg-slate-50 p-3 rounded-2xl">
+                  <span className="text-xs font-bold tracking-widest text-slate-400 uppercase">Funding</span>
+                  <span className="font-black text-emerald-600">Available</span>
+                </div>
               </div>
-              <div className="flex justify-between items-center bg-slate-50 p-3 rounded-2xl">
-                <span className="text-xs font-bold tracking-widest text-slate-400 uppercase">Funding</span>
-                <span className="font-black text-emerald-600">Available</span>
-              </div>
-            </div>
 
-            <div className="bg-primary-50 rounded-2xl p-4 border border-primary-100">
-              <p className="text-xs font-bold text-primary-900 leading-relaxed">
-                "Based on your 3.8 GPA and budget constraints, this program is highly viable..."
-              </p>
+              <div className="bg-primary-50 rounded-2xl p-4 border border-primary-100">
+                <p className="text-xs font-bold text-primary-900 leading-relaxed">
+                  "Based on your 3.8 GPA and budget constraints, this program is highly viable..."
+                </p>
+              </div>
             </div>
           </div>
 
@@ -129,25 +146,25 @@ export default function LandingPage() {
       <section id="how-it-works" className="py-20 md:py-24 bg-white relative z-20">
         <div className="max-w-6xl mx-auto px-6">
           <div className="text-center mb-12 md:mb-16">
-            <h2 className="text-3xl md:text-5xl font-black text-slate-900 tracking-tight mb-4">AI matching, <br/><span className="text-primary-600">grounded in real data.</span></h2>
-            <p className="text-lg text-slate-500 font-medium max-w-2xl mx-auto">No hallucinated schools, no generic lists. Every match is filtered through verified institutional records before our AI ever sees it.</p>
+            <h2 className="text-3xl md:text-5xl font-black text-slate-900 tracking-tight mb-4">Your acceptance <br/><span className="text-primary-600">starts here.</span></h2>
+            <p className="text-lg text-slate-500 font-medium max-w-2xl mx-auto">Skip the guesswork. Get a personalised college shortlist built around your strengths, your budget, and your future — backed by verified data, not vibes.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <FeatureCard
               icon={<Target className="text-accent-500" size={28} />}
-              title="Precision Profile Matching"
-              desc="Your GPA, test scores, intended field, and funding opportunities are weighed against thousands of programs to surface the ones you can actually get into and afford."
+              title="Matched to who you really are"
+              desc="Your GPA, scores, budget, and goals shape every recommendation — so the colleges you see are ones where you can actually get in, afford to attend, and thrive."
             />
             <FeatureCard
               icon={<ShieldCheck className="text-emerald-500" size={28} />}
-              title="Verified Programs Only"
-              desc="Every recommended school is cross-checked against accredited program data — no AI invention, no out-of-date listings, no programs that don't exist."
+              title="Real schools. Real programs."
+              desc="Every match is cross-checked against accredited program data. No invented schools, no dead listings, no application fees wasted chasing programs that don't exist."
             />
             <FeatureCard
               icon={<BrainCircuit className="text-primary-500" size={28} />}
-              title="Personalized AI Reasoning"
-              desc="For each match you get a written explanation of why this program fits your profile, what funding paths exist, and what to strengthen before applying."
+              title="Clear reasons, real strategy"
+              desc="Each match comes with a written explanation of why it fits, the funding paths worth chasing, and exactly what to strengthen — turning your shortlist into a plan."
             />
           </div>
         </div>
@@ -272,9 +289,9 @@ export default function LandingPage() {
           </div>
           <div className="flex gap-6 text-sm font-bold text-slate-400">
             <Link to="/faq" className="hover:text-primary-600 transition-colors">FAQ</Link>
-            <a href="#" className="hover:text-primary-600 transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-primary-600 transition-colors">Terms of Service</a>
-            <a href="#" className="hover:text-primary-600 transition-colors">Contact</a>
+            <Link to="/privacy" className="hover:text-primary-600 transition-colors">Privacy Policy</Link>
+            <Link to="/terms" className="hover:text-primary-600 transition-colors">Terms of Service</Link>
+            <Link to="/contact" className="hover:text-primary-600 transition-colors">Contact</Link>
           </div>
           <p className="text-xs font-medium text-slate-400">
             © 2026 College Ready. Practice tools only. Not affiliated with any government, embassy, or consular service.

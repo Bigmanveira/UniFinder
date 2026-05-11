@@ -172,18 +172,26 @@ export async function extractVisaDocument(args: {
  * to be human-pretty.
  */
 export function formatDocumentsForOfficer(docs: ExtractedDocument[]): string {
-  const completed = docs.filter((d) => d.status === "completed" && d.summary);
-  if (completed.length === 0) return "";
+  if (docs.length === 0) return "";
   const lines: string[] = [
     "",
-    "STUDENT-PROVIDED DOCUMENTS (you have already reviewed these — do NOT ask the student to re-state facts that appear here verbatim):",
+    "STUDENT-PROVIDED DOCUMENTS (the student has already uploaded these — do NOT ask them to upload any of these document types again, even if extraction was imperfect):",
   ];
-  for (const d of completed) {
-    lines.push(`- ${d.documentType}: ${d.summary}`);
-    const fieldEntries = Object.entries(d.fields).filter(([, v]) => v !== null && v !== "");
-    if (fieldEntries.length > 0) {
-      const compact = fieldEntries.map(([k, v]) => `${k}=${v}`).join("; ");
-      lines.push(`  fields: ${compact}`);
+  for (const d of docs) {
+    if (d.status === "completed" && d.summary) {
+      lines.push(`- ${d.documentType}: ${d.summary}`);
+      const fieldEntries = Object.entries(d.fields).filter(([, v]) => v !== null && v !== "");
+      if (fieldEntries.length > 0) {
+        const compact = fieldEntries.map(([k, v]) => `${k}=${v}`).join("; ");
+        lines.push(`  fields: ${compact}`);
+      }
+    } else {
+      // Failed extraction: the student DID try to upload this, but the file
+      // wasn't readable (wrong document, blurry photo, etc.). We tell Anna
+      // explicitly so she doesn't re-request the upload — she probes verbally
+      // instead, e.g. "What's the SEVIS ID on your I-20?" rather than
+      // "Could you upload your I-20?"
+      lines.push(`- ${d.documentType}: (Student attempted to upload this, but the file was not readable. Do NOT request another upload — probe verbally for the specific facts you'd want from this document.)`);
     }
   }
   return lines.join("\n");

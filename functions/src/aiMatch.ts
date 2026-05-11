@@ -70,7 +70,7 @@ export interface AiMatchResult {
 const MAX_CANDIDATES_TO_RANK = 80;
 const TARGET_TOP_K = 12;
 
-const SYSTEM_PROMPT = `You are an experienced U.S. university admissions advisor. You will be given a student profile and a verified list of universities — each one is already confirmed to offer the student's intended program at the right degree level. Your job is to rank the BEST ${TARGET_TOP_K} of them, assign each to reach / target / safety, and score the fit.
+const SYSTEM_PROMPT = `You are an experienced U.S. college admissions advisor. You will be given a student profile and a verified list of colleges — each one is already confirmed to offer the student's intended program at the right degree level. Your job is to rank the BEST ${TARGET_TOP_K} of them, assign each to reach / target / safety, and score the fit.
 
 EVALUATION CRITERIA (apply judgment, not a formula):
 - Academic fit: how the student's stats (GPA, test scores) compare to the school's typical admit. Be calibrated — at 3.6 GPA, MIT is reach, not target.
@@ -78,7 +78,7 @@ EVALUATION CRITERIA (apply judgment, not a formula):
 - Selectivity vs applicant strength. Schools with admit rate ≤ 15% are reach for almost everyone; ≥ 60% is safety for a competent applicant.
 - Funding viability vs the student's funding situation (Full Scholarship / Partial / Self-Funded). For Self-Funded, weight cost more heavily.
 - Geographic / institutional diversity in the picked set — avoid 10 schools that all look the same. Mix selectivity tiers within each bucket.
-- For doctoral candidates, weight research universities heavily over teaching-focused schools.
+- For doctoral candidates, weight research colleges heavily over teaching-focused schools.
 - For masters, weight programme depth and funding availability.
 - For undergrad, weight institutional fit + cost + brand recognition.
 
@@ -210,9 +210,6 @@ Rank the top ${TARGET_TOP_K} for this student and return the JSON described in t
     const admissionLikelihood = clampInt(m.admissionLikelihood, 0, 100, 50);
     const category = ["Strong Fit", "Good Fit", "Exploratory Fit"].includes(m.category)
       ? m.category : (matchScore >= 80 ? "Strong Fit" : matchScore >= 65 ? "Good Fit" : "Exploratory Fit");
-    const admissionBucket = ["reach", "target", "safety"].includes(m.admissionBucket)
-      ? m.admissionBucket
-      : (admissionLikelihood < 30 ? "reach" : admissionLikelihood < 70 ? "target" : "safety");
     const budgetFit = ["Excellent", "Good", "Stretch", "Out of Budget"].includes(m.budgetFit)
       ? m.budgetFit : "Good";
     const academicFit = ["Likely", "Target", "Reach", "High Reach", "Limited Data"].includes(m.academicFit)
@@ -222,7 +219,10 @@ Rank the top ${TARGET_TOP_K} for this student and return the JSON described in t
       unitId,
       matchScore,
       category,
-      admissionBucket,
+      // Bucket assignment is RE-DERIVED below from sorted likelihoods so we
+      // always produce a clean 3/4/3 split. Storing Claude's claim here is
+      // pointless because we're about to overwrite it.
+      admissionBucket: "target",
       admissionLikelihood,
       budgetFit,
       academicFit,
@@ -230,6 +230,31 @@ Rank the top ${TARGET_TOP_K} for this student and return the JSON described in t
     });
   }
 
+  // ── Enforce 3/4/3 reach/target/safety split ────────────────────────────
+  // Claude's freeform bucket assignment was unreliable — sometimes 8 reach
+  // and 0 target, sometimes all in one bucket, leaving tabs empty. Instead
+  // of trusting it, we sort the AI-picked matches by admissionLikelihood
+  // and slice into thirds. Lowest likelihood → reach (hardest), highest →
+  // safety (easiest). This guarantees buckets always sieve and is the
+  // canonical mathematical relationship anyway.
+  const sortedByLikelihood = [...matches].sort((a, b) => a.admissionLikelihood - b.admissionLikelihood);
+  const n = sortedByLikelihood.length;
+  // For 10 we want 3+4+3. For fewer items, scale proportionally.
+  const reachCount  = Math.min(3, Math.ceil(n * 0.3));
+  const safetyCount = Math.min(3, Math.ceil(n * 0.3));
+  const targetCount = Math.max(0, n - reachCount - safetyCount);
+  for (let i = 0; i < n; i++) {
+    let bucket: AiRankedMatch["admissionBucket"];
+    if (i < reachCount)                            bucket = "reach";
+    else if (i < reachCount + targetCount)         bucket = "target";
+    else                                           bucket = "safety";
+    sortedByLikelihood[i].admissionBucket = bucket;
+  }
+
+  // Return the matches in their ORIGINAL Claude order (best fit first
+  // overall), but with corrected bucket labels. The client groups by
+  // bucket; the order within each bucket then preserves Claude's
+  // ranking of fit within similarly-bucketed schools.
   return { matches, status: "completed" };
 }
 

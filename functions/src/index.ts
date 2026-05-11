@@ -412,11 +412,34 @@ export const unlockMatchReport = onCall(
       };
     }
 
-    // ── Step 3: Bucketize into top-10 (Reach / Target / Safety) ──────────────
-    const bucketed = bucketizeForClaude(programEligibleMatches);
+    // ── Step 3: Group into reach/target/safety ──────────────────────────────
+    // The client now sends AI-ranked matches with admissionBucket already
+    // assigned (and 3/4/3 enforced server-side in aiMatch.ts). Trust those
+    // labels and group accordingly — re-running bucketizeForClaude would
+    // re-sort by admit rate and trash the AI's curated order, causing the
+    // report to show different schools than the preview did.
+    const allHaveAiBucket = programEligibleMatches.every(
+      (m: any) => m?.admissionBucket === "reach" || m?.admissionBucket === "target" || m?.admissionBucket === "safety"
+    );
+    let bucketed: BucketedMatches;
+    if (allHaveAiBucket) {
+      const reach  = programEligibleMatches.filter((m: any) => m.admissionBucket === "reach");
+      const target = programEligibleMatches.filter((m: any) => m.admissionBucket === "target");
+      const safety = programEligibleMatches.filter((m: any) => m.admissionBucket === "safety");
+      bucketed = {
+        top10:  [...reach, ...target, ...safety].slice(0, 10),
+        reach,
+        target,
+        safety,
+      };
+    } else {
+      // No AI bucketing on input (deterministic fallback path during a
+      // brief Claude outage, or legacy clients). Use the old logic.
+      bucketed = bucketizeForClaude(programEligibleMatches);
+    }
     console.log(
-      `[unlockMatchReport] Top 10: reach=${bucketed.reach.length} ` +
-      `target=${bucketed.target.length} safety=${bucketed.safety.length}`,
+      `[unlockMatchReport] Top 10 (${allHaveAiBucket ? "AI" : "deterministic"}): ` +
+      `reach=${bucketed.reach.length} target=${bucketed.target.length} safety=${bucketed.safety.length}`,
     );
 
     // ── Step 4: Call Claude with the top-10 bucketed matches ─────────────────
@@ -761,10 +784,18 @@ export const sendVisaInterviewAnswer = onCall(
       createdAt: now,
     });
 
-    // Update session metadata (questionCount, currentStage, requested docs)
+    // Update session metadata (questionCount, currentStage, requested docs).
+    // Once the interview proper has started, NEVER let currentStage revert to
+    // "documents" — that's the gate for the intro upload flow and reverting
+    // it would cause the next upload to fire pickIntroQuestion() and feel
+    // like the interview restarted.
+    const isPostIntro = !!session.interviewStartedAt;
+    const clampedStage = (isPostIntro && officer.stage === "documents")
+      ? (session.currentStage && session.currentStage !== "documents" ? session.currentStage : "study_plan")
+      : officer.stage;
     const updates: Record<string, any> = {
       questionCount: admin.firestore.FieldValue.increment(1),
-      currentStage:  officer.stage,
+      currentStage:  clampedStage,
       updatedAt:     now,
     };
     if (officer.requiresDocumentUpload === "i20") {
@@ -879,10 +910,16 @@ export const recordVisaInterviewDocument = onCall(
 
     // Stash extraction in session.extractedDocuments[type] for re-use on every
     // subsequent officer turn. We keep one per type — re-uploads overwrite.
+    // CRITICAL: we stash FAILED extractions too. Without that, an unreadable
+    // upload looks like "no document" to Anna and she re-requests it on her
+    // next turn — which a previous user hit when they uploaded a wrong file.
+    // The dedup check in generateOfficerTurn matches by documentType only, so
+    // failed attempts still suppress re-requests; we expose the failure in
+    // the system prompt so Anna probes verbally instead.
     const extractedDocsAfter: Record<string, ExtractedDocument> = {
       ...(session.extractedDocuments ?? {}),
     };
-    if (extracted && extracted.status === "completed") {
+    if (extracted) {
       extractedDocsAfter[documentType] = extracted;
     }
 
@@ -953,7 +990,15 @@ export const recordVisaInterviewDocument = onCall(
         elapsedMs:     elapsedSinceInterviewStart(session),
       });
       nextOfficerText = officer.text;
-      nextStage = officer.stage;
+      // Once the interview proper has started, currentStage must NEVER revert
+      // to "documents". If it does, the next upload would be treated as part
+      // of the intro flow and could fire pickIntroQuestion() — effectively
+      // restarting the interview. Force a neutral interview-stage value if
+      // Claude tries to set documents stage post-intro.
+      const isPostIntro = !!session.interviewStartedAt;
+      nextStage = (isPostIntro && officer.stage === "documents")
+        ? (session.currentStage && session.currentStage !== "documents" ? session.currentStage : "study_plan")
+        : officer.stage;
       // Allow Anna to chain another doc request only if it's a different type.
       nextRequiresUpload = officer.requiresDocumentUpload && officer.requiresDocumentUpload !== documentType
         ? officer.requiresDocumentUpload

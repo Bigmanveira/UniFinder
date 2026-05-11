@@ -7,6 +7,17 @@ service firebase.storage {
       allow read, write: if false;
     }
 
+    // Profile avatar — strictly per-user, image only, 5 MB cap.
+    // Path: users/{uid}/profile/avatar (single file, overwritten on re-upload).
+    match /users/{uid}/profile/{fileName} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.size < 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
     // F-1 visa interview document uploads — strictly per-user.
     // Path format: users/{uid}/visa-interviews/{sessionId}/{docType}/{fileName}
     //   docType is one of: i20, ds160_confirmation, bank_statement,

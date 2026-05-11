@@ -1,8 +1,16 @@
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Wraps protected /app routes. If the user is signed-out, we bounce them to
+// /login but preserve the path they were trying to reach via a `?next=…`
+// query param. LoginPage and SignupPage honour that param after a successful
+// sign-in so the user lands where they intended — instead of being dumped on
+// the dashboard or the landing page.
+// ─────────────────────────────────────────────────────────────────────────────
 export const ProtectedRoute = () => {
   const { user, loading } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -12,8 +20,15 @@ export const ProtectedRoute = () => {
     );
   }
 
-  // Send unauthenticated users to the landing page instead of /login.
-  // The landing page hosts the Log In / Start CTAs and is what users expect
-  // to see after signing out (vs. immediately re-entering credentials).
-  return user ? <Outlet /> : <Navigate to="/" replace />;
+  if (!user) {
+    const nextPath = `${location.pathname}${location.search}${location.hash}`;
+    // Don't bother round-tripping "/" — that's just the landing page and
+    // adding it as a redirect target is noise.
+    const search = nextPath && nextPath !== "/"
+      ? `?next=${encodeURIComponent(nextPath)}`
+      : "";
+    return <Navigate to={`/login${search}`} replace />;
+  }
+
+  return <Outlet />;
 };

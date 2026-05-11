@@ -520,7 +520,7 @@ export function getProfileImprovementAdvice(profile: StudentProfile): ProfileAdv
       if (isTargetingAbroad) {
         advice.push({
           title: "Strengthen your graduate application profile",
-          body: "Because your GPA is below 2.5 and you are considering postgraduate study abroad, your current academic profile may be risky for many programs. Consider taking the GRE where accepted or recommended, and consider a WES or course-by-course credential evaluation where required or helpful. Always verify requirements on each university's official admissions page.",
+          body: "Because your GPA is below 2.5 and you are considering postgraduate study abroad, your current academic profile may be risky for many programs. Consider taking the GRE where accepted or recommended, and consider a WES or course-by-course credential evaluation where required or helpful. Always verify requirements on each college's official admissions page.",
           actions: ["Check GRE requirements", "Check credential evaluation requirements", "Shortlist broader-access programs"]
         });
       } else {
@@ -544,7 +544,7 @@ export function getProfileImprovementAdvice(profile: StudentProfile): ProfileAdv
   if (profile.funding && profile.funding.toLowerCase().includes("full")) {
     advice.push({
       title: "High financial need",
-      body: "You indicated a need for a full scholarship. We recommend filtering for lower-cost public institutions and checking funding options directly with the universities.",
+      body: "You indicated a need for a full scholarship. We recommend filtering for lower-cost public institutions and checking funding options directly with the colleges.",
       actions: ["Check official funding options"]
     });
   }

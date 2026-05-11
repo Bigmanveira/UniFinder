@@ -80,14 +80,19 @@ export default function InterviewReportView({ report, onRetry, onBack }: Props) 
           </div>
         </div>
 
-        {/* Sub-scores grid */}
+        {/* Sub-scores grid — show "score / 100" so the user reads each as a
+            fraction, not an opaque number. The dimmer "/100" suffix keeps
+            the headline number prominent while making the scale obvious. */}
         <div className="relative mt-6 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           {SCORE_LABELS.map(({ key, label }) => {
             const v = (report[key] as number) ?? 0;
             return (
               <div key={key} className="bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2.5">
-                <p className="text-[11px] text-white/60 leading-none mb-1">{label}</p>
-                <p className={`text-xl font-bold tabular-nums leading-none ${scoreColor(v)} brightness-150`}>{v}</p>
+                <p className="text-[11px] text-white/60 leading-none mb-1.5">{label}</p>
+                <p className={`leading-none ${scoreColor(v)} brightness-150`}>
+                  <span className="text-xl font-bold tabular-nums">{v}</span>
+                  <span className="text-[11px] font-medium opacity-60 ml-0.5">/100</span>
+                </p>
               </div>
             );
           })}

@@ -5,10 +5,21 @@ import { auth, googleProvider } from "../lib/firebase";
 import { GraduationCap, ArrowRight, Mail, Lock } from "lucide-react";
 import { motion } from "framer-motion";
 
+// Only honour next-paths that are same-site (start with "/" but not "//").
+// Stops a malicious link like /login?next=//evil.example from redirecting
+// the user off-site after sign-in. Returns null when the input is unsafe.
+function sanitizeNextPath(raw: string | null): string | null {
+  if (!raw) return null;
+  if (!raw.startsWith("/")) return null;
+  if (raw.startsWith("//"))  return null;
+  return raw;
+}
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const fromResults = searchParams.get("from") === "results";
+  const nextPath    = sanitizeNextPath(searchParams.get("next"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -25,12 +36,22 @@ export default function LoginPage() {
     return Date.now() < parseInt(expires, 10);
   };
 
+  // Where do we send the user post-login?
+  //   1. The explicit `next` query param (preserves protected-route intent)
+  //   2. The legacy /results round-trip
+  //   3. Otherwise the dashboard
+  const computePostLoginPath = () => {
+    if (nextPath) return nextPath;
+    if (shouldGoToResults()) return "/results";
+    return "/app";
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      navigate(shouldGoToResults() ? "/results" : "/app");
+      navigate(computePostLoginPath());
     } catch (err) {
       console.error(err);
       alert("Invalid email or password.");
@@ -51,11 +72,21 @@ export default function LoginPage() {
         return;
       }
 
-      navigate(shouldGoToResults() ? "/results" : "/app");
+      navigate(computePostLoginPath());
     } catch (err) {
       console.error(err);
     }
   };
+
+  // Build the cross-link to /signup so the user doesn't lose their intended
+  // destination when they switch tabs.
+  const signupHref = (() => {
+    const params = new URLSearchParams();
+    if (fromResults) params.set("from", "results");
+    if (nextPath)    params.set("next", nextPath);
+    const qs = params.toString();
+    return qs ? `/signup?${qs}` : "/signup";
+  })();
 
   return (
     <div className="min-h-screen relative flex items-center justify-center p-4 sm:p-6 font-sans selection:bg-primary-500 selection:text-white">
@@ -64,7 +95,7 @@ export default function LoginPage() {
         <img 
           src="https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=2000&auto=format&fit=crop" 
           className="w-full h-full object-cover" 
-          alt="University Campus" 
+          alt="College Campus"
         />
         <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"></div>
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent"></div>
@@ -150,7 +181,7 @@ export default function LoginPage() {
           </form>
 
           <p className="text-sm font-medium text-slate-500 text-center mt-8">
-            Don't have an account? <Link to="/signup" className="text-primary-600 font-black hover:underline">Sign up</Link>
+            Don't have an account? <Link to={signupHref} className="text-primary-600 font-black hover:underline">Sign up</Link>
           </p>
 
         </div>

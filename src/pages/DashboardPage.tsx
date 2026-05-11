@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { auth, db } from "../lib/firebase";
-import { signOut } from "firebase/auth";
-import { doc, onSnapshot, updateDoc } from "firebase/firestore";
-import { LogOut, Plus, Wallet, Bookmark, FileText, ChevronRight, User, GraduationCap, MapPin, Sparkles, Camera, Globe, Trash2, ChevronDown, ChevronUp, ArrowRight, Heart, Map, Gift, Copy, Check, Send, Mail, Home, ShieldAlert, Menu, X, Bell } from "lucide-react";
+import { auth, db, storage } from "../lib/firebase";
+import { signOut, sendPasswordResetEmail } from "firebase/auth";
+import { doc, getDoc, onSnapshot, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
+import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import { LogOut, Plus, Wallet, Bookmark, FileText, ChevronRight, User, GraduationCap, MapPin, Sparkles, Camera, Globe, Trash2, ChevronDown, ChevronUp, ArrowRight, Heart, Map, Gift, Copy, Check, Send, Mail, Home, ShieldAlert, Menu, X, Bell, Mic, KeyRound, Loader2, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { collection, query, where } from "firebase/firestore";
 import { FadeIn, FadeInItem } from "../components/FadeIn";
@@ -16,8 +17,13 @@ export default function DashboardPage() {
   const [activeTab, setActiveTab] = useState("matches");
   const [credits, setCredits] = useState<number>(0);
   const [matchReports, setMatchReports] = useState<any[]>([]);
+  const [interviewReports, setInterviewReports] = useState<any[]>([]);
   const [savedSchools, setSavedSchools] = useState<any[]>([]);
   const [showAllReports, setShowAllReports] = useState(false);
+  const [showAllInterviews, setShowAllInterviews] = useState(false);
+  // Live user-profile doc so saved displayName + avatar reflect everywhere
+  // (top-right avatar, dashboard greeting, drawer header).
+  const [userProfile, setUserProfile] = useState<{ displayName?: string; photoURL?: string } | null>(null);
   // Mobile drawer (the new top navbar uses a hamburger that opens this).
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
@@ -52,6 +58,29 @@ export default function DashboardPage() {
       setMatchReports(reports);
     });
 
+    const qInterviews = query(collection(db, "visaInterviewReports"), where("userId", "==", user.uid));
+    const unsubInterviews = onSnapshot(qInterviews, (snapshot) => {
+      const reports: any[] = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+      reports.sort((a, b) => {
+        const tA = a.createdAt?.toMillis?.() || 0;
+        const tB = b.createdAt?.toMillis?.() || 0;
+        return tB - tA;
+      });
+      setInterviewReports(reports);
+    });
+
+    const unsubProfile = onSnapshot(doc(db, "users", user.uid), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data() as any;
+        setUserProfile({
+          displayName: typeof data.displayName === "string" ? data.displayName : undefined,
+          photoURL:    typeof data.photoURL    === "string" ? data.photoURL    : undefined,
+        });
+      } else {
+        setUserProfile(null);
+      }
+    });
+
     const unsubSaved = onSnapshot(doc(db, "savedSchools", user.uid), (docSnap) => {
       if (docSnap.exists()) {
         const data = docSnap.data();
@@ -64,6 +93,8 @@ export default function DashboardPage() {
     return () => {
       unsubCredits();
       unsubReports();
+      unsubInterviews();
+      unsubProfile();
       unsubSaved();
     };
   }, [user]);
@@ -73,7 +104,12 @@ export default function DashboardPage() {
     navigate("/");
   };
 
-  const username = user?.email ? user.email.split('@')[0] : "Student";
+  const emailHandle = user?.email ? user.email.split('@')[0] : "Student";
+  // Prefer the saved display name everywhere the dashboard greets the user.
+  // We still keep emailHandle around for the username strip ("@email") and
+  // initials-fallback when no avatar is set.
+  const username = userProfile?.displayName?.trim() || emailHandle;
+  const avatarURL = userProfile?.photoURL ?? null;
 
   return (
     <div className="min-h-screen bg-slate-50 flex font-sans selection:bg-primary-500 selection:text-white">
@@ -94,6 +130,7 @@ export default function DashboardPage() {
           <DesktopNavItem icon={<Bookmark size={18} />} label="Saved Schools" active={activeTab === "saved"} onClick={() => setActiveTab("saved")} badge={savedSchools.length} />
           <DesktopNavItem icon={<Map size={18} />} label="Roadmap" active={false} onClick={() => navigate("/app/roadmap")} />
           <DesktopNavItem icon={<ShieldAlert size={18} />} label="Live interview practice" active={false} onClick={() => navigate("/app/visa-interview")} />
+          <DesktopNavItem icon={<Mic size={18} />} label="Interview history" active={activeTab === "interviews"} onClick={() => setActiveTab("interviews")} badge={interviewReports.length} />
           <DesktopNavItem icon={<Wallet size={18} />} label="Credits & Billing" active={activeTab === "billing"} onClick={() => setActiveTab("billing")} />
           <DesktopNavItem icon={<User size={18} />} label="Profile" active={activeTab === "profile"} onClick={() => setActiveTab("profile")} />
         </nav>
@@ -122,12 +159,13 @@ export default function DashboardPage() {
                 {activeTab === "saved" && "Saved Schools"}
                 {activeTab === "billing" && "Credit Wallet"}
                 {activeTab === "profile" && "Your Profile"}
+                {activeTab === "interviews" && "Interview history"}
               </h1>
               <p className="text-slate-500 font-medium text-sm mt-1">Welcome back! You have {credits} credits available.</p>
             </motion.div>
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex items-center gap-3">
               <button onClick={() => navigate("/intake")} className="bg-primary-600 hover:bg-primary-700 text-white font-bold text-sm px-6 py-3 rounded-full transition-colors flex items-center gap-2 shadow-xl shadow-primary-600/20 active:scale-95">
-                <Plus size={18} /> New Match Report
+                <Plus size={18} /> Find my schools
               </button>
             </motion.div>
           </header>
@@ -139,6 +177,7 @@ export default function DashboardPage() {
             <FadeIn>
               <DashboardHero
                 displayName={username}
+                photoURL={avatarURL}
                 credits={credits}
                 reportsCount={matchReports.length}
                 savedCount={savedSchools.length}
@@ -293,6 +332,40 @@ export default function DashboardPage() {
               </button>
             </FadeIn>
 
+            {/* Interview history — past F-1 practice sessions. Only renders
+                when the user has at least one completed interview report. */}
+            {interviewReports.length > 0 && (
+              <div id="interview-history">
+                <FadeIn>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h2 className="text-xl font-bold tracking-tight text-slate-900">Interview history</h2>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {`${interviewReports.length} practice session${interviewReports.length === 1 ? "" : "s"} · showing ${showAllInterviews ? interviewReports.length : Math.min(REPORTS_COLLAPSED_LIMIT, interviewReports.length)}`}
+                      </p>
+                    </div>
+                    {interviewReports.length > REPORTS_COLLAPSED_LIMIT && (
+                      <button
+                        onClick={() => setShowAllInterviews(v => !v)}
+                        className="text-sm font-semibold text-slate-700 hover:text-slate-900 inline-flex items-center gap-1"
+                      >
+                        {showAllInterviews ? "Show less" : `View all (${interviewReports.length})`}
+                        <ChevronRight size={14} className={`transition-transform ${showAllInterviews ? "rotate-90" : ""}`} />
+                      </button>
+                    )}
+                  </div>
+                </FadeIn>
+
+                <div className="space-y-3">
+                  {(showAllInterviews ? interviewReports : interviewReports.slice(0, REPORTS_COLLAPSED_LIMIT)).map((r, i) => (
+                    <FadeInItem key={r.id} index={i}>
+                      <InterviewRow report={r} onClick={() => navigate(`/app/interview-reports/${r.id}`)} />
+                    </FadeInItem>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Recent reports — bounded with View all toggle */}
             <div id="recent-reports">
               <FadeIn>
@@ -415,6 +488,14 @@ export default function DashboardPage() {
           <SavedSchoolsTab savedSchools={savedSchools} userId={user?.uid || ""} />
         )}
 
+        {activeTab === "interviews" && (
+          <InterviewHistoryTab
+            reports={interviewReports}
+            onOpen={(id) => navigate(`/app/interview-reports/${id}`)}
+            onPractice={() => navigate("/app/visa-interview")}
+          />
+        )}
+
       </main>
 
       {/*
@@ -510,6 +591,7 @@ export default function DashboardPage() {
                 <DesktopNavItem icon={<Bookmark size={18} />}    label="Saved Schools"      active={activeTab === "saved"}   onClick={() => { setActiveTab("saved");   setMobileNavOpen(false); }} badge={savedSchools.length} />
                 <DesktopNavItem icon={<Map size={18} />}         label="Roadmap"            active={false} onClick={() => { navigate("/app/roadmap");        setMobileNavOpen(false); }} />
                 <DesktopNavItem icon={<ShieldAlert size={18} />} label="Live interview practice" active={false} onClick={() => { navigate("/app/visa-interview"); setMobileNavOpen(false); }} />
+                <DesktopNavItem icon={<Mic size={18} />}         label="Interview history"  active={activeTab === "interviews"} onClick={() => { setActiveTab("interviews"); setMobileNavOpen(false); }} badge={interviewReports.length} />
                 <DesktopNavItem icon={<Wallet size={18} />}      label="Credits & Billing"  active={activeTab === "billing"} onClick={() => { setActiveTab("billing"); setMobileNavOpen(false); }} />
                 <DesktopNavItem icon={<User size={18} />}        label="Profile"            active={activeTab === "profile"} onClick={() => { setActiveTab("profile"); setMobileNavOpen(false); }} />
               </nav>
@@ -519,7 +601,7 @@ export default function DashboardPage() {
                   onClick={() => { navigate("/intake"); setMobileNavOpen(false); }}
                   className="w-full inline-flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white font-bold text-sm py-3.5 rounded-2xl transition-colors active:scale-[0.99] shadow-lg shadow-primary-600/20"
                 >
-                  <Plus size={16} /> New match report
+                  <Plus size={16} /> Find my schools
                 </button>
                 <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Logged in as</p>
@@ -540,23 +622,158 @@ export default function DashboardPage() {
 
 // Subcomponents
 
+type ProfileFormStatus =
+  | { kind: "idle" }
+  | { kind: "saving" }
+  | { kind: "saved" }
+  | { kind: "error"; message: string };
+
+type PasswordResetStatus =
+  | { kind: "idle" }
+  | { kind: "sending" }
+  | { kind: "sent" }
+  | { kind: "error"; message: string };
+
+const LANGUAGE_OPTIONS = ["English (US)", "Spanish", "French"];
+const NOTIFICATION_OPTIONS = ["All Notifications", "Important Updates Only", "None"];
+
 function ProfileTab({ user, username, onSignOut }: { user: any, username: string, onSignOut: () => void }) {
-  const [profileImage, setProfileImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      const imgUrl = URL.createObjectURL(e.target.files[0]);
-      setProfileImage(imgUrl);
+  // Persisted state, loaded from users/{uid} on mount.
+  const [photoURL, setPhotoURL]           = useState<string | null>(null);
+  const [displayName, setDisplayName]     = useState<string>(username);
+  const [language, setLanguage]           = useState<string>(LANGUAGE_OPTIONS[0]);
+  const [notifPref, setNotifPref]         = useState<string>(NOTIFICATION_OPTIONS[0]);
+
+  // Pending photo file kept locally until "Save All Changes" — that way users
+  // can preview the avatar without paying the Storage write until they commit.
+  const [pendingPhotoFile, setPendingPhotoFile] = useState<File | null>(null);
+  const [pendingPhotoPreview, setPendingPhotoPreview] = useState<string | null>(null);
+
+  const [loading, setLoading]   = useState(true);
+  const [status, setStatus]     = useState<ProfileFormStatus>({ kind: "idle" });
+  const [pwStatus, setPwStatus] = useState<PasswordResetStatus>({ kind: "idle" });
+
+  // Detect provider so we can tailor the password-reset action. Google /
+  // Apple sign-in users don't have a Firebase password to reset; they must
+  // go through their provider, so we surface a clear note instead.
+  const providers: string[] = (user?.providerData ?? []).map((p: any) => p?.providerId).filter(Boolean);
+  const hasPasswordAuth = providers.includes("password");
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!user?.uid) { setLoading(false); return; }
+      try {
+        const snap = await getDoc(doc(db, "users", user.uid));
+        if (cancelled) return;
+        if (snap.exists()) {
+          const data = snap.data() as any;
+          if (typeof data.displayName === "string" && data.displayName)   setDisplayName(data.displayName);
+          if (typeof data.photoURL    === "string" && data.photoURL)      setPhotoURL(data.photoURL);
+          if (typeof data.language    === "string" && data.language)      setLanguage(data.language);
+          if (typeof data.notificationPref === "string" && data.notificationPref) setNotifPref(data.notificationPref);
+        }
+      } catch (err) {
+        console.warn("Could not load profile:", err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user?.uid]);
+
+  // Object URLs leak unless explicitly revoked. Wipe on file change or unmount.
+  useEffect(() => {
+    if (!pendingPhotoPreview) return;
+    return () => URL.revokeObjectURL(pendingPhotoPreview);
+  }, [pendingPhotoPreview]);
+
+  const handleImagePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setStatus({ kind: "error", message: "Please choose an image file." });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setStatus({ kind: "error", message: "Image must be under 5 MB." });
+      return;
+    }
+    if (pendingPhotoPreview) URL.revokeObjectURL(pendingPhotoPreview);
+    setPendingPhotoFile(file);
+    setPendingPhotoPreview(URL.createObjectURL(file));
+    setStatus({ kind: "idle" });
+  };
+
+  const handleSave = async () => {
+    if (!user?.uid) return;
+    setStatus({ kind: "saving" });
+    try {
+      let nextPhotoURL = photoURL;
+      if (pendingPhotoFile) {
+        // Single fixed filename so re-uploads overwrite — keeps Storage tidy
+        // and avoids needing to clean up old objects.
+        const sref = storageRef(storage, `users/${user.uid}/profile/avatar`);
+        await uploadBytes(sref, pendingPhotoFile, { contentType: pendingPhotoFile.type });
+        nextPhotoURL = await getDownloadURL(sref);
+      }
+
+      await setDoc(
+        doc(db, "users", user.uid),
+        {
+          displayName: displayName.trim() || null,
+          photoURL: nextPhotoURL ?? null,
+          language,
+          notificationPref: notifPref,
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true },
+      );
+
+      if (pendingPhotoFile) {
+        setPhotoURL(nextPhotoURL);
+        setPendingPhotoFile(null);
+        if (pendingPhotoPreview) { URL.revokeObjectURL(pendingPhotoPreview); setPendingPhotoPreview(null); }
+      }
+      setStatus({ kind: "saved" });
+      setTimeout(() => setStatus(s => (s.kind === "saved" ? { kind: "idle" } : s)), 2500);
+    } catch (err: any) {
+      console.error("Profile save failed:", err);
+      setStatus({ kind: "error", message: err?.message ?? "Could not save your changes." });
     }
   };
 
+  const handlePasswordReset = async () => {
+    if (!user?.email) return;
+    setPwStatus({ kind: "sending" });
+    try {
+      await sendPasswordResetEmail(auth, user.email);
+      setPwStatus({ kind: "sent" });
+    } catch (err: any) {
+      console.error("Password reset failed:", err);
+      setPwStatus({ kind: "error", message: err?.message ?? "Could not send reset email." });
+    }
+  };
+
+  const displayedAvatar = pendingPhotoPreview ?? photoURL;
+  const headerName = (displayName?.trim() || username).trim();
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-16">
+        <Loader2 size={20} className="text-slate-400 animate-spin" />
+      </div>
+    );
+  }
+
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-3xl space-y-6">
-      
+
       {/* Cover Banner & Profile Info Card */}
       <div className="bg-white rounded-[32px] shadow-sm border border-slate-100 overflow-hidden">
-        
+
         {/* Gradient Banner */}
         <div className="h-32 md:h-40 bg-gradient-to-r from-primary-600 to-accent-500 relative">
           <div className="absolute inset-0 bg-white/10 mix-blend-overlay"></div>
@@ -564,17 +781,17 @@ function ProfileTab({ user, username, onSignOut }: { user: any, username: string
 
         {/* Profile Details Container */}
         <div className="px-6 md:px-10 pb-8 relative">
-          
+
           {/* Overlapping Avatar */}
           <div className="absolute -top-16 left-6 md:left-10 group cursor-pointer" onClick={() => fileInputRef.current?.click()}>
             <div className="w-32 h-32 rounded-[32px] bg-white flex items-center justify-center p-1.5 shadow-xl shadow-slate-900/10">
               <div className="w-full h-full bg-slate-100 rounded-[26px] overflow-hidden flex items-center justify-center text-slate-400 relative">
-                {profileImage ? (
-                  <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
+                {displayedAvatar ? (
+                  <img src={displayedAvatar} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
                   <User size={48} />
                 )}
-                
+
                 {/* Hover Camera Overlay */}
                 <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white backdrop-blur-sm">
                   <Camera size={24} />
@@ -584,17 +801,22 @@ function ProfileTab({ user, username, onSignOut }: { user: any, username: string
             <div className="absolute bottom-0 right-0 w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center text-white border-4 border-white shadow-sm transition-transform group-hover:scale-110">
               <Plus size={16} />
             </div>
-            <input type="file" ref={fileInputRef} onChange={handleImageUpload} accept="image/*" className="hidden" />
+            <input type="file" ref={fileInputRef} onChange={handleImagePick} accept="image/*" className="hidden" />
           </div>
 
           {/* Name & Badge */}
           <div className="pt-20">
-            <h2 className="text-3xl font-black text-slate-900 leading-tight mb-1">@{username}</h2>
-            <div className="flex items-center gap-3 mt-2">
+            <h2 className="text-3xl font-black text-slate-900 leading-tight mb-1">@{headerName}</h2>
+            <div className="flex items-center gap-3 mt-2 flex-wrap">
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary-50 text-primary-700 text-xs font-bold tracking-widest uppercase border border-primary-100">
                 <Sparkles size={12} /> Free Plan
               </span>
               <span className="text-sm font-medium text-slate-500">{user?.email}</span>
+              {pendingPhotoFile && (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 text-[11px] font-bold border border-amber-200">
+                  Pending — Save to apply
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -602,7 +824,7 @@ function ProfileTab({ user, username, onSignOut }: { user: any, username: string
 
       {/* Settings Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        
+
         {/* Personal Details Card */}
         <div className="bg-white rounded-[32px] p-6 md:p-8 shadow-sm border border-slate-100">
           <h3 className="text-sm font-black text-slate-900 mb-6 flex items-center gap-2">
@@ -611,7 +833,14 @@ function ProfileTab({ user, username, onSignOut }: { user: any, username: string
           <div className="space-y-5">
             <div>
               <label className="block text-[10px] font-black tracking-widest text-slate-500 mb-2 uppercase ml-1">Full Name</label>
-              <input type="text" placeholder="Your Name" defaultValue={username} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-slate-900 font-bold focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all" />
+              <input
+                type="text"
+                placeholder="Your Name"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                maxLength={80}
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-slate-900 font-bold focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
+              />
             </div>
             <div>
               <label className="block text-[10px] font-black tracking-widest text-slate-500 mb-2 uppercase ml-1">Email Address</label>
@@ -628,18 +857,22 @@ function ProfileTab({ user, username, onSignOut }: { user: any, username: string
           <div className="space-y-5">
             <div>
               <label className="block text-[10px] font-black tracking-widest text-slate-500 mb-2 uppercase ml-1">Notifications</label>
-              <select className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-slate-900 font-bold focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all appearance-none cursor-pointer">
-                <option>All Notifications</option>
-                <option>Important Updates Only</option>
-                <option>None</option>
+              <select
+                value={notifPref}
+                onChange={(e) => setNotifPref(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-slate-900 font-bold focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all appearance-none cursor-pointer"
+              >
+                {NOTIFICATION_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
               </select>
             </div>
             <div>
               <label className="block text-[10px] font-black tracking-widest text-slate-500 mb-2 uppercase ml-1">Language</label>
-              <select className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-slate-900 font-bold focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all appearance-none cursor-pointer">
-                <option>English (US)</option>
-                <option>Spanish</option>
-                <option>French</option>
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3.5 text-slate-900 font-bold focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all appearance-none cursor-pointer"
+              >
+                {LANGUAGE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
               </select>
             </div>
           </div>
@@ -647,12 +880,67 @@ function ProfileTab({ user, username, onSignOut }: { user: any, username: string
 
       </div>
 
+      {/* Security card — password reset */}
+      <div className="bg-white rounded-[32px] p-6 md:p-8 shadow-sm border border-slate-100">
+        <h3 className="text-sm font-black text-slate-900 mb-2 flex items-center gap-2">
+          <KeyRound size={18} className="text-primary-500" /> Security
+        </h3>
+        {hasPasswordAuth ? (
+          <>
+            <p className="text-sm text-slate-500 mb-5 leading-relaxed">
+              We'll email a secure link to <span className="font-bold text-slate-700">{user?.email}</span>. Open it on the same device and choose a new password.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+              <button
+                onClick={handlePasswordReset}
+                disabled={pwStatus.kind === "sending" || pwStatus.kind === "sent"}
+                className="inline-flex items-center justify-center gap-2 bg-slate-900 text-white font-bold py-3 px-5 rounded-2xl hover:bg-slate-800 transition-colors active:scale-[0.99] disabled:opacity-60 disabled:cursor-not-allowed text-sm"
+              >
+                {pwStatus.kind === "sending" ? <Loader2 size={15} className="animate-spin" /> : <Mail size={15} />}
+                {pwStatus.kind === "sent" ? "Reset email sent" : pwStatus.kind === "sending" ? "Sending…" : "Send password reset email"}
+              </button>
+              {pwStatus.kind === "sent" && (
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+                  <Check size={13} /> Check your inbox (and spam folder).
+                </span>
+              )}
+              {pwStatus.kind === "error" && (
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-700">
+                  <AlertTriangle size={13} /> {pwStatus.message}
+                </span>
+              )}
+            </div>
+          </>
+        ) : (
+          <p className="text-sm text-slate-500 leading-relaxed">
+            You signed in with {providers[0] === "google.com" ? "Google" : providers[0] === "apple.com" ? "Apple" : "a social provider"}. There's no separate College Ready password to reset — manage your account through {providers[0] === "google.com" ? "your Google account settings" : "your provider's account settings"}.
+          </p>
+        )}
+      </div>
+
       {/* Action Footer */}
-      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between mt-8">
-        <button className="w-full sm:w-auto bg-primary-600 text-white font-bold py-4 px-10 rounded-2xl hover:bg-primary-700 transition-transform active:scale-[0.98] shadow-lg shadow-primary-600/25">
-          Save All Changes
-        </button>
-        
+      <div className="flex flex-col sm:flex-row gap-4 items-center justify-between mt-2">
+        <div className="flex items-center gap-3 flex-1 w-full">
+          <button
+            onClick={handleSave}
+            disabled={status.kind === "saving"}
+            className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-primary-600 text-white font-bold py-4 px-10 rounded-2xl hover:bg-primary-700 transition-transform active:scale-[0.98] shadow-lg shadow-primary-600/25 disabled:opacity-70 disabled:cursor-not-allowed"
+          >
+            {status.kind === "saving" ? <Loader2 size={16} className="animate-spin" /> : null}
+            {status.kind === "saving" ? "Saving…" : "Save All Changes"}
+          </button>
+          {status.kind === "saved" && (
+            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700">
+              <Check size={13} /> Saved
+            </span>
+          )}
+          {status.kind === "error" && (
+            <span className="inline-flex items-start gap-1.5 text-xs font-semibold text-rose-700 leading-relaxed">
+              <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" /> {status.message}
+            </span>
+          )}
+        </div>
+
         <button onClick={onSignOut} className="w-full sm:w-auto md:hidden flex items-center justify-center gap-2 bg-white border border-rose-200 text-rose-600 font-bold py-4 px-8 rounded-2xl hover:bg-rose-50 transition-colors shadow-sm">
           <LogOut size={18} /> Sign Out
         </button>
@@ -691,32 +979,24 @@ function DesktopNavItem({ icon, label, active, onClick, badge }: { icon: React.R
 // Dashboard pieces — image-led hero + refined stats + report rows
 // ─────────────────────────────────────────────────────────────────────────────
 
-// A small rotating set of high-quality university/campus photos from Unsplash.
-// Picks one deterministically from the date so the same hero shows for the
-// same day (avoids jarring image flashes on every render).
-// All URLs verified live (HEAD 200). Replace with care — broken Unsplash IDs
-// silently 404, leaving the hero with a hole. Pool is restricted to
-// large-scene shots (architecture, library aisles, graduation crowds) —
-// no close-up desk imagery.
+// Hero pool — strictly college buildings / campus architecture. The previous
+// list mixed in interior, graduation, and (per a user report) an Unsplash ID
+// that returned a photo of children rather than the captioned campus shot.
+// We trimmed the pool to images we have visually verified through their use
+// elsewhere in the app and explicitly want behind the dashboard greeting.
+// Add a new URL only after eyeballing it — the captions on Unsplash are
+// authored by the uploader and can lie about content.
 const HERO_IMAGES = [
-  // Stanford-style campus archway
+  // Stanford Memorial Arch / Main Quad — also used on the landing-page hero
+  // mock card, so we know what it looks like in production.
   "https://images.unsplash.com/photo-1607237138185-eedd9c632b0b?auto=format&fit=crop&w=1600&q=80",
-  // Library aisle
-  "https://images.unsplash.com/photo-1571260899304-425eee4c7efc?auto=format&fit=crop&w=1600&q=80",
-  // Students walking on a sunny campus
-  "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=1600&q=80",
-  // Graduation ceremony
-  "https://images.unsplash.com/photo-1606761568499-6d2451b23c66?auto=format&fit=crop&w=1600&q=80",
-  // Campus architecture
-  "https://images.unsplash.com/photo-1497486751825-1233686d5d80?auto=format&fit=crop&w=1600&q=80",
-  // Library shelves
-  "https://images.unsplash.com/photo-1481627834876-b7833e8f5570?auto=format&fit=crop&w=1600&q=80",
 ];
 
 function DashboardHero({
-  displayName, credits, reportsCount, savedCount, onStart,
+  displayName, photoURL, credits, reportsCount, savedCount, onStart,
 }: {
   displayName: string;
+  photoURL?: string | null;
   credits: number;
   reportsCount: number;
   savedCount: number;
@@ -742,9 +1022,11 @@ function DashboardHero({
       <div className="absolute inset-0 bg-gradient-to-tr from-slate-950/85 via-slate-900/60 to-transparent" aria-hidden />
       <div className="absolute inset-0 bg-gradient-to-b from-transparent to-slate-950/40 pointer-events-none" aria-hidden />
 
-      {/* Avatar top-right */}
-      <div className="absolute top-5 right-5 z-10 w-11 h-11 rounded-full bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center text-white font-bold shadow-lg">
-        {initial}
+      {/* Avatar top-right — uses saved photo when present, otherwise initial */}
+      <div className="absolute top-5 right-5 z-10 w-11 h-11 rounded-full bg-white/15 backdrop-blur-md border border-white/20 flex items-center justify-center text-white font-bold shadow-lg overflow-hidden">
+        {photoURL ? (
+          <img src={photoURL} alt={displayName} className="w-full h-full object-cover" />
+        ) : initial}
       </div>
 
       {/* Bottom-left content */}
@@ -760,7 +1042,7 @@ function DashboardHero({
 
           <button onClick={onStart}
             className="inline-flex items-center gap-2 bg-white text-slate-900 hover:bg-slate-100 font-semibold text-sm py-3 px-5 rounded-2xl transition-colors active:scale-[0.99] shadow-lg shadow-slate-900/30">
-            <Plus size={15} /> Start new match report <ArrowRight size={14} />
+            <Plus size={15} /> Find my schools <ArrowRight size={14} />
           </button>
         </div>
 
@@ -829,7 +1111,7 @@ function ReferralCard({ userId }: { userId: string | undefined }) {
   }, [userId]);
 
   const url = code ? buildReferralUrl(code) : "";
-  const shareText = "I'm using College Ready to find a U.S. university match — sign up with my link and we both win.";
+  const shareText = "I'm using College Ready to find a U.S. college match — sign up with my link and we both win.";
 
   const handleCopy = async () => {
     if (!url) return;
@@ -853,7 +1135,7 @@ function ReferralCard({ userId }: { userId: string | undefined }) {
     twitter:  `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`,
     facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
     telegram: `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(shareText)}`,
-    email:    `mailto:?subject=${encodeURIComponent("Find your U.S. university match — College Ready")}&body=${encodeURIComponent(`${shareText}\n\n${url}`)}`,
+    email:    `mailto:?subject=${encodeURIComponent("Find your U.S. college match — College Ready")}&body=${encodeURIComponent(`${shareText}\n\n${url}`)}`,
   } : null;
 
   return (
@@ -971,6 +1253,101 @@ function ReportRow({ report, onClick }: { report: any; onClick: () => void }) {
         {reach > 0  && <span className="inline-flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-rose-500" />{reach}</span>}
         {target > 0 && <span className="inline-flex items-center gap-1 ml-1"><span className="w-1.5 h-1.5 rounded-full bg-blue-500" />{target}</span>}
         {safety > 0 && <span className="inline-flex items-center gap-1 ml-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />{safety}</span>}
+      </div>
+      <ChevronRight size={16} className="text-slate-400 group-hover:text-slate-600 flex-shrink-0" />
+    </button>
+  );
+}
+
+function InterviewHistoryTab({
+  reports, onOpen, onPractice,
+}: {
+  reports: any[];
+  onOpen: (id: string) => void;
+  onPractice: () => void;
+}) {
+  if (reports.length === 0) {
+    return (
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+        <div className="flex flex-col items-center justify-center py-20 text-center">
+          <div className="w-20 h-20 bg-slate-100 rounded-[24px] flex items-center justify-center text-slate-400 mb-6 border-2 border-dashed border-slate-200">
+            <Mic size={32} />
+          </div>
+          <h2 className="text-xl font-black text-slate-900 mb-2">No interview practice yet</h2>
+          <p className="text-slate-500 font-medium max-w-md mb-6">
+            Rehearse with Anna, our AI consular officer. Every practice session is scored and saved here so you can track your improvement.
+          </p>
+          <button
+            onClick={onPractice}
+            className="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold px-5 py-3 rounded-2xl transition-colors active:scale-[0.99] shadow-lg shadow-slate-900/20"
+          >
+            <Mic size={14} /> Start a practice interview
+          </button>
+        </div>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-sm text-slate-500">
+          {reports.length} practice session{reports.length === 1 ? "" : "s"} · most recent first
+        </p>
+        <button
+          onClick={onPractice}
+          className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold px-3.5 py-2 rounded-full transition-colors active:scale-[0.99] shadow-md shadow-slate-900/20"
+        >
+          <Mic size={12} /> New practice
+        </button>
+      </div>
+
+      <div className="space-y-3">
+        {reports.map((r, i) => (
+          <FadeInItem key={r.id} index={i}>
+            <InterviewRow report={r} onClick={() => onOpen(r.id)} />
+          </FadeInItem>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+function InterviewRow({ report, onClick }: { report: any; onClick: () => void }) {
+  const overall = typeof report.overallScore === "number" ? report.overallScore : null;
+  const created = report.createdAt?.toDate?.() as Date | undefined;
+  const dateStr = created
+    ? created.toLocaleDateString(undefined, { month: "short", day: "numeric", year: created.getFullYear() === new Date().getFullYear() ? undefined : "numeric" })
+    : "Recent";
+
+  // Score-colored dot. Mirrors the palette inside InterviewReportView so the
+  // dashboard preview reads consistently with the detail page.
+  const dotClass =
+    overall == null    ? "bg-slate-300"
+    : overall >= 80    ? "bg-emerald-500"
+    : overall >= 60    ? "bg-blue-500"
+    : overall >= 40    ? "bg-amber-500"
+    :                    "bg-rose-500";
+
+  return (
+    <button
+      onClick={onClick}
+      className="w-full text-left bg-white rounded-2xl border border-slate-200 hover:border-slate-300 p-4 sm:p-5 transition-colors group flex items-center gap-4"
+    >
+      <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-slate-900 to-blue-900 text-white flex items-center justify-center flex-shrink-0">
+        <Mic size={18} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap mb-0.5">
+          <h3 className="text-[15px] font-bold text-slate-900 truncate">F-1 practice interview</h3>
+          <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-semibold`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${dotClass}`} />
+            {overall != null ? `${overall}/100` : "—"}
+          </span>
+        </div>
+        <p className="text-xs text-slate-500 truncate">
+          With Anna · {dateStr}
+        </p>
       </div>
       <ChevronRight size={16} className="text-slate-400 group-hover:text-slate-600 flex-shrink-0" />
     </button>

@@ -12,10 +12,22 @@ import {
   clearPendingReferralCode,
 } from "../lib/referrals";
 
+// Only honour next-paths that are same-site (start with "/" but not "//").
+// Stops a crafted link like /signup?next=//evil.example from bouncing the
+// user off-site after sign-up. Returns null for anything that isn't a
+// plain relative path.
+function sanitizeNextPath(raw: string | null): string | null {
+  if (!raw) return null;
+  if (!raw.startsWith("/")) return null;
+  if (raw.startsWith("//"))  return null;
+  return raw;
+}
+
 export default function SignupPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const fromResults = searchParams.get("from") === "results";
+  const nextPath    = sanitizeNextPath(searchParams.get("next"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -54,6 +66,16 @@ export default function SignupPage() {
     return Date.now() < parseInt(expires, 10);
   };
 
+  // Where do we send the user post-signup?
+  //   1. The explicit `next` query param (preserves protected-route intent)
+  //   2. The legacy /results round-trip
+  //   3. Otherwise the dashboard
+  const computePostSignupPath = () => {
+    if (nextPath) return nextPath;
+    if (shouldGoToResults()) return "/results";
+    return "/app";
+  };
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -80,11 +102,7 @@ export default function SignupPage() {
 
       await applyReferralIfPresent();
 
-      if (shouldGoToResults()) {
-        navigate("/results");
-      } else {
-        navigate("/app");
-      }
+      navigate(computePostSignupPath());
     } catch (err) {
       console.error(err);
       alert("Error signing up. Please try again.");
@@ -117,15 +135,21 @@ export default function SignupPage() {
 
       await applyReferralIfPresent();
 
-      if (shouldGoToResults()) {
-        navigate("/results");
-      } else {
-        navigate("/app");
-      }
+      navigate(computePostSignupPath());
     } catch (err) {
       console.error(err);
     }
   };
+
+  // Build the cross-link to /login so the user doesn't lose their intended
+  // destination when they switch tabs.
+  const loginHref = (() => {
+    const params = new URLSearchParams();
+    if (fromResults) params.set("from", "results");
+    if (nextPath)    params.set("next", nextPath);
+    const qs = params.toString();
+    return qs ? `/login?${qs}` : "/login";
+  })();
 
 
   return (
@@ -218,7 +242,7 @@ export default function SignupPage() {
           </form>
 
           <p className="text-sm font-medium text-slate-500 text-center mt-8">
-            Already have an account? <Link to={fromResults ? "/login?from=results" : "/login"} className="text-primary-600 font-black hover:underline">Log in</Link>
+            Already have an account? <Link to={loginHref} className="text-primary-600 font-black hover:underline">Log in</Link>
           </p>
 
         </div>
