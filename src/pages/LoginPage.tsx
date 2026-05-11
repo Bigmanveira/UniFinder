@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { signInWithEmailAndPassword, signInWithPopup, getAdditionalUserInfo, deleteUser } from "firebase/auth";
+import { signInWithEmailAndPassword, signInWithRedirect, getRedirectResult, getAdditionalUserInfo, deleteUser } from "firebase/auth";
 import { auth, googleProvider } from "../lib/firebase";
 import { GraduationCap, ArrowRight, Mail, Lock } from "lucide-react";
 import { motion } from "framer-motion";
@@ -25,6 +25,31 @@ export default function LoginPage() {
     return Date.now() < parseInt(expires, 10);
   };
 
+  // When the page mounts, check whether we're returning from a Google
+  // OAuth redirect. signInWithRedirect bounces the entire page through
+  // Google's auth and lands us back here with the credential available
+  // via getRedirectResult. Without this listener the auth completes but
+  // the page sits doing nothing.
+  useEffect(() => {
+    getRedirectResult(auth)
+      .then(async (result) => {
+        if (!result) return; // fresh page load, not a redirect return
+        const additionalInfo = getAdditionalUserInfo(result);
+        if (additionalInfo?.isNewUser) {
+          // Login page = existing accounts only. Firebase just auto-created
+          // a Google account; nuke it and tell the user to sign up first.
+          try { await deleteUser(result.user); } catch { /* best-effort */ }
+          alert("Account not found. Please create an account on the Sign Up page first.");
+          return;
+        }
+        navigate(shouldGoToResults() ? "/results" : "/app", { replace: true });
+      })
+      .catch((err) => {
+        console.error("[auth] redirect result failed:", err);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -41,17 +66,12 @@ export default function LoginPage() {
 
   const handleGoogle = async () => {
     try {
-      const userCredential = await signInWithPopup(auth, googleProvider);
-      const additionalInfo = getAdditionalUserInfo(userCredential);
-
-      // If Firebase just created this Google account, it means they haven't formally signed up
-      if (additionalInfo?.isNewUser) {
-        await deleteUser(userCredential.user);
-        alert("Account not found. Please create an account on the Sign Up page first.");
-        return;
-      }
-
-      navigate(shouldGoToResults() ? "/results" : "/app");
+      // Full page redirect (not popup). Avoids COOP, popup blockers,
+      // mobile webview popup quirks, and third-party-cookie restrictions.
+      // After auth completes, the user lands back on /login and the
+      // getRedirectResult effect above takes them to the right place.
+      await signInWithRedirect(auth, googleProvider);
+      // Code after this line does not execute; the page has navigated.
     } catch (err) {
       console.error(err);
     }
