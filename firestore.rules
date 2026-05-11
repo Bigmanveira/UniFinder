@@ -85,6 +85,14 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Dodo Payments — one record per fulfilled purchase, written by the
+    // dodoWebhook Cloud Function via Admin SDK (so the write side is
+    // already protected). Users can read their own purchase history.
+    match /dodoPayments/{paymentId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow write: if false;
+    }
+
     // Referral codes: small reverse-lookup docs from code → userId.
     // - Any logged-in user can read (needed to verify a code on signup).
     // - A user can only CREATE a code that maps to their own uid, and only

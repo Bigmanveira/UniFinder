@@ -5,6 +5,8 @@ import { auth, db, storage } from "../lib/firebase";
 import { signOut, sendPasswordResetEmail } from "firebase/auth";
 import { doc, getDoc, onSnapshot, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "../lib/firebase";
 import { LogOut, Plus, Wallet, Bookmark, FileText, ChevronRight, User, GraduationCap, MapPin, Sparkles, Camera, Globe, Trash2, ChevronDown, ChevronUp, ArrowRight, Heart, Map, Gift, Copy, Check, Send, Mail, Home, ShieldAlert, Menu, X, Bell, Mic, KeyRound, Loader2, AlertTriangle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { collection, query, where } from "firebase/firestore";
@@ -40,9 +42,11 @@ export default function DashboardPage() {
           setCredits(data.credits);
         }
       } else {
-        // Wallet not yet created — new users start with 20 credits.
-        // The wallet document is created by the Cloud Function on first report unlock.
-        setCredits(20);
+        // Wallet not yet created — new users start with 5 free credits.
+        // The wallet document is created by the Cloud Function on first
+        // paid action (match unlock or visa interview). Keep this number
+        // in sync with FREE_CREDITS_ON_SIGNUP in functions/src/index.ts.
+        setCredits(5);
       }
     });
 
@@ -316,7 +320,7 @@ export default function DashboardPage() {
                         Rehearse with Anna<span className="hidden sm:inline">, your AI consular officer</span>
                       </h3>
                       <div className="flex items-center gap-2 text-[11px] sm:text-xs text-white/65 font-semibold">
-                        <span>1 credit</span>
+                        <span>15 credits</span>
                         <span className="opacity-50">·</span>
                         <span>~5 min</span>
                         <span className="opacity-50">·</span>
@@ -421,67 +425,7 @@ export default function DashboardPage() {
         )}
 
         {activeTab === "billing" && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl">
-            
-            {/* Balance Card */}
-            <div className="bg-slate-900 rounded-[40px] p-8 md:p-12 text-white shadow-2xl relative overflow-hidden mb-8">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-primary-500/20 rounded-full blur-[80px]"></div>
-              <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                <div>
-                  <h2 className="text-sm font-black tracking-widest text-slate-400 uppercase mb-2">Available Balance</h2>
-                  <div className="flex items-end gap-3">
-                    <span className="text-7xl font-black leading-none">{credits}</span>
-                    <span className="text-xl font-bold text-slate-400 mb-2">Credits</span>
-                  </div>
-                </div>
-                <div className="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/10 max-w-xs">
-                  <p className="text-sm font-bold mb-1">How credits work:</p>
-                  <p className="text-xs text-slate-400 leading-relaxed">1 Credit = Full Match Report. 2 Credits = AI Transcript Analysis. Credits never expire.</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Referral card — earn 5 credits per friend */}
-            <ReferralCard userId={user?.uid} />
-
-            <h3 className="text-xl font-black text-slate-900 mb-6">Top Up Credits</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              
-              <div className="bg-white rounded-[32px] p-6 md:p-8 border border-slate-100 shadow-sm hover:border-primary-500 hover:shadow-xl transition-all cursor-pointer relative group">
-                <h4 className="text-lg font-black text-slate-900 mb-1">Starter Pack</h4>
-                <p className="text-sm font-medium text-slate-500 mb-6">Perfect for a single report.</p>
-                <div className="mb-6">
-                  <span className="text-4xl font-black text-slate-900">$5</span>
-                  <span className="text-slate-500 font-bold"> / 5 Credits</span>
-                </div>
-                <button className="w-full bg-slate-100 text-slate-900 font-bold py-3.5 rounded-2xl group-hover:bg-primary-600 group-hover:text-white transition-colors">Buy Now</button>
-              </div>
-
-              <div className="bg-primary-50 rounded-[32px] p-6 md:p-8 border-2 border-primary-500 shadow-lg relative transform sm:-translate-y-2">
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary-600 text-white text-[10px] font-black tracking-widest uppercase px-3 py-1 rounded-full whitespace-nowrap">
-                  Most Popular
-                </div>
-                <h4 className="text-lg font-black text-primary-900 mb-1">Standard Pack</h4>
-                <p className="text-sm font-medium text-primary-700/80 mb-6">Ideal for building your shortlist.</p>
-                <div className="mb-6">
-                  <span className="text-4xl font-black text-primary-900">$15</span>
-                  <span className="text-primary-700 font-bold"> / 20 Credits</span>
-                </div>
-                <button className="w-full bg-primary-600 text-white font-bold py-3.5 rounded-2xl hover:bg-primary-700 transition-colors shadow-lg shadow-primary-600/30">Buy Now</button>
-              </div>
-
-              <div className="bg-white rounded-[32px] p-6 md:p-8 border border-slate-100 shadow-sm hover:border-primary-500 hover:shadow-xl transition-all cursor-pointer group">
-                <h4 className="text-lg font-black text-slate-900 mb-1">Pro Pack</h4>
-                <p className="text-sm font-medium text-slate-500 mb-6">For agencies and heavy users.</p>
-                <div className="mb-6">
-                  <span className="text-4xl font-black text-slate-900">$35</span>
-                  <span className="text-slate-500 font-bold"> / 50 Credits</span>
-                </div>
-                <button className="w-full bg-slate-100 text-slate-900 font-bold py-3.5 rounded-2xl group-hover:bg-primary-600 group-hover:text-white transition-colors">Buy Now</button>
-              </div>
-
-            </div>
-          </motion.div>
+          <BillingTab credits={credits} userId={user?.uid} />
         )}
 
         {activeTab === "saved" && (
@@ -946,6 +890,202 @@ function ProfileTab({ user, username, onSignOut }: { user: any, username: string
         </button>
       </div>
 
+    </motion.div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Billing tab — pulls credit packs from the backend, kicks off Dodo Payments
+// hosted checkout, and surfaces a success/cancel banner when the user is
+// bounced back from Dodo via return_url.
+// ─────────────────────────────────────────────────────────────────────────────
+type CreditPack = {
+  id:          string;
+  label:       string;
+  priceUsd:    number;
+  credits:     number;
+  recommended: boolean;
+};
+
+function BillingTab({ credits, userId }: { credits: number; userId: string | undefined }) {
+  const [packs, setPacks]   = useState<CreditPack[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [buying, setBuying] = useState<string | null>(null);
+  const [error, setError]   = useState("");
+  const [returnStatus, setReturnStatus] = useState<"paid" | "cancelled" | null>(null);
+
+  // Read return_url query param Dodo bounces back with. We strip it from
+  // the URL so refreshing the page doesn't keep showing the banner.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const paid      = url.searchParams.get("paid");
+    const cancelled = url.searchParams.get("cancelled");
+    if (paid === "1") {
+      setReturnStatus("paid");
+      url.searchParams.delete("paid");
+      window.history.replaceState({}, "", url.toString());
+    } else if (cancelled === "1") {
+      setReturnStatus("cancelled");
+      url.searchParams.delete("cancelled");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const fn  = httpsCallable(functions, "listCreditPacks");
+        const res = await fn({});
+        if (mounted) setPacks(res.data as CreditPack[]);
+      } catch (err) {
+        console.error("Could not load credit packs:", err);
+        if (mounted) setError("Could not load pricing. Refresh and try again.");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  const handleBuy = async (packId: string) => {
+    if (!userId) return;
+    setBuying(packId);
+    setError("");
+    try {
+      const base = window.location.origin;
+      // Dodo bounces back here with the same URL on success or failure; we
+      // use query params to know which happened. (Dodo doesn't currently
+      // differentiate success/cancel return URLs in their public docs, so
+      // we surface both as ?paid=1 and rely on the webhook for ground truth.)
+      const returnUrl = `${base}/app?tab=billing&paid=1`;
+      const fn  = httpsCallable(functions, "createDodoCheckout");
+      const res = await fn({ packId, returnUrl });
+      const data = res.data as { checkoutUrl?: string };
+      if (!data?.checkoutUrl) throw new Error("No checkout URL returned");
+      // Hard navigate — leaving SPA so on return the page boots fresh and
+      // wallet snapshot reflects the new balance.
+      window.location.href = data.checkoutUrl;
+    } catch (err: any) {
+      console.error("Checkout failed:", err);
+      setError(err?.message ?? "Could not start checkout. Please try again.");
+      setBuying(null);
+    }
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl">
+
+      {/* Return-from-Dodo banner */}
+      {returnStatus === "paid" && (
+        <div className="mb-6 bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-start gap-3">
+          <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 flex-shrink-0">
+            <Check size={16} />
+          </div>
+          <div className="flex-1">
+            <p className="font-bold text-emerald-900 text-sm mb-0.5">Payment received</p>
+            <p className="text-xs text-emerald-800 leading-relaxed">Credits usually post within a few seconds. If your balance hasn't updated in two minutes, contact <a className="underline" href="mailto:support@collegeready.io">support@collegeready.io</a> with your payment confirmation.</p>
+          </div>
+        </div>
+      )}
+      {returnStatus === "cancelled" && (
+        <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-900">
+          Payment was cancelled — no credits charged. You can pick a pack again any time.
+        </div>
+      )}
+
+      {/* Balance Card */}
+      <div className="bg-slate-900 rounded-[40px] p-8 md:p-12 text-white shadow-2xl relative overflow-hidden mb-8">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-primary-500/20 rounded-full blur-[80px]"></div>
+        <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div>
+            <h2 className="text-sm font-black tracking-widest text-slate-400 uppercase mb-2">Available Balance</h2>
+            <div className="flex items-end gap-3">
+              <span className="text-7xl font-black leading-none">{credits}</span>
+              <span className="text-xl font-bold text-slate-400 mb-2">Credits</span>
+            </div>
+          </div>
+          <div className="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/10 max-w-xs">
+            <p className="text-sm font-bold mb-1">How credits work:</p>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              <span className="font-bold text-white">1 credit</span> = Match report unlock.
+              <br />
+              <span className="font-bold text-white">15 credits</span> = F-1 interview practice (live avatar).
+              <br />
+              Credits never expire.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Referral card — earn 5 credits per friend */}
+      <ReferralCard userId={userId} />
+
+      <h3 className="text-xl font-black text-slate-900 mb-2">Top Up Credits</h3>
+      <p className="text-sm text-slate-500 mb-6">Secure checkout by Dodo Payments. Credits post automatically once payment confirms.</p>
+
+      {error && (
+        <div className="mb-4 bg-rose-50 border border-rose-200 rounded-2xl p-3 text-sm text-rose-700 flex items-start gap-2">
+          <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[0,1,2,3].map(i => (
+            <div key={i} className="bg-white rounded-[32px] p-6 border border-slate-100 shadow-sm h-56 animate-pulse" />
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {packs.map((pack) => {
+            const isBuying = buying === pack.id;
+            const perCredit = (pack.priceUsd / pack.credits).toFixed(2);
+            return (
+              <div
+                key={pack.id}
+                className={`relative rounded-[32px] p-6 md:p-7 shadow-sm transition-all ${
+                  pack.recommended
+                    ? "bg-primary-50 border-2 border-primary-500 shadow-lg sm:-translate-y-1"
+                    : "bg-white border border-slate-100 hover:border-primary-300 hover:shadow-xl"
+                }`}
+              >
+                {pack.recommended && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary-600 text-white text-[10px] font-black tracking-widest uppercase px-3 py-1 rounded-full whitespace-nowrap">
+                    Most Popular
+                  </div>
+                )}
+                <h4 className={`text-lg font-black mb-1 ${pack.recommended ? "text-primary-900" : "text-slate-900"}`}>{pack.label}</h4>
+                <p className={`text-xs font-medium mb-5 ${pack.recommended ? "text-primary-700/80" : "text-slate-500"}`}>
+                  ${perCredit} per credit
+                </p>
+                <div className="mb-5">
+                  <span className={`text-4xl font-black ${pack.recommended ? "text-primary-900" : "text-slate-900"}`}>${pack.priceUsd}</span>
+                  <span className={`font-bold ${pack.recommended ? "text-primary-700" : "text-slate-500"}`}> / {pack.credits} credits</span>
+                </div>
+                <button
+                  onClick={() => handleBuy(pack.id)}
+                  disabled={!!buying}
+                  className={`w-full inline-flex items-center justify-center gap-2 font-bold py-3.5 rounded-2xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+                    pack.recommended
+                      ? "bg-primary-600 text-white hover:bg-primary-700 shadow-lg shadow-primary-600/30"
+                      : "bg-slate-100 text-slate-900 hover:bg-slate-200"
+                  }`}
+                >
+                  {isBuying ? <Loader2 size={14} className="animate-spin" /> : null}
+                  {isBuying ? "Opening checkout…" : "Buy Now"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <p className="text-[11px] text-slate-400 mt-6 leading-relaxed">
+        Payments are processed by Dodo Payments. We don't see or store your card details.
+        Refunds and disputes: contact <a className="underline" href="mailto:support@collegeready.io">support@collegeready.io</a>.
+      </p>
     </motion.div>
   );
 }

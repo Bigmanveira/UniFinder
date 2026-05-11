@@ -199,7 +199,7 @@ export default function LiveAvatarPanel({
               const msg = "Avatar connected but no question arrived within 30s. Tearing down to save credits.";
               console.warn("[avatar]", msg);
               setPhase("failed");
-              setReason("No question arrived. Your interview credit can be refunded — contact support.");
+              setReason("No question arrived. Your interview credits can be refunded — contact support.");
               handleRef.current?.stop().catch(() => {});
               handleRef.current = null;
               httpsCallable(functions, "markAvatarStatus")({ visaInterviewSessionId: sessionId, status: "failed", reason: msg }).catch(() => {});

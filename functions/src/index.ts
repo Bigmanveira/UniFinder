@@ -1,4 +1,4 @@
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import { generateClaudeMatchExplanation } from "./claudeExplainMatches.js";
@@ -11,14 +11,61 @@ import { createHeyGenSessionToken, endHeyGenSession } from "./liveAvatarSession.
 import { synthesizeOfficerAudio } from "./avatarTts.js";
 import { extractVisaDocument, type VisaDocumentType, type ExtractedDocument } from "./visaDocExtractor.js";
 import { aiMatchSchools, type AiCandidate } from "./aiMatch.js";
+import {
+  createDodoCheckoutSession,
+  verifyDodoWebhook,
+  applyPaymentSucceeded,
+} from "./dodoPayments.js";
 
 admin.initializeApp();
 
-const ANTHROPIC_API_KEY = defineSecret("ANTHROPIC_API_KEY");
-const HEYGEN_API_KEY    = defineSecret("HEYGEN_API_KEY");
+const ANTHROPIC_API_KEY        = defineSecret("ANTHROPIC_API_KEY");
+const HEYGEN_API_KEY           = defineSecret("HEYGEN_API_KEY");
+const DODO_PAYMENTS_API_KEY    = defineSecret("DODO_PAYMENTS_API_KEY");
+const DODO_PAYMENTS_WEBHOOK_KEY = defineSecret("DODO_PAYMENTS_WEBHOOK_KEY");
 
-// Credits required to start a visa interview practice session.
-const VISA_INTERVIEW_CREDIT_COST = 1;
+// ─── Credit pricing ──────────────────────────────────────────────────────────
+// Single source of truth for every credit-deducting action. Keeping these as
+// named constants means we can audit cost vs. revenue from one file instead
+// of chasing magic numbers across the code.
+//
+// Pricing strategy (see PRICING.md / chat history for full math):
+//   • 1 credit retails at ~$1 on the Starter pack, dropping to $0.48 on Power.
+//   • Match unlock = 1 credit (≈$0.10 AI cost → ~90% margin baseline).
+//   • Visa interview = 15 credits. HeyGen avatar streaming dominates the
+//     real cost (~$2.20/session); 15 credits leaves >70% margin even on
+//     the most discounted pack.
+//   • Free-on-signup grant was 20; cut to 5 so anonymous farming isn't a
+//     loss-leader. A new user can run 5 match reports before paying.
+//   • Successful referrals award 5 credits to the referrer.
+const MATCH_REPORT_CREDIT_COST = 1;
+const VISA_INTERVIEW_CREDIT_COST = 15;
+const FREE_CREDITS_ON_SIGNUP   = 5;
+
+// Supporting-doc cap per interview. Each upload runs a Sonnet vision
+// extraction (~$0.012). Without a cap, one bad actor uploading 20 PDFs
+// burns ~$0.25 of margin on a single 15-credit session. Three covers the
+// realistic ask (bank statement, sponsor letter, employment letter).
+const MAX_SUPPORTING_DOCS_PER_INTERVIEW = 3;
+
+// Dodo Payments — one-time credit-pack products. The product_id values must
+// match what's configured in the Dodo dashboard. Pricing lives in Dodo (we
+// don't trust the client) but we mirror it here for the in-app billing UI.
+//
+// Edit this list when launching new packs; the credit amount and price are
+// also referenced by the client UI via the listCreditPacks callable.
+export const CREDIT_PACKS: Record<string, {
+  productId: string;     // Dodo product id — set after creating products in dashboard
+  label: string;
+  priceUsd: number;      // What we charge
+  credits: number;       // What the user receives
+  recommended?: boolean;
+}> = {
+  starter: { productId: "REPLACE_WITH_DODO_PRODUCT_ID_STARTER", label: "Starter", priceUsd:   5, credits:   5 },
+  plus:    { productId: "REPLACE_WITH_DODO_PRODUCT_ID_PLUS",    label: "Plus",    priceUsd:  20, credits:  30, recommended: true },
+  pro:     { productId: "REPLACE_WITH_DODO_PRODUCT_ID_PRO",     label: "Pro",     priceUsd:  50, credits: 100 },
+  power:   { productId: "REPLACE_WITH_DODO_PRODUCT_ID_POWER",   label: "Power",   priceUsd: 120, credits: 250 },
+};
 // Greeting + DS-160 ask. The interview proper (real questions) doesn't begin
 // until BOTH the DS-160 confirmation page and the I-20 have been uploaded.
 // See `recordVisaInterviewDocument` for the state machine that walks the
@@ -207,8 +254,8 @@ export const applyReferralCode = onCall(async (request) => {
 
     const walletSnap = await tx.get(referrerWalletRef);
     const currentCredits = walletSnap.exists
-      ? (walletSnap.data()?.credits ?? 20)
-      : 20;
+      ? (walletSnap.data()?.credits ?? FREE_CREDITS_ON_SIGNUP)
+      : FREE_CREDITS_ON_SIGNUP;
 
     tx.set(referrerWalletRef, { credits: currentCredits + REFERRAL_REWARD, updatedAt: now }, { merge: true });
     tx.set(userRef,           { referredBy: referrerUid, referredAt: now }, { merge: true });
@@ -480,17 +527,17 @@ export const unlockMatchReport = onCall(
       let currentCredits: number;
 
       if (!walletDoc.exists) {
-        currentCredits = 20;
-        transaction.set(walletRef, { credits: 20, updatedAt: now });
+        currentCredits = FREE_CREDITS_ON_SIGNUP;
+        transaction.set(walletRef, { credits: FREE_CREDITS_ON_SIGNUP, updatedAt: now });
       } else {
         currentCredits = walletDoc.data()?.credits ?? 0;
       }
 
-      if (currentCredits < 1) {
+      if (currentCredits < MATCH_REPORT_CREDIT_COST) {
         throw new HttpsError("resource-exhausted", "Insufficient credits");
       }
 
-      transaction.update(walletRef, { credits: currentCredits - 1, updatedAt: now });
+      transaction.update(walletRef, { credits: currentCredits - MATCH_REPORT_CREDIT_COST, updatedAt: now });
 
       // Only store what the report actually renders. Storing the full matches
       // array (or programEligibleMatches) blows past Firestore's 1 MiB
@@ -512,7 +559,7 @@ export const unlockMatchReport = onCall(
         aiProvider:           AI_PROVIDER,
         aiModel:              AI_MODEL,
         aiStatus:             aiResult.status,
-        creditsUsed:          1,
+        creditsUsed:          MATCH_REPORT_CREDIT_COST,
         status:               "completed",
         createdAt:            now,
         updatedAt:            now,
@@ -520,7 +567,7 @@ export const unlockMatchReport = onCall(
 
       transaction.set(txRef, {
         userId:    uid,
-        amount:    -1,
+        amount:    -MATCH_REPORT_CREDIT_COST,
         type:      "unlock_report",
         reportId:  reportRef.id,
         createdAt: now,
@@ -677,8 +724,8 @@ export const startVisaInterviewSession = onCall(
       const wallet = await tx.get(walletRef);
       let credits: number;
       if (!wallet.exists) {
-        credits = 20;
-        tx.set(walletRef, { credits: 20, updatedAt: now });
+        credits = FREE_CREDITS_ON_SIGNUP;
+        tx.set(walletRef, { credits: FREE_CREDITS_ON_SIGNUP, updatedAt: now });
       } else {
         credits = wallet.data()?.credits ?? 0;
       }
@@ -890,6 +937,25 @@ export const recordVisaInterviewDocument = onCall(
     if (session.userId !== uid)           throw new HttpsError("permission-denied", "Not your session");
     if (session.status !== "active")      throw new HttpsError("failed-precondition", "Session is not active");
 
+    // Cost guardrail: cap how many SUPPORTING docs (anything other than the
+    // mandatory I-20 / DS-160) the user can push through vision extraction
+    // in one session. Each extraction is a Sonnet vision call (~$0.012) and
+    // an unbounded loop is an easy way for a single bad actor to drain
+    // margin on a 15-credit session.
+    const isSupportingDoc =
+      documentType !== "i20" && documentType !== "ds160_confirmation";
+    if (isSupportingDoc && !isSkip) {
+      const supportingUploaded = Object.entries(session.extractedDocuments ?? {})
+        .filter(([type]) => type !== "i20" && type !== "ds160_confirmation")
+        .length;
+      if (supportingUploaded >= MAX_SUPPORTING_DOCS_PER_INTERVIEW) {
+        throw new HttpsError(
+          "resource-exhausted",
+          `You've already uploaded the maximum of ${MAX_SUPPORTING_DOCS_PER_INTERVIEW} supporting documents for this interview.`,
+        );
+      }
+    }
+
     const now = admin.firestore.FieldValue.serverTimestamp();
 
     // ── 1. Run extraction (best-effort, never block the interview) ──────────
@@ -1084,6 +1150,41 @@ export const finishVisaInterviewSession = onCall(
     });
 
     const now = admin.firestore.FieldValue.serverTimestamp();
+
+    // ── Scoring failure → refund the credits ────────────────────────────────
+    // Visa interviews charge 15 credits upfront (in startVisaInterviewSession).
+    // If scoring fails the user has nothing to show for it — refund the full
+    // cost rather than burn their wallet on our infra problem. We still mark
+    // the session completed so it doesn't keep streaming, and log the
+    // refunded run so support can audit later.
+    if (score.status === "failed") {
+      const walletRef = db.collection("creditWallets").doc(uid);
+      const refundTxRef = db.collection("creditTransactions").doc();
+      await db.runTransaction(async (tx) => {
+        const wallet = await tx.get(walletRef);
+        const current = wallet.exists ? (wallet.data()?.credits ?? 0) : 0;
+        tx.set(walletRef, { credits: current + VISA_INTERVIEW_CREDIT_COST, updatedAt: now }, { merge: true });
+        tx.set(refundTxRef, {
+          userId:     uid,
+          amount:     VISA_INTERVIEW_CREDIT_COST,
+          type:       "refund_visa_interview_scoring_failed",
+          sessionId,
+          createdAt:  now,
+        });
+        tx.update(sessionRef, { status: "completed", endedAt: now, updatedAt: now, refundIssued: true });
+      });
+      await logAiRun({
+        userId: uid, sessionId,
+        type: "visa_interview_scoring",
+        status: score.status,
+        errorMessage: score.errorMessage,
+      });
+      throw new HttpsError(
+        "internal",
+        "Scoring failed. Your credits have been refunded — please try again in a moment.",
+      );
+    }
+
     const reportRef = db.collection("visaInterviewReports").doc();
     const reportData = {
       sessionId, userId: uid,
@@ -1270,3 +1371,136 @@ export const markAvatarStatus = onCall(async (request) => {
   });
   return { ok: true };
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Dodo Payments — credit-pack checkout + webhook
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Toggle live vs. test by env. We default to live so production isn't an
+// opt-in; set DODO_ENV=test_mode in the function config when developing.
+const DODO_ENV: "live_mode" | "test_mode" =
+  (process.env.DODO_ENV === "test_mode") ? "test_mode" : "live_mode";
+
+/** Public catalogue — client reads this to render the billing tab. */
+export const listCreditPacks = onCall(async () => {
+  return Object.entries(CREDIT_PACKS).map(([id, p]) => ({
+    id,
+    label:       p.label,
+    priceUsd:    p.priceUsd,
+    credits:     p.credits,
+    recommended: !!p.recommended,
+  }));
+});
+
+/**
+ * Create a Dodo checkout session for the requested credit pack and return
+ * the URL the browser should redirect to. The client supplies only the
+ * packId — pricing and credit amount come from CREDIT_PACKS server-side so
+ * a tampered client can't pay $5 for the Power pack.
+ */
+export const createDodoCheckout = onCall(
+  { secrets: [DODO_PAYMENTS_API_KEY] },
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid)                throw new HttpsError("unauthenticated", "Sign in to buy credits");
+    const userEmail = request.auth?.token?.email;
+    if (!userEmail)          throw new HttpsError("failed-precondition", "Your account has no email — contact support");
+
+    const packId    = String(request.data?.packId ?? "");
+    const returnUrl = String(request.data?.returnUrl ?? "");
+    const pack = CREDIT_PACKS[packId];
+    if (!pack)               throw new HttpsError("invalid-argument", "Unknown credit pack");
+    if (!returnUrl.startsWith("https://") && !returnUrl.startsWith("http://localhost"))
+      throw new HttpsError("invalid-argument", "Invalid returnUrl");
+    if (pack.productId.startsWith("REPLACE_WITH"))
+      throw new HttpsError("failed-precondition", "Credit pack not configured — admin must set Dodo product IDs.");
+
+    try {
+      const { checkoutUrl, sessionId } = await createDodoCheckoutSession({
+        apiKey:      DODO_PAYMENTS_API_KEY.value(),
+        environment: DODO_ENV,
+        pack,
+        packId,
+        userId:      uid,
+        userEmail,
+        returnUrl,
+      });
+      return { checkoutUrl, sessionId };
+    } catch (err: any) {
+      console.error("[dodo] checkout creation failed:", err?.message ?? err);
+      throw new HttpsError("internal", "Could not start checkout. Please try again.");
+    }
+  },
+);
+
+/**
+ * Dodo webhook receiver. Raw HTTP endpoint (not callable) because Dodo posts
+ * from the outside world. We verify the signature with the webhook secret,
+ * then atomically credit the user's wallet on payment.succeeded.
+ *
+ * Returns:
+ *   200 + { ok: true }           on successful credit
+ *   200 + { duplicated: true }   on already-processed (Dodo retries)
+ *   200 + { ignored: true }      for event types we don't handle (still 200
+ *                                so Dodo doesn't retry forever)
+ *   400 on signature failure (causes Dodo to retry — correct behavior)
+ *
+ * IMPORTANT: returning anything other than 200 will cause Dodo to retry,
+ * so 200 is the right answer for "we got it, even if it was a duplicate
+ * or an event we don't care about."
+ */
+export const dodoWebhook = onRequest(
+  { secrets: [DODO_PAYMENTS_WEBHOOK_KEY], cors: false },
+  async (req, res) => {
+    if (req.method !== "POST") {
+      res.status(405).send("Method not allowed");
+      return;
+    }
+
+    // We need the raw body for signature verification. Firebase v2 onRequest
+    // gives us req.rawBody as a Buffer when content-type is application/json.
+    const rawBody = (req.rawBody ?? Buffer.from("")).toString("utf8");
+    const webhookId        = String(req.header("webhook-id") ?? "");
+    const webhookSignature = String(req.header("webhook-signature") ?? "");
+    const webhookTimestamp = String(req.header("webhook-timestamp") ?? "");
+
+    if (!webhookId || !webhookSignature || !webhookTimestamp) {
+      res.status(400).send("Missing webhook headers");
+      return;
+    }
+
+    let event;
+    try {
+      event = verifyDodoWebhook({
+        rawBody,
+        webhookKey:       DODO_PAYMENTS_WEBHOOK_KEY.value(),
+        webhookId,
+        webhookSignature,
+        webhookTimestamp,
+      });
+    } catch (err: any) {
+      console.warn("[dodo] webhook signature invalid:", err?.message ?? err);
+      // 400 so Dodo retries — could be a transient timestamp drift.
+      res.status(400).send("Invalid signature");
+      return;
+    }
+
+    try {
+      if (event.type === "payment.succeeded") {
+        const result = await applyPaymentSucceeded(event);
+        if (!result.applied && !result.duplicated) {
+          console.warn("[dodo] payment.succeeded not applied:", result.reason);
+        }
+        res.status(200).json({ ok: result.applied, duplicated: !!result.duplicated });
+        return;
+      }
+      // payment.failed and any other events: log and 200 so Dodo stops retrying.
+      console.log("[dodo] received event:", event.type);
+      res.status(200).json({ ignored: true });
+    } catch (err: any) {
+      console.error("[dodo] webhook processing error:", err?.message ?? err);
+      // 500 so Dodo retries — transient Firestore issue, etc.
+      res.status(500).send("Webhook processing failed");
+    }
+  },
+);

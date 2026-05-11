@@ -134,7 +134,7 @@ export default function InterviewIntroCard({
         disabled={!canStart}
         className="flex items-center justify-center gap-2 w-full bg-slate-900 hover:bg-slate-800 text-white text-base font-semibold py-4 rounded-2xl transition-all active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-slate-900/20"
       >
-        {starting ? <Loader2 size={16} className="animate-spin" /> : <>Start the interview · 1 credit <ArrowRight size={16} /></>}
+        {starting ? <Loader2 size={16} className="animate-spin" /> : <>Start the interview · 15 credits <ArrowRight size={16} /></>}
       </button>
     </motion.div>
   );
