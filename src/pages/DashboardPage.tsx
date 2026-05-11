@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { auth, db, storage } from "../lib/firebase";
 import { signOut, sendPasswordResetEmail } from "firebase/auth";
@@ -13,10 +13,30 @@ import { collection, query, where } from "firebase/firestore";
 import { FadeIn, FadeInItem } from "../components/FadeIn";
 import { getOrCreateReferralCode, buildReferralUrl } from "../lib/referrals";
 
+const VALID_DASHBOARD_TABS = new Set(["matches", "saved", "billing", "profile", "interviews"]);
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("matches");
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Honour deep-links like /app?tab=billing (used by the landing page's
+  // "View All Packages" CTA and any other entry point that wants to drop
+  // the user on a specific tab). After consuming the param we strip it so
+  // a refresh doesn't keep forcing the tab.
+  const initialTab = (() => {
+    const requested = searchParams.get("tab");
+    return requested && VALID_DASHBOARD_TABS.has(requested) ? requested : "matches";
+  })();
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  useEffect(() => {
+    if (searchParams.has("tab")) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("tab");
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [credits, setCredits] = useState<number>(0);
   const [matchReports, setMatchReports] = useState<any[]>([]);
   const [interviewReports, setInterviewReports] = useState<any[]>([]);

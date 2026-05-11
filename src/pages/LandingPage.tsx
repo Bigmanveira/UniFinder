@@ -23,6 +23,14 @@ export default function LandingPage() {
     ? "/app/visa-interview"
     : "/signup?next=/app/visa-interview";
 
+  // "View All Packages" jumps signed-in users straight to the Billing tab on
+  // the dashboard. Signed-out users sign up first; the same destination is
+  // preserved via ProtectedRoute's `next` param so they land on Billing
+  // after auth instead of the default Home tab.
+  const billingHref = user
+    ? "/app?tab=billing"
+    : `/signup?next=${encodeURIComponent("/app?tab=billing")}`;
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans selection:bg-primary-500 selection:text-white relative overflow-hidden">
 
@@ -253,7 +261,7 @@ export default function LandingPage() {
             </p>
             <ul className="space-y-4 mb-10">
               <li className="flex items-center gap-3 font-bold text-slate-300"><CheckCircle2 className="text-primary-500"/> Full match report = 1 credit</li>
-              <li className="flex items-center gap-3 font-bold text-slate-300"><CheckCircle2 className="text-primary-500"/> F-1 visa interview practice = 1 credit</li>
+              <li className="flex items-center gap-3 font-bold text-slate-300"><CheckCircle2 className="text-primary-500"/> F-1 visa interview practice = 15 credits</li>
               <li className="flex items-center gap-3 font-bold text-slate-300"><CheckCircle2 className="text-primary-500"/> Personalized application roadmap = included</li>
             </ul>
             <Link to="/intake" className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-500 text-white font-bold px-8 py-4 rounded-full transition-colors">
@@ -264,15 +272,18 @@ export default function LandingPage() {
           <div className="flex-1 w-full max-w-sm">
             <div className="bg-slate-800 border border-slate-700 rounded-[40px] p-8 shadow-2xl relative">
               <div className="absolute -top-4 right-8 bg-accent-500 text-white text-[10px] font-black tracking-widest uppercase px-3 py-1.5 rounded-full">Most Popular</div>
-              <h3 className="text-2xl font-black mb-2">Standard Pack</h3>
+              <h3 className="text-2xl font-black mb-2">Plus Pack</h3>
               <p className="text-slate-400 font-medium text-sm mb-6">Perfect for building your shortlist.</p>
               <div className="mb-6">
-                <span className="text-5xl font-black">$15</span>
-                <span className="text-slate-400 font-bold"> / 15 Credits</span>
+                <span className="text-5xl font-black">$20</span>
+                <span className="text-slate-400 font-bold"> / 30 Credits</span>
               </div>
-              <button className="w-full bg-white text-slate-900 font-bold py-4 rounded-full hover:bg-slate-100 transition-colors">
+              <Link
+                to={billingHref}
+                className="w-full inline-flex items-center justify-center bg-white text-slate-900 font-bold py-4 rounded-full hover:bg-slate-100 transition-colors"
+              >
                 View All Packages
-              </button>
+              </Link>
             </div>
           </div>
         </div>
