@@ -117,7 +117,7 @@ export default function GuestMatchWizard() {
   return (
     <div className="min-h-screen bg-slate-50 dot-grid-bg font-sans selection:bg-primary-500 selection:text-white flex flex-col">
       <header className="p-6 flex justify-center">
-        <Link to="/" className="text-2xl font-black tracking-tight text-primary-600">Unifinder</Link>
+        <Link to="/" className="text-2xl font-black tracking-tight text-primary-600">College Ready</Link>
       </header>
 
       <main className="flex-1 w-full max-w-xl mx-auto px-6 pb-12 pt-4">

@@ -307,7 +307,7 @@ export default function VisaInterviewPage() {
 
   const headerSubtitle = useMemo(() => {
     if (phase === "intro")  return "Pre-flight your F-1 interview with realistic questions and AI feedback.";
-    if (phase === "active") return "Answer truthfully — Unifinder doesn't coach dishonesty.";
+    if (phase === "active") return "Answer truthfully — College Ready doesn't coach dishonesty.";
     return "Practice feedback — not an official assessment.";
   }, [phase]);
 

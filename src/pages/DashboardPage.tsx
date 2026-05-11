@@ -86,7 +86,7 @@ export default function DashboardPage() {
           <div className="w-8 h-8 rounded-xl bg-primary-600 flex items-center justify-center text-white shadow-lg shadow-primary-600/30">
             <GraduationCap size={20} />
           </div>
-          <span className="text-xl font-black tracking-tight text-slate-900">Unifinder</span>
+          <span className="text-xl font-black tracking-tight text-slate-900">College Ready</span>
         </div>
 
         <nav className="flex-1 space-y-2">
@@ -436,7 +436,7 @@ export default function DashboardPage() {
             <div className="w-8 h-8 rounded-xl bg-primary-600 flex items-center justify-center text-white shadow-md shadow-primary-600/30">
               <GraduationCap size={18} />
             </div>
-            <span className="text-lg font-black tracking-tight text-slate-900">Unifinder</span>
+            <span className="text-lg font-black tracking-tight text-slate-900">College Ready</span>
           </div>
           <button
             onClick={() => setNotifOpen((v) => !v)}
@@ -494,7 +494,7 @@ export default function DashboardPage() {
                   <div className="w-9 h-9 rounded-xl bg-primary-600 flex items-center justify-center text-white shadow-md shadow-primary-600/30">
                     <GraduationCap size={18} />
                   </div>
-                  <span className="text-xl font-black tracking-tight text-slate-900">Unifinder</span>
+                  <span className="text-xl font-black tracking-tight text-slate-900">College Ready</span>
                 </div>
                 <button
                   onClick={() => setMobileNavOpen(false)}
@@ -829,7 +829,7 @@ function ReferralCard({ userId }: { userId: string | undefined }) {
   }, [userId]);
 
   const url = code ? buildReferralUrl(code) : "";
-  const shareText = "I'm using Unifinder to find a U.S. university match — sign up with my link and we both win.";
+  const shareText = "I'm using College Ready to find a U.S. university match — sign up with my link and we both win.";
 
   const handleCopy = async () => {
     if (!url) return;
@@ -853,7 +853,7 @@ function ReferralCard({ userId }: { userId: string | undefined }) {
     twitter:  `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(url)}`,
     facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
     telegram: `https://t.me/share/url?url=${encodeURIComponent(url)}&text=${encodeURIComponent(shareText)}`,
-    email:    `mailto:?subject=${encodeURIComponent("Find your U.S. university match — Unifinder")}&body=${encodeURIComponent(`${shareText}\n\n${url}`)}`,
+    email:    `mailto:?subject=${encodeURIComponent("Find your U.S. university match — College Ready")}&body=${encodeURIComponent(`${shareText}\n\n${url}`)}`,
   } : null;
 
   return (

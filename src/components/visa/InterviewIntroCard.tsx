@@ -87,7 +87,7 @@ export default function InterviewIntroCard({
           <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
           <div>
             <p className="font-bold mb-0.5">This browser doesn't support voice input.</p>
-            <p>Open Unifinder in Chrome, Edge, Brave, or Safari to start the interview.</p>
+            <p>Open College Ready in Chrome, Edge, Brave, or Safari to start the interview.</p>
           </div>
         </div>
       )}
@@ -125,7 +125,7 @@ export default function InterviewIntroCard({
           {accepted && <Check size={12} className="stroke-[3]" />}
         </span>
         <span className="text-[13.5px] text-slate-700 leading-relaxed">
-          I understand this is a practice simulator only. I will answer truthfully — Unifinder does not coach dishonesty, and a good practice score does not predict the real interview outcome.
+          I understand this is a practice simulator only. I will answer truthfully — College Ready does not coach dishonesty, and a good practice score does not predict the real interview outcome.
         </span>
       </button>
 

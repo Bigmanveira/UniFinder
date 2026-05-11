@@ -145,7 +145,7 @@ export default function SignupPage() {
         <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center">
           <GraduationCap size={22} />
         </div>
-        <span className="text-xl font-black tracking-tight hidden sm:block">Unifinder</span>
+        <span className="text-xl font-black tracking-tight hidden sm:block">College Ready</span>
       </Link>
 
       {/* Signup Card */}

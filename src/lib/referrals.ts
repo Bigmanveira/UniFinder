@@ -52,7 +52,10 @@ export async function getOrCreateReferralCode(uid: string): Promise<string> {
 }
 
 export function buildReferralUrl(code: string): string {
-  const origin = typeof window !== "undefined" ? window.location.origin : "https://unifinder.app";
+  // Fallback only fires under SSR (no window). This codebase is fully
+  // client-rendered so the fallback never actually triggers; the string
+  // is here purely for visible brand alignment.
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://college-ready.app";
   return `${origin}/signup?ref=${code}`;
 }
 

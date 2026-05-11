@@ -1,6 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Roadmap content — structured guidance shown after a match report.
-// All copy below is original to Unifinder.
+// All copy below is original to College Ready.
 // ─────────────────────────────────────────────────────────────────────────────
 
 export type CalloutTone = "info" | "warn";

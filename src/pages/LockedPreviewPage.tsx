@@ -154,7 +154,7 @@ export default function LockedPreviewPage() {
           <div className="w-9 h-9 rounded-2xl bg-slate-900 flex items-center justify-center text-white">
             <GraduationCap size={16} />
           </div>
-          <span className="text-lg font-bold tracking-tight">Unifinder</span>
+          <span className="text-lg font-bold tracking-tight">College Ready</span>
         </Link>
         {user ? (
           <Link to="/app" className="w-10 h-10 rounded-full ring-2 ring-white shadow-md bg-gradient-to-br from-blue-500 to-cyan-600 text-white flex items-center justify-center font-bold">
@@ -205,7 +205,7 @@ export default function LockedPreviewPage() {
             </div>
             <h3 className="text-lg font-bold mb-2">No verified programs for {profile?.field || "this field"} ({profile?.level || "this level"})</h3>
             <p className="text-sm text-slate-500 max-w-md mx-auto leading-relaxed">
-              Unifinder only recommends schools with a verified program record at your chosen level.
+              College Ready only recommends schools with a verified program record at your chosen level.
             </p>
           </section>
         )}

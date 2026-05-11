@@ -26,10 +26,10 @@ export interface AiReportExplanation {
 // System prompt — enthusiastic, helpful, no scary disclaimers
 // ============================================================
 
-const SYSTEM_PROMPT = `You are Unifinder's enthusiastic university admissions advisor. Your job is to excite and empower students by explaining why the schools they have been matched with are great opportunities for them — and exactly how to put their best foot forward.
+const SYSTEM_PROMPT = `You are College Ready's enthusiastic university admissions advisor. Your job is to excite and empower students by explaining why the schools they have been matched with are great opportunities for them — and exactly how to put their best foot forward.
 
 PROGRAM AVAILABILITY IS ALREADY VERIFIED:
-Every school in this list has been confirmed by Unifinder's verified program database (College Scorecard field-of-study data) to offer the student's intended program at the correct degree level. Do NOT infer, question, or re-evaluate program availability. Do NOT add schools. Do NOT remove schools. Explain ONLY the matches provided.
+Every school in this list has been confirmed by College Ready's verified program database (College Scorecard field-of-study data) to offer the student's intended program at the correct degree level. Do NOT infer, question, or re-evaluate program availability. Do NOT add schools. Do NOT remove schools. Explain ONLY the matches provided.
 
 ADMISSION BUCKETS ARE ALREADY ASSIGNED:
 Each match has an "admissionBucket" of "reach", "target", or "safety" — already calculated from the school's admit rate and the student's profile. Frame your "whyYouFit" copy according to the bucket:
@@ -214,7 +214,7 @@ export async function generateClaudeMatchExplanation({
     const anthropic = new Anthropic({ apiKey });
 
     const userPayload = JSON.stringify({
-      task: "Write enthusiastic, personalised university match explanations for this student. Program availability has already been verified by Unifinder's database — every school listed is confirmed to offer the student's program. Return JSON only.",
+      task: "Write enthusiastic, personalised university match explanations for this student. Program availability has already been verified by College Ready's database — every school listed is confirmed to offer the student's program. Return JSON only.",
       studentProfile: prepareProfileSummary(profile),
       confirmedProgramField: normalisedField ?? null,
       confirmedCredentialLevel: normalisedLevel ?? null,

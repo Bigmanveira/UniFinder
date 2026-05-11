@@ -10,11 +10,11 @@ const FAQS = [
   },
   {
     question: "What are Credits and how do I use them?",
-    answer: "Unifinder operates on a simple pay-as-you-go credit system. One credit unlocks a full, deeply personalized match report for your profile. Two credits can be used to run our AI Transcript Analysis tool. You get 2 free credits just for signing up!"
+    answer: "College Ready operates on a simple pay-as-you-go credit system. One credit unlocks a full, deeply personalized match report for your profile. Two credits can be used to run our AI Transcript Analysis tool. You get 2 free credits just for signing up!"
   },
   {
-    question: "Does Unifinder guarantee my admission?",
-    answer: "No platform can guarantee university admission, as admissions committees consider subjective factors like essays and interviews. However, Unifinder dramatically improves your odds by strictly filtering out programs where you do not meet the minimum objective thresholds, saving you thousands of dollars in wasted application fees."
+    question: "Does College Ready guarantee my admission?",
+    answer: "No platform can guarantee university admission, as admissions committees consider subjective factors like essays and interviews. However, College Ready dramatically improves your odds by strictly filtering out programs where you do not meet the minimum objective thresholds, saving you thousands of dollars in wasted application fees."
   },
   {
     question: "Do credits expire?",
@@ -37,7 +37,7 @@ export default function FAQPage() {
           <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center text-white shadow-lg shadow-primary-600/20 group-hover:scale-105 transition-transform">
             <GraduationCap size={22} />
           </div>
-          <span className="text-xl font-black tracking-tight">Unifinder</span>
+          <span className="text-xl font-black tracking-tight">College Ready</span>
         </Link>
         <Link to="/login" className="text-sm font-bold text-primary-600 hover:text-primary-700 bg-primary-50 px-5 py-2.5 rounded-full transition-colors">
           Log in
@@ -127,7 +127,7 @@ export default function FAQPage() {
             <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white">
               <GraduationCap size={16} />
             </div>
-            <span className="text-xl font-black tracking-tight text-slate-900">Unifinder</span>
+            <span className="text-xl font-black tracking-tight text-slate-900">College Ready</span>
           </div>
           <div className="flex gap-6 text-sm font-bold text-slate-400">
             <Link to="/faq" className="hover:text-primary-600 transition-colors">FAQ</Link>
@@ -136,7 +136,7 @@ export default function FAQPage() {
             <a href="#" className="hover:text-primary-600 transition-colors">Contact</a>
           </div>
           <p className="text-xs font-medium text-slate-400">
-            © 2026 Unifinder. Not affiliated with the U.S. Government.
+            © 2026 College Ready. Not affiliated with the U.S. Government.
           </p>
         </div>
       </footer>

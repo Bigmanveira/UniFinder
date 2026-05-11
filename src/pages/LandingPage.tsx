@@ -35,7 +35,7 @@ export default function LandingPage() {
             <div className="w-9 h-9 md:w-10 md:h-10 rounded-[12px] bg-primary-600 flex items-center justify-center text-white shadow-lg shadow-primary-500/30">
               <GraduationCap size={20} />
             </div>
-            <span className="text-xl md:text-2xl font-black tracking-tight text-slate-900">Unifinder</span>
+            <span className="text-xl md:text-2xl font-black tracking-tight text-slate-900">College Ready</span>
           </div>
           <nav className="hidden md:flex items-center gap-8">
             <a href="#how-it-works" className="text-sm font-bold text-slate-500 hover:text-primary-600 transition-colors">How it Works</a>
@@ -201,7 +201,7 @@ export default function LandingPage() {
           {/* Copy second on lg, first on mobile */}
           <div className="flex-1 order-1 lg:order-2">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-black tracking-widest uppercase mb-5">
-              <ShieldAlert size={12} /> Unifinder exclusive
+              <ShieldAlert size={12} /> College Ready exclusive
             </div>
             <h2 className="text-3xl md:text-5xl font-black tracking-tight text-slate-900 mb-5 leading-[1.05]">
               Rehearse the interview <span className="text-primary-600">that decides everything.</span>
@@ -268,7 +268,7 @@ export default function LandingPage() {
             <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white">
               <GraduationCap size={16} />
             </div>
-            <span className="text-xl font-black tracking-tight text-slate-900">Unifinder</span>
+            <span className="text-xl font-black tracking-tight text-slate-900">College Ready</span>
           </div>
           <div className="flex gap-6 text-sm font-bold text-slate-400">
             <Link to="/faq" className="hover:text-primary-600 transition-colors">FAQ</Link>
@@ -277,7 +277,7 @@ export default function LandingPage() {
             <a href="#" className="hover:text-primary-600 transition-colors">Contact</a>
           </div>
           <p className="text-xs font-medium text-slate-400">
-            © 2026 Unifinder. Practice tools only. Not affiliated with any government, embassy, or consular service.
+            © 2026 College Ready. Practice tools only. Not affiliated with any government, embassy, or consular service.
           </p>
         </div>
       </footer>

@@ -95,7 +95,7 @@ export default function BrowseSchoolsPage() {
           <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center text-white shadow-lg shadow-primary-600/20 group-hover:scale-105 transition-transform">
             <GraduationCap size={22} />
           </div>
-          <span className="text-xl font-black tracking-tight">Unifinder</span>
+          <span className="text-xl font-black tracking-tight">College Ready</span>
         </Link>
         <Link to="/login" className="text-sm font-bold text-slate-600 hover:text-primary-600 transition-colors">Log In</Link>
       </header>
