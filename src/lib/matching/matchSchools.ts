@@ -6,6 +6,74 @@ import {
   getFieldMatchScore,
 } from "../schools/getSchools";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Per-level scoring configuration.
+// The original algorithm used one weight table for every applicant level,
+// which made undergrad / masters / doctoral matches feel identical. They're
+// NOT. The dimensions that matter differ per level:
+//
+//   Undergrad — selectivity + stats + cost dominate. Brand reputation
+//               matters because students apply broadly.
+//   Masters   — programme fit + funding + admit rate. Two students at the
+//               same school in different masters can have wildly different
+//               outcomes; programme-level signal matters most.
+//   Doctoral  — research fit (university type) + admit rate. Cost matters
+//               LESS because most PhD admits are funded; international
+//               support matters MORE for international PhDs.
+//
+// Weights MUST sum to 100 within each level. Validate at module load.
+// ─────────────────────────────────────────────────────────────────────────────
+type LevelKey = "undergrad" | "masters" | "doctoral";
+
+interface LevelWeights {
+  academic:   number;
+  admission:  number;
+  fieldFit:   number;
+  budget:     number;
+  location:   number;
+  intl:       number;
+}
+
+const LEVEL_WEIGHTS: Record<LevelKey, LevelWeights> = {
+  undergrad: { academic: 40, admission: 25, fieldFit: 12, budget: 12, location: 8, intl:  3 },
+  masters:   { academic: 35, admission: 22, fieldFit: 22, budget: 10, location: 8, intl:  3 },
+  doctoral:  { academic: 28, admission: 18, fieldFit: 30, budget:  6, location: 8, intl: 10 },
+};
+
+// Sanity-check at load time so a future weight tweak that adds to 99 or 101
+// is caught immediately instead of producing subtly wrong match scores.
+for (const [level, w] of Object.entries(LEVEL_WEIGHTS)) {
+  const sum = w.academic + w.admission + w.fieldFit + w.budget + w.location + w.intl;
+  if (sum !== 100) {
+    // eslint-disable-next-line no-console
+    console.error(`[matching] LEVEL_WEIGHTS.${level} sums to ${sum}, expected 100`);
+  }
+}
+
+function getLevelKey(profile: StudentProfile): LevelKey {
+  const lvl = (profile.level || profile.degreeLevel || profile.targetDegreeLevel || "").toLowerCase();
+  if (lvl.includes("phd") || lvl.includes("doctorate") || lvl.includes("doctoral")) return "doctoral";
+  if (lvl.includes("master") || lvl.includes("mba") || lvl.includes("postgrad") || lvl.includes("graduate")) return "masters";
+  return "undergrad";
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Selectivity tier — derived from admission rate. Lets us reason about
+// "is this an elite school" / "broad-access" without re-checking admit rate
+// at every site. Also feeds the stratified bucketize so the picked top-10
+// includes a spread of tiers within reach/target/safety, not 3 ivies stacked.
+// ─────────────────────────────────────────────────────────────────────────────
+type SelectivityTier = "elite" | "selective" | "moderate" | "broad" | "unknown";
+
+function selectivityTier(school: School): SelectivityTier {
+  const r = school.admissionRate;
+  if (r == null || r === 0) return "unknown";
+  if (r < 0.15) return "elite";
+  if (r < 0.35) return "selective";
+  if (r < 0.70) return "moderate";
+  return "broad";
+}
+
 // ====================================================
 // TASK 2: Applicant-level helper functions
 // ====================================================
@@ -726,6 +794,7 @@ export function getDeterministicMatches(
   const fieldStr = (profile.field || profile.intendedMajor || "").toLowerCase();
   const levelStr  = (profile.level || profile.degreeLevel || profile.targetDegreeLevel || "").toLowerCase();
   const isPhd = levelStr.includes("phd") || levelStr.includes("doctorate");
+  const levelKey = getLevelKey(profile);
 
   // Seed for the personalization tiebreaker. Two applicants with the SAME
   // exact profile see the same ordering; applicants with different profiles
@@ -771,21 +840,10 @@ export function getDeterministicMatches(
 
     let rawScore = 0;
 
-    // ── Score weights (must sum to 100) ───────────────────────────────────
-    // Rebalanced from the original PhD-CS-tuned config so masters and
-    // undergrad reports differentiate properly between fields:
-    //   - Major Fit went 7 -> 15: a CS applicant and a Biology applicant
-    //     should not see nearly identical school lists. Field signal now
-    //     carries real weight.
-    //   - Academic Fit 40 -> 42: profile stats matter slightly more.
-    //   - Admission Likelihood 25 -> 22: a touch less, since field+academic
-    //     already encode prestige indirectly.
-    //   - Budget 15 -> 10: cost-of-attendance varies less between top
-    //     schools than the old weight implied; "Out of budget" was
-    //     dragging strong fits below threshold for non-CS fields.
-    //   - Location 10 -> 8, International 3 -> 3.
+    // Per-level weight table — see LEVEL_WEIGHTS above for the rationale.
+    const W = LEVEL_WEIGHTS[levelKey];
 
-    // 1. Budget Fit (10%)
+    // 1. Budget Fit
     const knownCost = school.averageCost ?? school.outOfStateTuition ?? school.inStateTuition;
     const cost = knownCost ?? 40000;
     let budgetFit: SchoolMatch["budgetFit"] = "Good";
@@ -794,47 +852,64 @@ export function getDeterministicMatches(
     else if (cost <= maxBudget)        { budgetFit = "Good";         budgetWeight = 0.85; }
     else if (cost <= maxBudget * 1.2)  { budgetFit = "Stretch";      budgetWeight = 0.55; }
     else                               { budgetFit = "Out of Budget"; budgetWeight = 0.30; }
-    rawScore += budgetWeight * 10;
+    rawScore += budgetWeight * W.budget;
     if (knownCost === null || knownCost === undefined) rawScore -= 1.5;
 
-    // 2. Academic Fit (42%) — your stats vs the school's selectivity.
-    let academic;
-    if (isUndergrad) {
-      academic = scoreUndergraduateAcademicFit(profile, school);
-    } else if (isPostgrad) {
-      academic = scorePostgraduateAcademicFit(profile, school);
-    } else {
-      academic = scoreUndergraduateAcademicFit(profile, school);
-    }
-    rawScore += (academic.score / 100) * 42;
+    // 2. Academic Fit — your stats vs the school's selectivity.
+    const academic = isUndergrad
+      ? scoreUndergraduateAcademicFit(profile, school)
+      : scorePostgraduateAcademicFit(profile, school);
+    rawScore += (academic.score / 100) * W.academic;
 
-    // 3. Admission Likelihood (22%) — your chance given the school's admit
+    // 3. Admission Likelihood — your chance given the school's admit
     // rate and your profile strength. Differentiates Reach/Target/Safety.
     const admissionLikelihood = getAdmissionLikelihood(profile, school);
-    rawScore += (admissionLikelihood / 100) * 22;
+    rawScore += (admissionLikelihood / 100) * W.admission;
     const admissionBucket = bucketForLikelihood(admissionLikelihood);
 
     // Data-confidence penalty: schools without an admissions-rate record
     // shouldn't outrank schools with verified Target/Safety admit rates.
+    // Scale by level — for PhD the institutional admit rate is a weaker
+    // signal anyway (programmes are individually selective), so the
+    // missing-data penalty is lighter.
     if (school.admissionRate == null || school.admissionRate === 0) {
-      rawScore -= 6;
+      rawScore -= levelKey === "doctoral" ? 3 : 6;
     }
 
-    // 4. Location Fit (8%)
+    // 4. Location Fit
     let locationFit: SchoolMatch["locationFit"] = "No";
     if (targetCountry.includes("us") || targetCountry.includes("united states")) {
       locationFit = "Yes";
-      rawScore += 8;
+      rawScore += W.location;
     }
 
-    // 5. Major Fit (15%) — the BIG rebalance. Field/program alignment is
-    // now a primary driver, not a tiebreaker. Two applicants with the same
-    // GPA but different majors will see materially different school lists.
+    // 5. Field / Major Fit — biggest dimension for masters and doctoral.
+    // We use the name-pattern heuristic as the base, then apply a
+    // tier-based bonus: schools in higher selectivity tiers are more
+    // likely to run rigorous graduate programmes in the requested field.
     const fieldFit = getFieldMatchScore(school, fieldStr);
-    rawScore += (fieldFit.score / 100) * 15;
+    let fieldFitScore = fieldFit.score;
+    if (eligibleUnitIds !== null) {
+      // The school is in the verified-program gate — it's confirmed to
+      // offer this exact programme at this level. Floor the field-fit so
+      // gate-eligible schools always read as "Likely Available" with a
+      // strong base. Without this, name-pattern alone could give Stanford
+      // CS a 70 while it should be a 95.
+      fieldFitScore = Math.max(fieldFitScore, 80);
+    }
+    const tier = selectivityTier(school);
+    if (levelKey === "masters" || levelKey === "doctoral") {
+      // For graduate study, more selective institutions generally run
+      // higher-quality programmes (more funding, faculty, research output).
+      // Small bumps so a state R1 doesn't tie with a non-research liberal-
+      // arts college on programme fit.
+      if (tier === "elite")        fieldFitScore = Math.min(100, fieldFitScore + 8);
+      else if (tier === "selective") fieldFitScore = Math.min(100, fieldFitScore + 4);
+    }
+    rawScore += (fieldFitScore / 100) * W.fieldFit;
     const majorFitLabel = fieldFit.label;
 
-    // 6. International Fit (3%)
+    // 6. International Fit
     let intFitScore = 40;
     let intFitLabel: SchoolMatch["internationalFit"] = "Unknown";
     if (school.ownership === "Public") {
@@ -844,7 +919,7 @@ export function getDeterministicMatches(
     } else if (school.ownership === "Private for-profit") {
       intFitScore = 40; intFitLabel = "Unknown";
     }
-    rawScore += (intFitScore / 100) * 3;
+    rawScore += (intFitScore / 100) * W.intl;
 
     // 6. Apply Penalties + PhD research-university requirement
     let penalty = 0;
@@ -866,16 +941,21 @@ export function getDeterministicMatches(
       penalty += 25;
     }
 
-    // Personalization tiebreaker: small deterministic jitter (-1.5 to +1.5)
-    // seeded by (profile, school). Tied schools shuffle slightly between
-    // different profiles without changing the broader ranking.
+    // Personalization tiebreaker: deterministic jitter (-3.5 to +3.5)
+    // seeded by (profile, school). Two profiles with similar stats see
+    // visibly different top-10s; identical profiles see identical lists.
+    // The previous ±1.5 was too small to break ties in dense score bands
+    // — every profile in the same field/level got the same 3-4 schools at
+    // the top. ±3.5 spreads the surface area without pushing schools
+    // across category boundaries (Strong Fit / Good Fit thresholds are
+    // 15-point bands).
     const seed = profileSeed + "::" + String(school.unitId ?? school.name ?? "");
     let h = 2166136261 >>> 0;
     for (let i = 0; i < seed.length; i++) {
       h ^= seed.charCodeAt(i);
       h = Math.imul(h, 16777619) >>> 0;
     }
-    const personalization = ((h % 30) - 15) / 10;
+    const personalization = ((h % 70) - 35) / 10;
 
     let finalScore = rawScore - penalty + personalization;
     finalScore = Math.min(finalScore, cap);

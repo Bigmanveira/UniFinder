@@ -51,12 +51,17 @@ YOUR ROLE
 
 DOCUMENT REQUESTS
 - Before the interview proper begins, the student is given the chance to upload their I-20 and DS-160 confirmation page. If they uploaded them, the extracted facts will appear in a "STUDENT-PROVIDED DOCUMENTS" section appended to this prompt — read it carefully and DO NOT ask the student to repeat numbers/names that are printed there. If no such section appears, the student didn't (or couldn't) upload them; probe verbally instead and don't pretend to have read documents you don't have.
+
+- CROSS-CHECK WHAT THE STUDENT SAYS AGAINST THE DOCUMENTS. If the student names a school, programme, cost figure, sponsor, SEVIS ID, or start date that contradicts what's printed on the I-20 or DS-160, you MUST politely flag it: e.g. "Your I-20 lists the school as X but you mentioned Y — can you clarify?" This is one of the most realistic things a consular officer does. Don't soft-pedal — if it's a real contradiction, raise it once. Don't be paranoid about minor wording differences (nicknames for the school, etc.); only flag substantive mismatches.
+
 - You MAY ask for one supporting document mid-interview when it would naturally come up. Allowed values for requiresDocumentUpload:
   · "bank_statement"     — when probing finances and the student claims personal/family savings
   · "sponsor_letter"     — when the student names a sponsor whose commitment isn't on the I-20
   · "employment_letter"  — when the student or sponsor cites employment income
   · "transcript"         — when academic preparation is in question
   · null                 — default; no upload requested this turn
+
+- NEVER re-request a document that already appears in the STUDENT-PROVIDED DOCUMENTS section — those have been verified. If you doubt a specific field on an already-uploaded document, ask a verbal clarifying question instead of asking for a re-upload.
 - Don't request a document at random. Only ask if the student's spoken answer leaves a gap that the document would close.
 - CRITICAL: Set requiresDocumentUpload to a non-null value ONLY when your "text" field literally asks the student to upload, share, send, or provide that document. If your text is just a clarifying question ("Who is he?", "How much exactly?", etc.), requiresDocumentUpload MUST be null. The student should be able to read your text and immediately know they're being asked for a file.
 - If the student says they don't have a requested document with them, accept it gracefully and probe verbally on the same topic instead. NEVER request the same document type a second time within one interview.
@@ -229,16 +234,31 @@ export async function generateOfficerTurn(args: {
     let requiresDocumentUpload = ALLOWED_DOC_REQUESTS.has(parsed.requiresDocumentUpload)
       ? parsed.requiresDocumentUpload
       : null;
-    // Sanity check: even if Claude's JSON says it's asking for a doc, only
-    // honor the request if the spoken text actually contains an upload-style
-    // verb. Without this, Claude occasionally pairs a clarifying question
-    // ("Who is he?") with a stale doc request and we pop a modal the student
-    // wasn't asked to fill.
+    // Sanity check 1: even if Claude's JSON says it's asking for a doc,
+    // only honor the request if the spoken text actually contains an
+    // upload-style verb. Without this, Claude occasionally pairs a
+    // clarifying question ("Who is he?") with a stale doc request and
+    // we pop a modal the student wasn't asked to fill.
     if (requiresDocumentUpload) {
       const textLower = text.toLowerCase();
       const hasUploadVerb = /\b(upload|share|send|provide|show me|attach|let me see|forward|present)\b/.test(textLower);
       if (!hasUploadVerb) {
         console.warn("[visaInterview] dropping requiresDocumentUpload — text doesn't ask for it:", text.slice(0, 100));
+        requiresDocumentUpload = null;
+      }
+    }
+    // Sanity check 2: hard dedup against already-extracted documents.
+    // If Claude asks for an I-20 that's already been uploaded and parsed
+    // (it's in extractedDocuments), null it. The prompt forbids this but
+    // we don't trust LLMs to never slip up — and the bug it causes
+    // (re-prompting for an already-uploaded doc) is jarring on a fresh
+    // user's first run.
+    if (requiresDocumentUpload && extractedDocuments) {
+      const alreadyHave = extractedDocuments.some(
+        (d) => d.status === "completed" && d.documentType === requiresDocumentUpload,
+      );
+      if (alreadyHave) {
+        console.warn("[visaInterview] dropping requiresDocumentUpload — already extracted:", requiresDocumentUpload);
         requiresDocumentUpload = null;
       }
     }
