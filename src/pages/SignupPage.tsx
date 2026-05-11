@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { createUserWithEmailAndPassword, signInWithRedirect, getRedirectResult } from "firebase/auth";
+import { createUserWithEmailAndPassword, signInWithPopup } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { auth, googleProvider, db, functions } from "../lib/firebase";
@@ -93,44 +93,35 @@ export default function SignupPage() {
     }
   };
 
-  // Handle the redirect return from Google's auth. signInWithRedirect
-  // does a full page navigation through Google's OAuth and lands us back
-  // here; getRedirectResult retrieves the credential on the second mount.
-  useEffect(() => {
-    getRedirectResult(auth)
-      .then(async (result) => {
-        if (!result) return;
-        try {
-          const uid = result.user.uid;
-          const userEmail = result.user.email;
-          await setDoc(doc(db, "users", uid), {
-            email: userEmail,
-            createdAt: serverTimestamp(),
-            role: "student",
-          }, { merge: true });
-          const guestProfile = localStorage.getItem("unifinder_guest_profile");
-          if (guestProfile) {
-            await setDoc(doc(db, "studentProfiles", uid), JSON.parse(guestProfile));
-          }
-        } catch (dbError) {
-          console.warn("Could not save backend foundation records:", dbError);
-        }
-        await applyReferralIfPresent();
-        navigate(shouldGoToResults() ? "/results" : "/app", { replace: true });
-      })
-      .catch((err) => {
-        console.error("[auth] redirect result failed:", err);
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const handleGoogle = async () => {
     try {
-      // Full page redirect through Google's OAuth. Avoids the popup-based
-      // failure modes (COOP, popup blockers, mobile WebView quirks). When
-      // the user lands back on this page the getRedirectResult effect
-      // above takes over and routes them to the right destination.
-      await signInWithRedirect(auth, googleProvider);
+      const userCredential = await signInWithPopup(auth, googleProvider);
+
+      try {
+        const uid = userCredential.user.uid;
+        const userEmail = userCredential.user.email;
+
+        await setDoc(doc(db, "users", uid), {
+          email: userEmail,
+          createdAt: serverTimestamp(),
+          role: "student"
+        }, { merge: true });
+
+        const guestProfile = localStorage.getItem("unifinder_guest_profile");
+        if (guestProfile) {
+          await setDoc(doc(db, "studentProfiles", uid), JSON.parse(guestProfile));
+        }
+      } catch (dbError) {
+        console.warn("Could not save backend foundation records:", dbError);
+      }
+
+      await applyReferralIfPresent();
+
+      if (shouldGoToResults()) {
+        navigate("/results");
+      } else {
+        navigate("/app");
+      }
     } catch (err) {
       console.error(err);
     }

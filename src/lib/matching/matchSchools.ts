@@ -627,11 +627,38 @@ function getApplicantStrength(profile: StudentProfile): number {
 }
 
 /**
- * 0-100 estimate of admission likelihood at this specific school.
- * Combines the school's admit rate with the applicant's profile strength.
+ * When a school's admission rate is missing (null / 0 — College Scorecard
+ * doesn't report it for many small or recently-data-light schools), we
+ * infer a rough proxy from institution type. Without this every null-admit
+ * school received the SAME likelihood score and collapsed into one bucket,
+ * leaving Reach / Target / Safety filters with empty tabs.
  *
- * Returns 50 (middle) when admissionRate is unknown - better to push the
- * school into the "Target" bucket than to over- or under-promise.
+ * Returns null if we can't make any reasonable inference.
+ */
+function inferredAdmitRate(school: School): number | null {
+  const ownership = (school.ownership || "").toLowerCase();
+
+  // Best-effort name-based identification of well-known elite institutions
+  // whose admit rates anyone in admissions would know — used as a fallback
+  // when our dataset is missing the rate.
+  if (/\bharvard\b|\bstanford\b|\bmit\b|\bprinceton\b|\byale\b|\bcaltech\b|\bcolumbia\b|\bchicago\b|\bpenn\b/i.test(school.name)) return 0.07;
+  if (/\bcornell\b|\bbrown\b|\bdartmouth\b|\bduke\b|\bjohns hopkins\b|\bnorthwestern\b|\brice\b|\bvanderbilt\b/i.test(school.name)) return 0.13;
+  if (/\bnyu\b|\busc\b|\bucla\b|\bberkeley\b|\bumich\b|\bcarnegie mellon\b|\bgeorgetown\b/i.test(school.name)) return 0.20;
+  if (/institute of technology|polytechnic|state university/i.test(school.name)) {
+    return ownership.includes("private") ? 0.30 : 0.55;
+  }
+  if (ownership.includes("private nonprofit") && /university/i.test(school.name)) return 0.40;
+  if (ownership.includes("public") && /university/i.test(school.name))           return 0.60;
+  if (ownership.includes("private for-profit"))                                  return 0.85;
+  if (/university/i.test(school.name))                                           return 0.55;
+  if (/college/i.test(school.name))                                              return 0.65;
+  return null;
+}
+
+/**
+ * 0-100 estimate of admission likelihood at this specific school.
+ * Combines the school's admit rate (or an inferred fallback) with the
+ * applicant's profile strength.
  *
  * NOTE: this uses the school's *overall* admit rate. Doctoral programs are
  * typically more selective than the institutional average; communicate this
@@ -639,16 +666,20 @@ function getApplicantStrength(profile: StudentProfile): number {
  */
 export function getAdmissionLikelihood(profile: StudentProfile, school: School): number {
   const applicantStrength = getApplicantStrength(profile);
-  const admRate = school.admissionRate;
-  // Treat both null AND a literal 0 as "unknown" — College Scorecard reports
-  // 0% for many small schools that simply didn't submit admissions data.
-  if (admRate === null || admRate === undefined || admRate === 0) {
-    // Anchor on applicant strength alone, dampened toward the middle
+  // Treat null AND literal 0 as "unknown" — College Scorecard reports 0%
+  // for many small schools that simply didn't submit admissions data.
+  const knownRate = (school.admissionRate != null && school.admissionRate > 0)
+    ? school.admissionRate
+    : inferredAdmitRate(school);
+
+  if (knownRate === null) {
+    // Truly nothing to go on — anchor on applicant strength alone.
     return Math.max(0, Math.min(100, 50 + (applicantStrength - 50) * 0.5));
   }
+
   // Base = institutional admit rate * 100 (e.g. 25% admit -> 25 base)
-  // Then ± half the applicant's deviation from average
-  const base = admRate * 100;
+  // Then ± 0.7 × the applicant's deviation from average.
+  const base = knownRate * 100;
   const bonus = (applicantStrength - 50) * 0.7;
   return Math.max(0, Math.min(100, base + bonus));
 }
