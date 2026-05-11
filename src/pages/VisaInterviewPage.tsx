@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, ShieldAlert, Loader2, AlertTriangle, Mic, Volume2, StopCircle } from "lucide-react";
+import { ArrowLeft, ShieldAlert, Loader2, AlertTriangle, Mic, MicOff, Volume2, StopCircle } from "lucide-react";
 import { collection, onSnapshot, orderBy, query, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "../lib/firebase";
@@ -23,6 +23,7 @@ type ActiveStage =
   | "speaking"    // avatar is talking
   | "listening"   // mic is hot
   | "processing"  // we sent the answer, waiting on Claude
+  | "micBlocked"  // mic permission denied — waiting on user to enable + tap retry
   | "failed";     // avatar couldn't come up — interview is dead in the water
 
 export default function VisaInterviewPage() {
@@ -46,6 +47,10 @@ export default function VisaInterviewPage() {
   // We let her finish speaking before kicking off scoring so the user hears
   // the goodbye instead of being yanked to the report screen mid-sentence.
   const [pendingEndAfterSpeech, setPendingEndAfterSpeech] = useState(false);
+  // True when mic permission was just denied and we've queued Anna's
+  // "please enable mic" line. After she finishes speaking it, we flip
+  // stage to "micBlocked" and show a Retry button instead of auto-arming.
+  const [pendingMicRecoveryAfterSpeech, setPendingMicRecoveryAfterSpeech] = useState(false);
   const [stage,        setStage]        = useState<ActiveStage>("connecting");
   const [fatalReason,  setFatalReason]  = useState<string | null>(null);
 
@@ -60,12 +65,12 @@ export default function VisaInterviewPage() {
       void sendAnswer(text);
     },
     onError: (code, message) => {
-      // `not-allowed` means the user denied mic permissions — they must allow
-      // it for the interview to function at all.
       if (code === "not-allowed") {
-        setError("Microphone access was blocked. Allow it in your browser and reload the page.");
-        setStage("failed");
-        setFatalReason("Microphone access was blocked.");
+        // Mic permission denied. Don't kill the interview — have Anna ASK
+        // the user to enable mic, then surface a Retry button.
+        setError("");
+        setPendingMicRecoveryAfterSpeech(true);
+        setLatestOfficer("I can't hear you yet. Please allow microphone access for this site in your browser, then tap the Retry button below so we can continue.");
       } else if (code === "not-supported") {
         setError("Your browser doesn't support voice input. Use Chrome, Edge, or Safari.");
         setStage("failed");
@@ -76,6 +81,15 @@ export default function VisaInterviewPage() {
       }
     },
   });
+
+  // Tap-Retry handler: re-arm the mic. If permission is still denied, the
+  // speech hook's onError will set pendingMicRecoveryAfterSpeech again and
+  // Anna will repeat the request.
+  const handleMicRetry = () => {
+    setStage("listening");
+    setError("");
+    speech.start();
+  };
 
   // Subscribe to messages once we have a session
   useEffect(() => {
@@ -231,13 +245,19 @@ export default function VisaInterviewPage() {
   const handleAvatarSpeakEnded = () => {
     // Avatar finished its line. Decide what comes next, in priority order:
     //   1. Anna's last line was her sign-off → auto-end and go to scoring.
-    //   2. There's an upload queued for after speech → open the modal.
-    //   3. A modal is already open → do nothing.
-    //   4. The session has failed → do nothing.
-    //   5. Otherwise it's the student's turn → arm the mic.
+    //   2. Anna just asked the user to enable mic → wait for explicit Retry tap.
+    //   3. There's an upload queued for after speech → open the modal.
+    //   4. A modal is already open → do nothing.
+    //   5. The session has failed → do nothing.
+    //   6. Otherwise it's the student's turn → arm the mic.
     if (pendingEndAfterSpeech) {
       setPendingEndAfterSpeech(false);
       void endInterview();
+      return;
+    }
+    if (pendingMicRecoveryAfterSpeech) {
+      setPendingMicRecoveryAfterSpeech(false);
+      setStage("micBlocked");
       return;
     }
     if (pendingUploadAfterSpeech) {
@@ -247,7 +267,7 @@ export default function VisaInterviewPage() {
       return;
     }
     if (pendingUpload) return;
-    if (stage === "failed") return;
+    if (stage === "failed" || stage === "micBlocked") return;
     setStage("listening");
     speech.start();
   };
@@ -291,6 +311,7 @@ export default function VisaInterviewPage() {
     setPendingUpload(null);
     setPendingUploadAfterSpeech(null);
     setPendingEndAfterSpeech(false);
+    setPendingMicRecoveryAfterSpeech(false);
     setFatalReason(null);
     spokenOfficerIdsRef.current.clear();
     setStage("connecting");
@@ -373,6 +394,7 @@ export default function VisaInterviewPage() {
             onAvatarSpeakEnded={handleAvatarSpeakEnded}
             onAvatarTtsFailed={handleAvatarTtsFailed}
             onAvatarFallback={handleAvatarFallback}
+            onMicRetry={handleMicRetry}
             onEnd={endInterview}
           />
         )}
@@ -454,7 +476,7 @@ export default function VisaInterviewPage() {
 // ─────────────────────────────────────────────────────────────────────────────
 function ActiveInterviewLayout({
   sessionId, latestOfficer, stage, transcript, ending, messageCount, fatalReason,
-  onAvatarLive, onAvatarSpeakStarted, onAvatarSpeakEnded, onAvatarTtsFailed, onAvatarFallback, onEnd,
+  onAvatarLive, onAvatarSpeakStarted, onAvatarSpeakEnded, onAvatarTtsFailed, onAvatarFallback, onMicRetry, onEnd,
 }: {
   sessionId:            string;
   latestOfficer:        string | undefined;
@@ -468,6 +490,7 @@ function ActiveInterviewLayout({
   onAvatarSpeakEnded:   () => void;
   onAvatarTtsFailed:    () => void;
   onAvatarFallback:     (reason: string) => void;
+  onMicRetry:           () => void;
   onEnd:                () => Promise<void>;
 }) {
   return (
@@ -501,6 +524,21 @@ function ActiveInterviewLayout({
         <div className="w-full bg-rose-50 border border-rose-200 rounded-2xl px-4 py-3 text-sm text-rose-800">
           <p className="font-semibold mb-1">Interview cannot continue.</p>
           <p className="leading-relaxed">{fatalReason ?? "The avatar service is unavailable. Try again in a few minutes; your credit will be refunded if no answers were recorded."}</p>
+        </div>
+      )}
+
+      {stage === "micBlocked" && (
+        <div className="w-full bg-amber-50 border border-amber-200 rounded-2xl px-4 py-4 text-sm text-amber-900">
+          <p className="font-semibold mb-2 flex items-center gap-2"><MicOff size={15} /> Microphone access blocked</p>
+          <p className="leading-relaxed mb-3">
+            Enable microphone access for this site in your browser (look for the mic icon in the address bar), then tap Retry. Your interview will pick up where it left off.
+          </p>
+          <button
+            onClick={onMicRetry}
+            className="inline-flex items-center gap-2 bg-amber-900 hover:bg-amber-950 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-colors active:scale-[0.99]"
+          >
+            <Mic size={14} /> Retry microphone
+          </button>
         </div>
       )}
 
@@ -541,6 +579,11 @@ function StatusPill({ stage }: { stage: ActiveStage }) {
       icon: <Loader2 size={13} className="animate-spin" />,
       label: "Officer is thinking…",
       className: "bg-amber-50 text-amber-700 border-amber-200",
+    },
+    micBlocked: {
+      icon: <MicOff size={13} />,
+      label: "Microphone needed",
+      className: "bg-amber-50 text-amber-800 border-amber-200",
     },
     failed: {
       icon: <AlertTriangle size={13} />,

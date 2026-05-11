@@ -161,7 +161,7 @@ export default function LockedPreviewPage() {
             {initial}
           </Link>
         ) : (
-          <Link to="/login" className="text-sm font-semibold text-slate-700 hover:text-slate-900">Log in</Link>
+          <Link to="/login?from=results" className="text-sm font-semibold text-slate-700 hover:text-slate-900">Log in</Link>
         )}
       </header>
 

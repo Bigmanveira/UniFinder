@@ -218,7 +218,7 @@ export default function SignupPage() {
           </form>
 
           <p className="text-sm font-medium text-slate-500 text-center mt-8">
-            Already have an account? <Link to="/login" className="text-primary-600 font-black hover:underline">Log in</Link>
+            Already have an account? <Link to={fromResults ? "/login?from=results" : "/login"} className="text-primary-600 font-black hover:underline">Log in</Link>
           </p>
 
         </div>

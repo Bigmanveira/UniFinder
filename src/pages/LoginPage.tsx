@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { signInWithEmailAndPassword, signInWithPopup, getAdditionalUserInfo, deleteUser } from "firebase/auth";
 import { auth, googleProvider } from "../lib/firebase";
 import { GraduationCap, ArrowRight, Mail, Lock } from "lucide-react";
@@ -7,16 +7,30 @@ import { motion } from "framer-motion";
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const fromResults = searchParams.get("from") === "results";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // If the user came in via "Already have an account? Log in" from the
+  // locked-preview page, their guest profile is still in localStorage and
+  // unexpired. Honour that path and send them back to /results so they
+  // don't have to redo the wizard.
+  const shouldGoToResults = () => {
+    if (!fromResults) return false;
+    const profile = localStorage.getItem("unifinder_guest_profile");
+    const expires = localStorage.getItem("unifinder_preview_expires");
+    if (!profile || !expires) return false;
+    return Date.now() < parseInt(expires, 10);
+  };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      navigate("/app");
+      navigate(shouldGoToResults() ? "/results" : "/app");
     } catch (err) {
       console.error(err);
       alert("Invalid email or password.");
@@ -29,7 +43,7 @@ export default function LoginPage() {
     try {
       const userCredential = await signInWithPopup(auth, googleProvider);
       const additionalInfo = getAdditionalUserInfo(userCredential);
-      
+
       // If Firebase just created this Google account, it means they haven't formally signed up
       if (additionalInfo?.isNewUser) {
         await deleteUser(userCredential.user);
@@ -37,7 +51,7 @@ export default function LoginPage() {
         return;
       }
 
-      navigate("/app");
+      navigate(shouldGoToResults() ? "/results" : "/app");
     } catch (err) {
       console.error(err);
     }

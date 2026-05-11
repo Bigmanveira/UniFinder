@@ -17,7 +17,14 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+
+// Force Google's account picker on every sign-in. Without `prompt: select_account`
+// Chrome silently re-authenticates the most recently used Google account, which
+// surprises users on shared phones — they tap "Sign in with Google" expecting
+// to choose an account and instead get auto-logged in without confirmation.
 export const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({ prompt: "select_account" });
+
 export const appleProvider = new OAuthProvider('apple.com');
 export const functions = getFunctions(app);
 export const storage = getStorage(app);

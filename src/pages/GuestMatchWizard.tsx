@@ -6,6 +6,83 @@ import { useAuth } from "../hooks/useAuth";
 import { doc, setDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
+// Autocomplete suggestions for the "Intended Major" field. Curated from the
+// fields our `programs` collection actually covers + the most-applied
+// majors across U.S. universities. Users can still type anything they want —
+// this is hint-only, not a constraint.
+const INTENDED_MAJOR_SUGGESTIONS = [
+  // STEM — Computing / Engineering
+  "Computer Science",
+  "Data Science",
+  "Artificial Intelligence",
+  "Cybersecurity",
+  "Information Systems",
+  "Information Science",
+  "Software Engineering",
+  "Computer Engineering",
+  "Electrical Engineering",
+  "Mechanical Engineering",
+  "Civil Engineering",
+  "Chemical Engineering",
+  "Biomedical Engineering",
+  "Industrial Engineering",
+  "Aerospace Engineering",
+  "Materials Science",
+  // STEM — Sciences
+  "Mathematics",
+  "Applied Mathematics",
+  "Statistics",
+  "Physics",
+  "Chemistry",
+  "Biology",
+  "Biochemistry",
+  "Neuroscience",
+  "Environmental Science",
+  "Geology",
+  // Business
+  "Business Administration",
+  "Business Analytics",
+  "Finance",
+  "Accounting",
+  "Marketing",
+  "Economics",
+  "Management",
+  "Entrepreneurship",
+  "Supply Chain Management",
+  "International Business",
+  "MBA",
+  // Health
+  "Public Health",
+  "Nursing",
+  "Pharmacy",
+  "Health Administration",
+  "Nutrition",
+  "Kinesiology",
+  // Social sciences / humanities
+  "Psychology",
+  "Sociology",
+  "Political Science",
+  "International Relations",
+  "Economics",
+  "Education",
+  "History",
+  "English",
+  "Communications",
+  "Journalism",
+  "Linguistics",
+  "Philosophy",
+  // Arts & Design
+  "Architecture",
+  "Graphic Design",
+  "Fine Arts",
+  "Industrial Design",
+  "Film & Media Studies",
+  "Music",
+  // Law-adjacent
+  "Criminal Justice",
+  "Legal Studies",
+];
+
 export default function GuestMatchWizard() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -160,8 +237,24 @@ export default function GuestMatchWizard() {
           {step === 3 && (
             <div>
               {renderHeader("Field of Study")}
-              <label className="block text-xs font-bold tracking-widest text-slate-500 mb-2 uppercase">Intended Major</label>
-              <input type="text" placeholder="e.g. Computer Science" value={formData.field} onChange={(e) => updateForm("field", e.target.value)} className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-primary-500" />
+              <label htmlFor="intended-major" className="block text-xs font-bold tracking-widest text-slate-500 mb-2 uppercase">Intended Major</label>
+              <input
+                id="intended-major"
+                type="text"
+                placeholder="Start typing — e.g. Computer Science"
+                value={formData.field}
+                onChange={(e) => updateForm("field", e.target.value)}
+                list="major-options"
+                autoComplete="off"
+                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+              {/* Native datalist — browser-rendered autocomplete, zero JS,
+                  zero network requests. Users can still type free-form (we
+                  normalise the input server-side via normaliseProfileField). */}
+              <datalist id="major-options">
+                {INTENDED_MAJOR_SUGGESTIONS.map((m) => <option key={m} value={m} />)}
+              </datalist>
+              <p className="text-[11px] text-slate-400 mt-2">Pick from the list or type your own — we'll match against verified programs either way.</p>
             </div>
           )}
 
