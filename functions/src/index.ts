@@ -10,6 +10,7 @@ import {
 import { createHeyGenSessionToken, endHeyGenSession } from "./liveAvatarSession.js";
 import { synthesizeOfficerAudio } from "./avatarTts.js";
 import { extractVisaDocument, type VisaDocumentType, type ExtractedDocument } from "./visaDocExtractor.js";
+import { aiMatchSchools, type AiCandidate } from "./aiMatch.js";
 
 admin.initializeApp();
 
@@ -222,6 +223,80 @@ export const applyReferralCode = onCall(async (request) => {
 
   return { ok: true, creditsAwarded: REFERRAL_REWARD };
 });
+
+// ============================================================
+// aiMatchSchoolsCallable — AI-powered school ranking + bucketing.
+// The client sends a candidate set (already filtered through the
+// program-eligibility gate, capped to a manageable size); Claude
+// returns the top ~12 ranked matches with admission-bucket assignment,
+// per-school category, and a one-sentence fit reasoning.
+//
+// Output shape mirrors the SchoolMatch type the client UI already
+// consumes — callers (LockedPreviewPage) can swap from the deterministic
+// matcher to this without changing rendering code. Returns an empty
+// `matches` array on failure; the client falls back to the deterministic
+// algorithm so users never see a broken state.
+// ============================================================
+
+export const aiMatchSchoolsCallable = onCall(
+  {
+    secrets: [ANTHROPIC_API_KEY],
+    // Claude can take 10–30s to rank a full candidate list. Be generous.
+    timeoutSeconds: 90,
+    memory:         "512MiB",
+  },
+  async (request) => {
+    const uid = request.auth?.uid;
+    void uid; // anonymous matching is allowed (used during /results preview)
+
+    const { profile, candidates } = request.data ?? {};
+    if (!profile || typeof profile !== "object") {
+      throw new HttpsError("invalid-argument", "Missing profile");
+    }
+    if (!Array.isArray(candidates) || candidates.length === 0) {
+      throw new HttpsError("invalid-argument", "Missing candidates");
+    }
+    if (candidates.length > 300) {
+      // Hard upper bound. Client should be pre-filtering; if it's sending
+      // 1000+ schools we reject rather than burn tokens on a likely bug.
+      throw new HttpsError("invalid-argument", "Too many candidates (max 300)");
+    }
+
+    const sanitised: AiCandidate[] = candidates.map((c: any) => ({
+      unitId:        String(c?.unitId ?? ""),
+      name:          String(c?.name ?? "Unknown"),
+      state:         c?.state ?? null,
+      city:          c?.city ?? null,
+      admissionRate: typeof c?.admissionRate === "number" ? c.admissionRate : null,
+      averageCost:   typeof c?.averageCost   === "number" ? c.averageCost   : null,
+      ownership:     String(c?.ownership ?? ""),
+    })).filter((c: AiCandidate) => c.unitId.length > 0);
+
+    try {
+      const result = await aiMatchSchools({
+        apiKey:     ANTHROPIC_API_KEY.value(),
+        profile,
+        candidates: sanitised,
+      });
+      return {
+        matches:       result.matches,
+        status:        result.status,
+        errorMessage:  result.errorMessage ?? null,
+        rankedAt:      Date.now(),
+      };
+    } catch (err: any) {
+      console.error("[aiMatchSchoolsCallable] failed:", err?.message);
+      // Don't throw — return an empty list with a status so the client
+      // can fall back gracefully without showing an error UI.
+      return {
+        matches:      [],
+        status:       "failed",
+        errorMessage: err?.message ?? "Unknown error",
+        rankedAt:     Date.now(),
+      };
+    }
+  },
+);
 
 // ============================================================
 // unlockMatchReport

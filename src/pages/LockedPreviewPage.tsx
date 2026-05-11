@@ -77,17 +77,97 @@ export default function LockedPreviewPage() {
           getActiveSchools(degreeLevel),
           getEligibleUnitIds(parsed),
         ]);
+
+        // Step 1 — deterministic matcher gives us a pre-scored candidate set
+        // we can hand to the AI ranker. The deterministic algo is still
+        // load-bearing for: hard filters (community-college exclusion,
+        // theology-incompat exclusion), program-gate enforcement, and as a
+        // fallback if Claude is down or returns garbage.
         const computedMatches = getDeterministicMatches(schools, parsed, gate.eligibleUnitIds);
         const recommended = computedMatches.filter(
           m => m.category === "Strong Fit" || m.category === "Good Fit" || m.category === "Exploratory Fit"
         );
-        const top = bucketizeMatches(recommended);
         setAllMatches(computedMatches);
-        setBucketed(top);
         setAdvice(getProfileImprovementAdvice(parsed));
+
+        // Step 2 — set gate state based on the pre-filter (independent of AI).
         if (gate.eligibleUnitIds === null) setProgramGate("not-enforced");
-        else if (top.top10.length === 0) setProgramGate("no-eligible");
+        else if (recommended.length === 0) setProgramGate("no-eligible");
         else setProgramGate("enforced");
+
+        // Step 3 — short-circuit if the gate left us nothing. AI can't
+        // invent schools that aren't in our verified-program set.
+        if (recommended.length === 0) {
+          setBucketed({ top10: [], reach: [], target: [], safety: [] });
+          return;
+        }
+
+        // Step 4 — show deterministic results IMMEDIATELY so the user
+        // sees something while Claude is ranking. ~5-15s delay for the
+        // AI call would feel like a hung loading screen otherwise.
+        const fallbackBucketed = bucketizeMatches(recommended);
+        setBucketed(fallbackBucketed);
+
+        // Step 5 — call AI matcher with the top 100 deterministic
+        // candidates. Replace the displayed bucketing if AI succeeds.
+        try {
+          const aiCandidates = recommended.slice(0, 100).map((m) => ({
+            unitId:        m.school.unitId,
+            name:          m.school.name,
+            state:         m.school.state,
+            city:          m.school.city,
+            admissionRate: m.school.admissionRate,
+            averageCost:   m.school.averageCost,
+            ownership:     m.school.ownership,
+          }));
+          const fn = httpsCallable(functions, "aiMatchSchoolsCallable", { timeout: 90_000 });
+          const res = await fn({ profile: parsed, candidates: aiCandidates });
+          const data = res.data as {
+            matches: Array<{
+              unitId: string; matchScore: number;
+              category: "Strong Fit" | "Good Fit" | "Exploratory Fit";
+              admissionBucket: "reach" | "target" | "safety";
+              admissionLikelihood: number;
+              budgetFit: "Excellent" | "Good" | "Stretch" | "Out of Budget";
+              academicFit: "Likely" | "Target" | "Reach" | "High Reach" | "Limited Data";
+            }>;
+            status: "completed" | "failed";
+          };
+          if (data.status === "completed" && data.matches.length > 0) {
+            const schoolById = new Map(recommended.map((m) => [m.school.unitId, m.school]));
+            const aiMatches: SchoolMatch[] = [];
+            for (const m of data.matches) {
+              const school = schoolById.get(m.unitId);
+              if (!school) continue;
+              aiMatches.push({
+                school,
+                matchScore:          m.matchScore,
+                category:            m.category,
+                budgetFit:           m.budgetFit,
+                academicFit:         m.academicFit,
+                locationFit:         "Yes",
+                majorFit:            "Likely Available",
+                internationalFit:    "Likely Yes",
+                admissionLikelihood: m.admissionLikelihood,
+                admissionBucket:     m.admissionBucket,
+              });
+            }
+
+            // Preserve AI's intra-bucket ordering (don't pass through
+            // bucketizeMatches, which would re-sort by admit rate).
+            setBucketed({
+              top10:  aiMatches.slice(0, 10),
+              reach:  aiMatches.filter((m) => m.admissionBucket === "reach"),
+              target: aiMatches.filter((m) => m.admissionBucket === "target"),
+              safety: aiMatches.filter((m) => m.admissionBucket === "safety"),
+            });
+          }
+          // If status === "failed", we silently keep the deterministic
+          // bucketing already on screen. The fallback path is invisible
+          // to the user — they see something, just not the AI ranking.
+        } catch (aiErr) {
+          console.warn("[ai-match] ranker failed, keeping deterministic top-10:", aiErr);
+        }
       } catch (err) { console.error("Error matching:", err); }
       finally { setLoading(false); }
     }
