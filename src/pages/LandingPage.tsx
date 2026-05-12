@@ -54,12 +54,22 @@ export default function LandingPage() {
               Tweak the `h-36 / h-40` and translate offsets if the icon
               isn't perfectly framed once you see it live. */}
           <Link to="/" className="flex items-center gap-3" aria-label="College Ready home">
-            <div className="w-9 h-9 md:w-10 md:h-10 rounded-[12px] overflow-hidden flex-shrink-0 relative bg-white shadow-sm shadow-slate-200">
+            {/* Circular blue radial-gradient backdrop so the icon pops off
+                the white pill. The PNG ships with a solid white background
+                rather than transparency, so we apply `mix-blend-multiply`
+                to the <img> — white pixels become transparent under
+                multiply, revealing the gradient, while the dark mark stays
+                intact. Without this you'd see a white square sitting on
+                top of the blue circle. */}
+            <div
+              className="w-10 h-10 md:w-11 md:h-11 rounded-full overflow-hidden flex-shrink-0 relative shadow-lg shadow-primary-500/30 ring-1 ring-white/60"
+              style={{ background: "radial-gradient(circle at 30% 30%, #dbeafe 0%, #93c5fd 60%, #60a5fa 100%)" }}
+            >
               <img
                 src={webLogo}
                 alt=""
                 aria-hidden
-                className="absolute top-0 left-0 h-36 md:h-40 w-auto max-w-none block select-none"
+                className="absolute top-0 left-0 h-40 md:h-44 w-auto max-w-none block select-none mix-blend-multiply"
                 draggable={false}
               />
             </div>
