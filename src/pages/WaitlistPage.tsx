@@ -39,24 +39,31 @@ type Status =
 // engine table-stakes for any college search tool. Each slide has its own
 // duration in ms so we can give the hero shot more screen-time.
 const SLIDES: Array<{
-  image:    string;
-  alt:      string;
-  badge:    string;
-  caption:  string;
-  duration: number;
+  image:          string;
+  alt:            string;
+  badge:          string;
+  caption:        string;     // short headline-style line for the floating card
+  subtitle:       string;     // longer feature line that rotates under the H1
+  /** Optional CSS object-position. Anna's face sits high in her source, so we
+   *  bias the crop upward to keep her in frame on portrait-mobile screens. */
+  objectPosition?: string;
+  duration:       number;
 }> = [
   {
-    image:    "/anna.webp",
-    alt:      "Anna, the AI consular officer practising an F-1 interview",
-    badge:    "Live AI Consular Officer",
-    caption:  "Rehearse the F-1 visa interview that decides everything.",
-    duration: 7500,
+    image:          "/anna.webp",
+    alt:            "Anna, the AI consular officer practising an F-1 interview",
+    badge:          "Live AI Consular Officer",
+    caption:        "Rehearse the F-1 visa interview that decides everything.",
+    subtitle:       "A live AI consular officer reads your I-20, asks the questions a real officer would, and scores how you answer.",
+    objectPosition: "50% 22%",
+    duration:       7500,
   },
   {
     image:    "https://images.unsplash.com/photo-1607237138185-eedd9c632b0b?auto=format&fit=crop&w=1600&q=80",
     alt:      "Stanford University campus archway",
     badge:    "Verified College Matches",
     caption:  "Real schools. Real programs. No AI-invented listings.",
+    subtitle: "Every match is cross-checked against accredited program data, so no application fees get wasted on programs that don't exist.",
     duration: 6500,
   },
   {
@@ -64,6 +71,7 @@ const SLIDES: Array<{
     alt:      "Students walking through a sunlit campus",
     badge:    "Personalised AI Reasoning",
     caption:  "Each match explains why it fits and what to strengthen.",
+    subtitle: "Every shortlist comes with a written explanation of why it fits, the funding paths worth chasing, and what to sharpen before applying.",
     duration: 6500,
   },
 ];
@@ -79,7 +87,6 @@ const SOCIALS = {
 
 export default function WaitlistPage() {
   const [email, setEmail]   = useState("");
-  const [name, setName]     = useState("");
   const [status, setStatus] = useState<Status>({ kind: "idle" });
   const [slideIdx, setSlideIdx] = useState(0);
 
@@ -113,7 +120,6 @@ export default function WaitlistPage() {
     try {
       await addDoc(collection(db, "waitlist"), {
         email:     trimmedEmail,
-        name:      name.trim() || null,
         ref:       new URLSearchParams(window.location.search).get("ref") ?? null,
         userAgent: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 200) : null,
         createdAt: serverTimestamp(),
@@ -131,19 +137,23 @@ export default function WaitlistPage() {
     <div className="min-h-screen relative overflow-hidden bg-slate-950 text-white font-sans selection:bg-primary-500 selection:text-white">
 
       {/* ── Slideshow backdrop ───────────────────────────────────────────── */}
+      {/* Real <img> elements (not background-image divs) so the browser's
+          native object-cover handles responsive cropping on every viewport.
+          Each slide stacks at inset-0 and we crossfade with opacity. */}
       <div className="absolute inset-0 z-0" aria-hidden>
         {SLIDES.map((s, i) => (
-          <div
+          <img
             key={s.image}
-            className="absolute inset-0 bg-cover bg-center"
+            src={s.image}
+            alt=""
+            decoding="async"
+            loading={i === 0 ? "eager" : "lazy"}
+            className="absolute inset-0 w-full h-full object-cover"
             style={{
-              backgroundImage:    `url(${s.image})`,
-              opacity:            i === slideIdx ? 1 : 0,
-              transition:         "opacity 1400ms cubic-bezier(0.4, 0, 0.2, 1)",
-              willChange:         "opacity",
-              // Anna's portrait is centred top-heavy in the source; nudge the
-              // background position to keep her face inside the visible area.
-              backgroundPosition: s.image === "/anna.webp" ? "right 30%" : "center",
+              opacity:        i === slideIdx ? 1 : 0,
+              transition:     "opacity 1400ms cubic-bezier(0.4, 0, 0.2, 1)",
+              willChange:     "opacity",
+              objectPosition: s.objectPosition ?? "center",
             }}
           />
         ))}
@@ -240,11 +250,27 @@ export default function WaitlistPage() {
               </span>
             </h1>
 
-            <p className="text-base sm:text-lg text-slate-300 font-medium leading-relaxed mb-9 max-w-lg">
-              AI college matching grounded in verified program data — plus a live AI consular officer that rehearses your F-1 visa interview, scored.
-              <br className="hidden sm:block" />
-              Join the waitlist for early access and free credits at launch.
-            </p>
+            {/* Rotating feature subtitle — swaps when the slideshow advances
+                so each slide's value prop reads in plain text under the H1.
+                Reserved min-height so the form below doesn't jump as the
+                lines change. */}
+            <div className="max-w-lg mb-9 min-h-[5.5rem] sm:min-h-[5rem]">
+              <AnimatePresence mode="wait">
+                <motion.p
+                  key={slide.subtitle}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.45, ease: "easeOut" }}
+                  className="text-base sm:text-lg text-slate-300 font-medium leading-relaxed"
+                >
+                  {slide.subtitle}
+                </motion.p>
+              </AnimatePresence>
+              <p className="text-sm text-slate-400 font-medium mt-2">
+                Join the waitlist for early access and free credits at launch.
+              </p>
+            </div>
 
             {/* Form / success swap */}
             {status.kind === "submitted" ? (
@@ -270,17 +296,6 @@ export default function WaitlistPage() {
                 onSubmit={handleSubmit}
                 className="max-w-lg space-y-3"
               >
-                {/* Optional name row — kept above the email row so the email
-                    line + button compose the visual "primary" action. */}
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Your name (optional)"
-                  maxLength={80}
-                  className="w-full bg-slate-900/60 backdrop-blur-sm ring-1 ring-white/10 hover:ring-white/20 focus:ring-cyan-400/60 rounded-2xl px-5 py-4 text-white placeholder:text-slate-400 font-medium focus:outline-none focus:bg-slate-900/80 transition-all"
-                />
-
                 <div className="flex flex-col sm:flex-row gap-2.5">
                   <div className="relative flex-1">
                     <input
@@ -363,10 +378,15 @@ export default function WaitlistPage() {
           <p className="text-slate-400 font-medium text-center sm:text-left">
             © 2026 CollegeReady. Practice tools only. Not affiliated with any government, embassy, or consular service.
           </p>
-          <div className="flex gap-5 font-bold text-slate-400">
-            <Link to="/privacy" className="hover:text-cyan-300 transition-colors">Privacy</Link>
-            <Link to="/terms"   className="hover:text-cyan-300 transition-colors">Terms</Link>
-            <Link to="/contact" className="hover:text-cyan-300 transition-colors">Contact</Link>
+          {/* Privacy / Terms / Contact rendered as inert spans while we're in
+              waitlist mode. Once the site goes public these will turn back
+              into <Link> components — keeping them visible (just unclickable)
+              signals that the policies exist without driving traffic to them
+              pre-launch. */}
+          <div className="flex gap-5 font-bold text-slate-500 select-none">
+            <span className="cursor-not-allowed" aria-disabled="true">Privacy</span>
+            <span className="cursor-not-allowed" aria-disabled="true">Terms</span>
+            <span className="cursor-not-allowed" aria-disabled="true">Contact</span>
           </div>
         </div>
       </footer>
