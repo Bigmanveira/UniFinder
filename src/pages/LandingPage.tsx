@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, GraduationCap, CheckCircle2, Sparkles, BrainCircuit, Target, ShieldCheck, Mic, Video, ShieldAlert } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
+import webLogo from "../assets/weblogo.png";
 
 // Performance notes for future-me:
 //   - We deliberately do NOT use framer-motion here — first-paint entry
@@ -42,12 +43,21 @@ export default function LandingPage() {
       {/* Navigation */}
       <header className="fixed top-0 left-0 right-0 p-4 md:p-6 z-50">
         <div className="max-w-6xl mx-auto bg-white md:bg-white/80 md:backdrop-blur-xl border border-slate-100 md:border-white/50 shadow-sm rounded-full px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 md:w-10 md:h-10 rounded-[12px] bg-primary-600 flex items-center justify-center text-white shadow-lg shadow-primary-500/30">
-              <GraduationCap size={20} />
-            </div>
-            <span className="text-xl md:text-2xl font-black tracking-tight text-slate-900">College Ready</span>
-          </div>
+          {/* Wordmark logo. The source PNG has whitespace padding baked in, so
+              we set an explicit height and let width auto-scale — the
+              whitespace becomes harmless transparent margin inside the pill.
+              No fallback text is needed beside it because the asset already
+              includes the "COLLEGEREADY.IO" wordmark. */}
+          <Link to="/" className="flex items-center" aria-label="College Ready home">
+            <img
+              src={webLogo}
+              alt="College Ready"
+              width={160}
+              height={40}
+              className="h-8 md:h-10 w-auto select-none"
+              draggable={false}
+            />
+          </Link>
           <nav className="hidden md:flex items-center gap-8">
             <a href="#how-it-works" className="text-sm font-bold text-slate-500 hover:text-primary-600 transition-colors">How it Works</a>
             <a href="#pricing" className="text-sm font-bold text-slate-500 hover:text-primary-600 transition-colors">Pricing</a>
