@@ -87,9 +87,9 @@ const SLIDES: Array<{
 // component reads them lazily so you can swap one without redeploying any
 // other page.
 const SOCIALS = {
-  instagram: "https://instagram.com/collegeready",
-  twitter:   "https://twitter.com/collegeready",
-  linkedin:  "https://linkedin.com/company/collegeready",
+  instagram: "https://instagram.com/233labs",
+  twitter:   "https://twitter.com/233labs",
+  linkedin:  "https://linkedin.com/company/233labs",
 };
 
 export default function WaitlistPage() {
