@@ -61,23 +61,24 @@ export default function LandingPage() {
                 multiply, revealing the gradient, while the dark mark stays
                 intact. Without this you'd see a white square sitting on
                 top of the blue circle. */}
-            {/* Multi-stop radial gradient — cyan highlight at the top-left
-                glints, deep indigo in the bottom-right adds depth. Reads as
-                a polished "branded" badge instead of a flat blue disc. The
-                centred icon is scaled-down with p-2 padding so a clear
-                gradient ring is visible around it. */}
+            {/* Lighter radial gradient (sky-300 → blue-400 → blue-500) for a
+                friendlier brand badge. The icon in the source PNG sits in
+                the upper-middle of the canvas (not the geometric centre),
+                so a small translate-y nudge centres it visually inside the
+                circle. The brightness(0)+invert(1) filter forces every
+                visible stroke to pure white for sharp contrast. */}
             <div
-              className="w-11 h-11 md:w-12 md:h-12 rounded-full overflow-hidden flex-shrink-0 shadow-lg shadow-primary-500/40 flex items-center justify-center p-2 ring-1 ring-white/15"
+              className="w-11 h-11 md:w-12 md:h-12 rounded-full overflow-hidden flex-shrink-0 shadow-lg shadow-primary-500/40 flex items-center justify-center p-2 ring-1 ring-white/20"
               style={{
                 background:
-                  "radial-gradient(circle at 28% 22%, #38bdf8 0%, #3b82f6 45%, #4f46e5 100%)",
+                  "radial-gradient(circle at 30% 30%, #7dd3fc 0%, #60a5fa 50%, #3b82f6 100%)",
               }}
             >
               <img
                 src={webLogo}
                 alt=""
                 aria-hidden
-                className="w-full h-full object-contain scale-[1.6] select-none"
+                className="w-full h-full object-contain scale-[1.55] translate-y-[3px] select-none"
                 style={{ filter: "brightness(0) invert(1)" }}
                 draggable={false}
               />
