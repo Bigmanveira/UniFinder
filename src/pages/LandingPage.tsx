@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ArrowRight, CheckCircle2, Sparkles, BrainCircuit, Target, ShieldCheck, Mic, Video, ShieldAlert } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
@@ -32,6 +33,32 @@ export default function LandingPage() {
   const billingHref = user
     ? "/app?tab=billing"
     : `/signup?next=${encodeURIComponent("/app?tab=billing")}`;
+
+  // When the user clicks an in-page anchor (Pricing / How It Works) the URL
+  // gets a hash like #pricing. If they then scroll all the way back to the
+  // top, the lingering hash leaves the page anchored — a refresh, a tab
+  // switch, or a back/forward gesture would re-position the page at the
+  // anchor instead of the actual top. We watch the scroll position and
+  // strip the hash as soon as the user reaches the hero area, so the
+  // top of the document is genuinely the top of the document again.
+  useEffect(() => {
+    let raf = 0;
+    const onScroll = () => {
+      // rAF coalesces multiple scroll events into a single check per frame.
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        if (window.scrollY < 50 && window.location.hash) {
+          window.history.replaceState(null, "", window.location.pathname + window.location.search);
+        }
+      });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans selection:bg-primary-500 selection:text-white relative overflow-hidden">
@@ -158,7 +185,7 @@ export default function LandingPage() {
       </section>
 
       {/* Feature Section */}
-      <section id="how-it-works" className="py-20 md:py-24 bg-white relative z-20">
+      <section id="how-it-works" className="scroll-mt-24 py-20 md:py-24 bg-white relative z-20">
         <div className="max-w-6xl mx-auto px-6">
           <Reveal className="text-center mb-12 md:mb-16">
             <h2 className="text-3xl md:text-5xl font-black text-slate-900 tracking-tight mb-4">Your acceptance <br/><span className="text-primary-600">starts here.</span></h2>
@@ -263,7 +290,7 @@ export default function LandingPage() {
       </section>
 
       {/* Pricing — solid background, no expensive blur on mobile */}
-      <section id="pricing" className="py-20 md:py-24 bg-slate-900 text-white relative z-20 overflow-hidden">
+      <section id="pricing" className="scroll-mt-24 py-20 md:py-24 bg-slate-900 text-white relative z-20 overflow-hidden">
         <div className="hidden md:block absolute top-0 right-0 w-[500px] h-[500px] bg-primary-600/20 rounded-full blur-[100px] pointer-events-none" />
 
         <div className="max-w-6xl mx-auto px-6 relative z-10 flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
