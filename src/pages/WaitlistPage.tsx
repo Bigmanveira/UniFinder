@@ -367,7 +367,7 @@ export default function WaitlistPage() {
       {/* ── Footer ───────────────────────────────────────────────────────── */}
       <footer className="relative z-10 shrink-0 border-t border-white/10">
         <div className="max-w-6xl mx-auto px-5 sm:px-8 lg:px-12 py-3 sm:py-4 flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3 text-[10px] sm:text-[11px]">
-          <p className="text-slate-400 font-medium text-center sm:text-left">
+          <p className="text-slate-400 font-medium text-center">
             © 2026 CollegeReady. Practice tools only. Not affiliated with any government, embassy, or consular service.
           </p>
           {/* Privacy / Terms / Contact rendered as inert spans while we're in
