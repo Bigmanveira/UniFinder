@@ -58,7 +58,7 @@ const SLIDES: Array<{
     alt:            "Anna, the AI consular officer practising an F-1 interview",
     badge:          "Live AI Consular Officer",
     headlineTop:    "Match your college.",
-    headlineAccent: "Ace the visa.",
+    headlineAccent: "Ace the visa interview.",
     subtitle:       "A live AI consular officer reads your I-20, asks the questions a real officer would, and scores how you answer.",
     objectPosition: "50% 22%",
     duration:       7500,
