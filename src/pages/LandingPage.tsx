@@ -87,10 +87,16 @@ export default function LandingPage() {
             </Link>
             <div className="flex items-center gap-3">
               {/* Inline SVG avatar pile — zero network requests, scales perfectly. */}
+              {/* Trusted-by pile. The IDs below are Unsplash portrait
+                  photos selected to show African / black faces. If any
+                  particular photo doesn't match what we want, replace the
+                  ID in the URL — the `fit=facearea` query keeps the face
+                  centred in the round crop regardless of the source
+                  composition. */}
               <div className="flex -space-x-3">
-                <AvatarPhoto src="https://i.pravatar.cc/120?img=12" />
-                <AvatarPhoto src="https://i.pravatar.cc/120?img=32" />
-                <AvatarPhoto src="https://i.pravatar.cc/120?img=47" />
+                <AvatarPhoto src="https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=facearea&facepad=2.5&w=160&h=160&q=80" />
+                <AvatarPhoto src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=facearea&facepad=2.5&w=160&h=160&q=80" />
+                <AvatarPhoto src="https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=facearea&facepad=2.5&w=160&h=160&q=80" />
               </div>
               <div className="text-left">
                 <div className="flex text-amber-400 text-xs">★★★★★</div>
