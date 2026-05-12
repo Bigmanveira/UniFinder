@@ -61,14 +61,18 @@ export default function LandingPage() {
                 multiply, revealing the gradient, while the dark mark stays
                 intact. Without this you'd see a white square sitting on
                 top of the blue circle. */}
-            {/* Solid blue gradient backdrop. The logo is white, so we just
-                need a darker surface for contrast — no blend mode. */}
-            <div className="w-10 h-10 md:w-11 md:h-11 rounded-full overflow-hidden flex-shrink-0 relative shadow-lg shadow-primary-500/30 bg-gradient-to-br from-primary-500 to-primary-700">
+            {/* Blue gradient backdrop. The icon glyph is centred in the PNG
+                with a lot of transparent padding around it, so we use
+                object-contain + a 2.5x scale to zoom into the icon. The
+                `brightness(0) invert(1)` filter forces the strokes to
+                pure white for maximum contrast against the blue. */}
+            <div className="w-10 h-10 md:w-11 md:h-11 rounded-full overflow-hidden flex-shrink-0 shadow-lg shadow-primary-500/30 bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center">
               <img
                 src={webLogo}
                 alt=""
                 aria-hidden
-                className="absolute top-0 left-0 h-40 md:h-44 w-auto max-w-none block select-none"
+                className="w-full h-full object-contain scale-[2.5] select-none"
+                style={{ filter: "brightness(0) invert(1)" }}
                 draggable={false}
               />
             </div>
