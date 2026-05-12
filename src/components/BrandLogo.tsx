@@ -65,8 +65,12 @@ export default function BrandLogo({
         />
       </div>
       {!iconOnly && (
-        <span className={`${s.text} font-black tracking-tight ${textColor}`}>
-          College Ready
+        // Wordmark is one word: "CollegeReady". "College" is heavy/bold,
+        // "Ready" is a lighter weight on the same line so the eye reads
+        // them as a compound brand without a space.
+        <span className={`${s.text} tracking-tight leading-none ${textColor}`}>
+          <span className="font-black">College</span>
+          <span className="font-medium">Ready</span>
         </span>
       )}
     </div>

@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { ArrowRight, CheckCircle2, Sparkles, BrainCircuit, Target, ShieldCheck, Mic, Video, ShieldAlert } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import BrandLogo from "../components/BrandLogo";
+import { Reveal } from "../components/Reveal";
 
 // Performance notes for future-me:
 //   - We deliberately do NOT use framer-motion here — first-paint entry
@@ -87,9 +88,9 @@ export default function LandingPage() {
             <div className="flex items-center gap-3">
               {/* Inline SVG avatar pile — zero network requests, scales perfectly. */}
               <div className="flex -space-x-3">
-                <AvatarPip color="#3b82f6" letter="A" />
-                <AvatarPip color="#a855f7" letter="J" />
-                <AvatarPip color="#10b981" letter="M" />
+                <AvatarPhoto src="https://i.pravatar.cc/120?img=12" />
+                <AvatarPhoto src="https://i.pravatar.cc/120?img=32" />
+                <AvatarPhoto src="https://i.pravatar.cc/120?img=47" />
               </div>
               <div className="text-left">
                 <div className="flex text-amber-400 text-xs">★★★★★</div>
@@ -153,27 +154,33 @@ export default function LandingPage() {
       {/* Feature Section */}
       <section id="how-it-works" className="py-20 md:py-24 bg-white relative z-20">
         <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center mb-12 md:mb-16">
+          <Reveal className="text-center mb-12 md:mb-16">
             <h2 className="text-3xl md:text-5xl font-black text-slate-900 tracking-tight mb-4">Your acceptance <br/><span className="text-primary-600">starts here.</span></h2>
             <p className="text-lg text-slate-500 font-medium max-w-2xl mx-auto">Skip the guesswork. Get a personalised college shortlist built around your strengths, your budget, and your future — backed by verified data, not vibes.</p>
-          </div>
+          </Reveal>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <FeatureCard
-              icon={<Target className="text-accent-500" size={28} />}
-              title="Matched to who you really are"
-              desc="Your GPA, scores, budget, and goals shape every recommendation — so the colleges you see are ones where you can actually get in, afford to attend, and thrive."
-            />
-            <FeatureCard
-              icon={<ShieldCheck className="text-emerald-500" size={28} />}
-              title="Real schools. Real programs."
-              desc="Every match is cross-checked against accredited program data. No invented schools, no dead listings, no application fees wasted chasing programs that don't exist."
-            />
-            <FeatureCard
-              icon={<BrainCircuit className="text-primary-500" size={28} />}
-              title="Clear reasons, real strategy"
-              desc="Each match comes with a written explanation of why it fits, the funding paths worth chasing, and exactly what to strengthen — turning your shortlist into a plan."
-            />
+            <Reveal delay={0}>
+              <FeatureCard
+                icon={<Target className="text-accent-500" size={28} />}
+                title="Matched to who you really are"
+                desc="Your GPA, scores, budget, and goals shape every recommendation — so the colleges you see are ones where you can actually get in, afford to attend, and thrive."
+              />
+            </Reveal>
+            <Reveal delay={80}>
+              <FeatureCard
+                icon={<ShieldCheck className="text-emerald-500" size={28} />}
+                title="Real schools. Real programs."
+                desc="Every match is cross-checked against accredited program data. No invented schools, no dead listings, no application fees wasted chasing programs that don't exist."
+              />
+            </Reveal>
+            <Reveal delay={160}>
+              <FeatureCard
+                icon={<BrainCircuit className="text-primary-500" size={28} />}
+                title="Clear reasons, real strategy"
+                desc="Each match comes with a written explanation of why it fits, the funding paths worth chasing, and exactly what to strengthen — turning your shortlist into a plan."
+              />
+            </Reveal>
           </div>
         </div>
       </section>
@@ -186,7 +193,7 @@ export default function LandingPage() {
 
         <div className="max-w-6xl mx-auto px-6 relative z-10 flex flex-col lg:flex-row items-center gap-10 lg:gap-16">
           {/* Visual first on lg, second on mobile */}
-          <div className="flex-1 w-full max-w-md order-2 lg:order-1">
+          <Reveal className="flex-1 w-full max-w-md order-2 lg:order-1">
             <div className="bg-slate-950 text-white rounded-[36px] p-6 shadow-2xl shadow-slate-950/30 relative aspect-[4/5] overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-primary-700/40 via-slate-900 to-slate-950" />
               {/* Live indicator chip */}
@@ -221,10 +228,10 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
-          </div>
+          </Reveal>
 
           {/* Copy second on lg, first on mobile */}
-          <div className="flex-1 order-1 lg:order-2">
+          <Reveal delay={120} className="flex-1 order-1 lg:order-2">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-black tracking-widest uppercase mb-5">
               <ShieldAlert size={12} /> College Ready exclusive
             </div>
@@ -245,7 +252,7 @@ export default function LandingPage() {
               Try the simulator <ArrowRight size={18} />
             </Link>
             <p className="text-[11px] text-slate-400 mt-3 font-semibold">Practice only. Not affiliated with any government or consular service.</p>
-          </div>
+          </Reveal>
         </div>
       </section>
 
@@ -254,7 +261,7 @@ export default function LandingPage() {
         <div className="hidden md:block absolute top-0 right-0 w-[500px] h-[500px] bg-primary-600/20 rounded-full blur-[100px] pointer-events-none" />
 
         <div className="max-w-6xl mx-auto px-6 relative z-10 flex flex-col lg:flex-row items-center gap-12 lg:gap-16">
-          <div className="flex-1">
+          <Reveal className="flex-1">
             <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-6">Pay per match.<br/>No hidden subscriptions.</h2>
             <p className="text-slate-400 text-lg mb-8 leading-relaxed">
               We operate on a transparent credit system — generate exactly what you need, when you need it. Every new account starts with free credits to try the engine before you ever pay.
@@ -267,9 +274,9 @@ export default function LandingPage() {
             <Link to="/intake" className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-500 text-white font-bold px-8 py-4 rounded-full transition-colors">
               Claim Your Free Credits <ArrowRight size={18} />
             </Link>
-          </div>
+          </Reveal>
 
-          <div className="flex-1 w-full max-w-sm">
+          <Reveal delay={120} className="flex-1 w-full max-w-sm">
             <div className="bg-slate-800 border border-slate-700 rounded-[40px] p-8 shadow-2xl relative">
               <div className="absolute -top-4 right-8 bg-accent-500 text-white text-[10px] font-black tracking-widest uppercase px-3 py-1.5 rounded-full">Most Popular</div>
               <h3 className="text-2xl font-black mb-2">Plus Pack</h3>
@@ -285,7 +292,7 @@ export default function LandingPage() {
                 View All Packages
               </Link>
             </div>
-          </div>
+          </Reveal>
         </div>
       </section>
 
@@ -331,17 +338,23 @@ function FeaturePill({ icon, label, color }: { icon: React.ReactNode; label: str
 }
 
 /**
- * Inline SVG avatar circle — replaces external pravatar.cc URLs, which were
- * blocking first-paint with three uncached HTTPS round trips.
+ * Real-photo avatar circle for the "trusted by 10k+" pile. Images are
+ * lazy-loaded (loading="lazy", decoding="async") so they don't compete
+ * with the hero text and CTA for first-paint bandwidth. The 120-px
+ * source is downscaled by the 40-px wrapper, giving us crisp retina
+ * rendering without paying for larger sources.
  */
-function AvatarPip({ color, letter }: { color: string; letter: string }) {
+function AvatarPhoto({ src }: { src: string }) {
   return (
-    <div
-      className="w-10 h-10 rounded-full border-2 border-white shadow-sm flex items-center justify-center text-white text-sm font-black"
-      style={{ backgroundColor: color }}
+    <img
+      src={src}
+      alt=""
       aria-hidden
-    >
-      {letter}
-    </div>
+      loading="lazy"
+      decoding="async"
+      width={40}
+      height={40}
+      className="w-10 h-10 rounded-full border-2 border-white shadow-sm object-cover bg-slate-200"
+    />
   );
 }
