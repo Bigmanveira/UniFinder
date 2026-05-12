@@ -42,8 +42,12 @@ const SLIDES: Array<{
   image:          string;
   alt:            string;
   badge:          string;
-  caption:        string;     // short headline-style line for the floating card
-  subtitle:       string;     // longer feature line that rotates under the H1
+  /** Top line of the rotating H1 — plain weight, in the wordmark colour. */
+  headlineTop:    string;
+  /** Bottom line of the rotating H1 — rendered in the brand gradient. */
+  headlineAccent: string;
+  /** Short feature description that rotates under the H1. */
+  subtitle:       string;
   /** Optional CSS object-position. Anna's face sits high in her source, so we
    *  bias the crop upward to keep her in frame on portrait-mobile screens. */
   objectPosition?: string;
@@ -53,26 +57,29 @@ const SLIDES: Array<{
     image:          "/anna.webp",
     alt:            "Anna, the AI consular officer practising an F-1 interview",
     badge:          "Live AI Consular Officer",
-    caption:        "Rehearse the F-1 visa interview that decides everything.",
+    headlineTop:    "Match your college.",
+    headlineAccent: "Ace the visa.",
     subtitle:       "A live AI consular officer reads your I-20, asks the questions a real officer would, and scores how you answer.",
     objectPosition: "50% 22%",
     duration:       7500,
   },
   {
-    image:    "https://images.unsplash.com/photo-1607237138185-eedd9c632b0b?auto=format&fit=crop&w=1600&q=80",
-    alt:      "Stanford University campus archway",
-    badge:    "Verified College Matches",
-    caption:  "Real schools. Real programs. No AI-invented listings.",
-    subtitle: "Every match is cross-checked against accredited program data, so no application fees get wasted on programs that don't exist.",
-    duration: 6500,
+    image:          "https://images.unsplash.com/photo-1607237138185-eedd9c632b0b?auto=format&fit=crop&w=1600&q=80",
+    alt:            "Stanford University campus archway",
+    badge:          "Verified College Matches",
+    headlineTop:    "Real colleges.",
+    headlineAccent: "Real programs.",
+    subtitle:       "Every match is cross-checked against accredited program data, so no application fees get wasted on programs that don't exist.",
+    duration:       6500,
   },
   {
-    image:    "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=1600&q=80",
-    alt:      "Students walking through a sunlit campus",
-    badge:    "Personalised AI Reasoning",
-    caption:  "Each match explains why it fits and what to strengthen.",
-    subtitle: "Every shortlist comes with a written explanation of why it fits, the funding paths worth chasing, and what to sharpen before applying.",
-    duration: 6500,
+    image:          "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=1600&q=80",
+    alt:            "Students walking through a sunlit campus",
+    badge:          "Personalised AI Reasoning",
+    headlineTop:    "Clear reasons.",
+    headlineAccent: "Real strategy.",
+    subtitle:       "Every shortlist comes with a written explanation of why it fits, the funding paths worth chasing, and what to sharpen before applying.",
+    duration:       6500,
   },
 ];
 
@@ -134,7 +141,14 @@ export default function WaitlistPage() {
   const slide = SLIDES[slideIdx];
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-slate-950 text-white font-sans selection:bg-primary-500 selection:text-white">
+    // h-[100dvh] uses the dynamic viewport height where supported (modern
+    // mobile browsers) so the page actually fills the visible area even
+    // when the browser chrome shows/hides. Falls back to h-screen on
+    // older browsers. flex-col + overflow-hidden = no scroll anywhere.
+    <div
+      className="h-screen flex flex-col relative overflow-hidden bg-slate-950 text-white font-sans selection:bg-primary-500 selection:text-white"
+      style={{ height: "100dvh" }}
+    >
 
       {/* ── Slideshow backdrop ───────────────────────────────────────────── */}
       {/* Real <img> elements (not background-image divs) so the browser's
@@ -187,7 +201,7 @@ export default function WaitlistPage() {
       <div className="hidden md:block absolute -bottom-40 left-1/4 w-[520px] h-[520px] rounded-full bg-accent-500/20 blur-[160px] z-[1] pointer-events-none" aria-hidden />
 
       {/* ── Top bar: logo + socials ──────────────────────────────────────── */}
-      <header className="relative z-10 px-5 sm:px-8 lg:px-12 pt-6 sm:pt-8 flex items-center justify-between">
+      <header className="relative z-10 shrink-0 px-5 sm:px-8 lg:px-12 pt-5 sm:pt-6 flex items-center justify-between">
         {/* Logo — strips the wordmark on phones to keep the bar uncluttered.
             Renders inline to avoid pulling BrandLogo's full machinery for a
             page that has its own tone. */}
@@ -219,9 +233,11 @@ export default function WaitlistPage() {
         </div>
       </header>
 
-      {/* ── Main content grid ────────────────────────────────────────────── */}
-      <main className="relative z-10 px-5 sm:px-8 lg:px-12 pt-10 sm:pt-16 lg:pt-24 pb-16">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-10 items-center min-h-[calc(100vh-12rem)]">
+      {/* ── Main content ─────────────────────────────────────────────────── */}
+      {/* flex-1 + min-h-0 lets this region shrink as needed without
+          forcing the page to scroll. Content is vertically centred. */}
+      <main className="relative z-10 flex-1 min-h-0 flex items-center px-5 sm:px-8 lg:px-12 py-4 sm:py-6">
+        <div className="max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-center">
 
           {/* Left: hero copy + form */}
           <div className="lg:col-span-7">
@@ -235,26 +251,38 @@ export default function WaitlistPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.35 }}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/8 ring-1 ring-white/15 backdrop-blur-sm text-[10px] sm:text-[11px] font-black tracking-widest uppercase text-cyan-200 mb-6"
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/8 ring-1 ring-white/15 backdrop-blur-sm text-[10px] sm:text-[11px] font-black tracking-widest uppercase text-cyan-200 mb-4 sm:mb-5"
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
                 {slide.badge}
               </motion.div>
             </AnimatePresence>
 
-            <h1 className="text-[2.5rem] sm:text-5xl lg:text-6xl xl:text-7xl font-black tracking-tight leading-[1.02] mb-5">
-              Match your college.
-              <br />
-              <span className="bg-gradient-to-br from-primary-400 via-cyan-300 to-accent-500 bg-clip-text text-transparent">
-                Ace the visa.
-              </span>
-            </h1>
+            {/* Rotating headline. Reserved min-height stops the form from
+                jumping as the two-line copy swaps in/out. The accent line
+                takes the brand gradient; the top line stays plain white. */}
+            <div className="mb-4 sm:mb-5 min-h-[5.5rem] sm:min-h-[7rem] lg:min-h-[8.5rem]">
+              <AnimatePresence mode="wait">
+                <motion.h1
+                  key={slide.headlineTop + slide.headlineAccent}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  transition={{ duration: 0.5, ease: "easeOut" }}
+                  className="text-[2.25rem] sm:text-5xl lg:text-6xl xl:text-7xl font-black tracking-tight leading-[1.02]"
+                >
+                  {slide.headlineTop}
+                  <br />
+                  <span className="bg-gradient-to-br from-primary-400 via-cyan-300 to-accent-500 bg-clip-text text-transparent">
+                    {slide.headlineAccent}
+                  </span>
+                </motion.h1>
+              </AnimatePresence>
+            </div>
 
-            {/* Rotating feature subtitle — swaps when the slideshow advances
-                so each slide's value prop reads in plain text under the H1.
-                Reserved min-height so the form below doesn't jump as the
-                lines change. */}
-            <div className="max-w-lg mb-9 min-h-[5.5rem] sm:min-h-[5rem]">
+            {/* Rotating feature subtitle. Reserved min-height keeps the form
+                from jumping when lines swap. */}
+            <div className="max-w-lg mb-5 sm:mb-6 min-h-[4rem] sm:min-h-[4.5rem]">
               <AnimatePresence mode="wait">
                 <motion.p
                   key={slide.subtitle}
@@ -262,14 +290,11 @@ export default function WaitlistPage() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
                   transition={{ duration: 0.45, ease: "easeOut" }}
-                  className="text-base sm:text-lg text-slate-300 font-medium leading-relaxed"
+                  className="text-sm sm:text-base text-slate-300 font-medium leading-relaxed"
                 >
                   {slide.subtitle}
                 </motion.p>
               </AnimatePresence>
-              <p className="text-sm text-slate-400 font-medium mt-2">
-                Join the waitlist for early access and free credits at launch.
-              </p>
             </div>
 
             {/* Form / success swap */}
@@ -332,49 +357,16 @@ export default function WaitlistPage() {
             )}
           </div>
 
-          {/* Right column: only on lg+ — shows the active slide's caption as
-              a small overlay caption card that floats over the imagery. The
-              full slideshow image is in the page background. */}
-          <div className="hidden lg:flex lg:col-span-5 items-end justify-end">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={slide.caption}
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -12 }}
-                transition={{ duration: 0.45, ease: "easeOut" }}
-                className="max-w-sm bg-slate-900/65 backdrop-blur-md ring-1 ring-white/10 rounded-3xl p-5 shadow-2xl shadow-black/40"
-              >
-                <p className="text-[10px] font-bold tracking-widest uppercase text-cyan-300 mb-2">{slide.badge}</p>
-                <p className="text-base font-semibold text-white leading-snug">
-                  {slide.caption}
-                </p>
-              </motion.div>
-            </AnimatePresence>
-          </div>
-        </div>
-
-        {/* Slide pagination dots — tiny but help the user know it's a
-            slideshow, not a static image. */}
-        <div className="max-w-6xl mx-auto mt-10 flex items-center gap-2">
-          {SLIDES.map((s, i) => (
-            <button
-              key={s.badge}
-              onClick={() => setSlideIdx(i)}
-              aria-label={`Show slide ${i + 1}`}
-              className={`h-1.5 rounded-full transition-all ${
-                i === slideIdx
-                  ? "w-10 bg-cyan-300 shadow-[0_0_8px_rgba(103,232,249,0.6)]"
-                  : "w-2.5 bg-white/25 hover:bg-white/40"
-              }`}
-            />
-          ))}
+          {/* Right column reserved for visual breathing room on lg+ so the
+              slideshow image isn't completely overlaid by the dark gradient.
+              No content here — the imagery itself does the talking. */}
+          <div className="hidden lg:block lg:col-span-5" aria-hidden />
         </div>
       </main>
 
       {/* ── Footer ───────────────────────────────────────────────────────── */}
-      <footer className="relative z-10 border-t border-white/10 mt-auto">
-        <div className="max-w-6xl mx-auto px-5 sm:px-8 lg:px-12 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px]">
+      <footer className="relative z-10 shrink-0 border-t border-white/10">
+        <div className="max-w-6xl mx-auto px-5 sm:px-8 lg:px-12 py-3 sm:py-4 flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3 text-[10px] sm:text-[11px]">
           <p className="text-slate-400 font-medium text-center sm:text-left">
             © 2026 CollegeReady. Practice tools only. Not affiliated with any government, embassy, or consular service.
           </p>
