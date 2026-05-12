@@ -43,22 +43,27 @@ export default function LandingPage() {
       {/* Navigation */}
       <header className="fixed top-0 left-0 right-0 p-4 md:p-6 z-50">
         <div className="max-w-6xl mx-auto bg-white md:bg-white/80 md:backdrop-blur-xl border border-slate-100 md:border-white/50 shadow-sm rounded-full px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
-          {/* Wordmark logo. The source PNG has substantial whitespace baked
-              in around the actual mark — using `object-contain` shows that
-              whitespace and makes the logo look tiny. Instead we wrap the
-              image in a fixed-size box, render the <img> several times
-              larger than the box, and let `overflow-hidden` clip the
-              whitespace. The mark sits in the upper portion of the PNG so
-              we anchor the image to the top-left of the wrapper.
-              If you re-export the PNG with a tight crop, you can swap this
-              back to a simple `<img className="h-10 w-auto" />`. */}
-          <Link to="/" className="block relative overflow-hidden h-10 md:h-12 w-44 md:w-52" aria-label="College Ready home">
-            <img
-              src={webLogo}
-              alt="College Ready"
-              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-44 md:h-52 w-auto max-w-none select-none pointer-events-none"
-              draggable={false}
-            />
+          {/* Old icon-square + "College Ready" wordmark layout, with the
+              GraduationCap swapped for the brand mark from weblogo.png.
+              The PNG contains the icon AND the wordmark side-by-side on a
+              large whitespace canvas. We render the image well-oversized
+              and anchor it to the top-left of the icon box so only the
+              icon glyph is visible; the wordmark and surrounding
+              whitespace get clipped by overflow-hidden. The colored
+              background is gone — the icon has its own colours.
+              Tweak the `h-36 / h-40` and translate offsets if the icon
+              isn't perfectly framed once you see it live. */}
+          <Link to="/" className="flex items-center gap-3" aria-label="College Ready home">
+            <div className="w-9 h-9 md:w-10 md:h-10 rounded-[12px] overflow-hidden flex-shrink-0 relative bg-white shadow-sm shadow-slate-200">
+              <img
+                src={webLogo}
+                alt=""
+                aria-hidden
+                className="absolute top-0 left-0 h-36 md:h-40 w-auto max-w-none block select-none"
+                draggable={false}
+              />
+            </div>
+            <span className="text-xl md:text-2xl font-black tracking-tight text-slate-900">College Ready</span>
           </Link>
           <nav className="hidden md:flex items-center gap-8">
             <a href="#how-it-works" className="text-sm font-bold text-slate-500 hover:text-primary-600 transition-colors">How it Works</a>
