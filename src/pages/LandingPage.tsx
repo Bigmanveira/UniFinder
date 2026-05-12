@@ -61,17 +61,17 @@ export default function LandingPage() {
                 multiply, revealing the gradient, while the dark mark stays
                 intact. Without this you'd see a white square sitting on
                 top of the blue circle. */}
-            {/* Blue gradient backdrop. The icon glyph is centred in the PNG
-                with a lot of transparent padding around it, so we use
-                object-contain + a 2.5x scale to zoom into the icon. The
-                `brightness(0) invert(1)` filter forces the strokes to
-                pure white for maximum contrast against the blue. */}
-            <div className="w-10 h-10 md:w-11 md:h-11 rounded-full overflow-hidden flex-shrink-0 shadow-lg shadow-primary-500/30 bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center">
+            {/* Blue gradient backdrop with the centred icon scaled to fit
+                inside the circle with visible padding all around. The
+                wrapper's p-2 leaves a 4-pixel ring of blue between the
+                circle edge and the icon; the scale-[1.6] zooms the icon
+                within that padded box without pushing past the rim. */}
+            <div className="w-11 h-11 md:w-12 md:h-12 rounded-full overflow-hidden flex-shrink-0 shadow-lg shadow-primary-500/30 bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center p-2">
               <img
                 src={webLogo}
                 alt=""
                 aria-hidden
-                className="w-full h-full object-contain scale-[2.5] select-none"
+                className="w-full h-full object-contain scale-[1.6] select-none"
                 style={{ filter: "brightness(0) invert(1)" }}
                 draggable={false}
               />
