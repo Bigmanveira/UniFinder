@@ -50,7 +50,11 @@ export default function LandingPage() {
             <Link to="/faq" className="text-sm font-bold text-slate-500 hover:text-primary-600 transition-colors">FAQ</Link>
           </nav>
           <div className="flex items-center gap-3 md:gap-4">
-            <Link to="/login" className="text-sm font-bold text-slate-900 hover:text-primary-600 transition-colors">Log In</Link>
+            {/* Log In hides on phones — the badge + wordmark + Start Free
+                already fill the pill. Returning users tap Start Free,
+                which routes them to /intake; they can switch to /login
+                from there. On sm+ the link returns. */}
+            <Link to="/login" className="hidden sm:inline text-sm font-bold text-slate-900 hover:text-primary-600 transition-colors">Log In</Link>
             <Link to="/intake" className="bg-slate-900 text-white px-4 md:px-5 py-2 md:py-2.5 rounded-full text-sm font-bold hover:bg-slate-800 transition-transform active:scale-95 shadow-md">
               Start Free
             </Link>

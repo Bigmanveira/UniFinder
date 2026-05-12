@@ -65,10 +65,7 @@ export default function BrandLogo({
         />
       </div>
       {!iconOnly && (
-        // Wordmark hides on phones to keep the navbar pill compact next to
-        // the hamburger/login button. The gradient badge is recognisable on
-        // its own; the text returns at the `sm` breakpoint (>= 640px).
-        <span className={`hidden sm:inline-block ${s.text} font-black tracking-tight ${textColor}`}>
+        <span className={`${s.text} font-black tracking-tight ${textColor}`}>
           College Ready
         </span>
       )}
