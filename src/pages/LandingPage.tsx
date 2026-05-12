@@ -61,19 +61,14 @@ export default function LandingPage() {
                 multiply, revealing the gradient, while the dark mark stays
                 intact. Without this you'd see a white square sitting on
                 top of the blue circle. */}
-            <div
-              className="w-10 h-10 md:w-11 md:h-11 rounded-full overflow-hidden flex-shrink-0 relative shadow-lg shadow-primary-500/30 ring-1 ring-white/80"
-              // Very pale blueish radial gradient. The mark in the PNG is a
-              // medium blue (~#5b87fb), so the backdrop must stay much
-              // lighter than the icon to keep contrast. mix-blend-multiply
-              // still does its job of removing the PNG's white background.
-              style={{ background: "radial-gradient(circle at 30% 30%, #ffffff 0%, #f0f9ff 55%, #bae6fd 100%)" }}
-            >
+            {/* Solid blue gradient backdrop. The logo is white, so we just
+                need a darker surface for contrast — no blend mode. */}
+            <div className="w-10 h-10 md:w-11 md:h-11 rounded-full overflow-hidden flex-shrink-0 relative shadow-lg shadow-primary-500/30 bg-gradient-to-br from-primary-500 to-primary-700">
               <img
                 src={webLogo}
                 alt=""
                 aria-hidden
-                className="absolute top-0 left-0 h-40 md:h-44 w-auto max-w-none block select-none mix-blend-multiply"
+                className="absolute top-0 left-0 h-40 md:h-44 w-auto max-w-none block select-none"
                 draggable={false}
               />
             </div>
