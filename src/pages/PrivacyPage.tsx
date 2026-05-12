@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
-import { GraduationCap, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
+import BrandLogo from "../components/BrandLogo";
 
 const LAST_UPDATED = "May 11, 2026";
 
@@ -14,12 +15,7 @@ export default function PrivacyPage() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans selection:bg-primary-500 selection:text-white">
       <header className="absolute top-0 left-0 right-0 z-50 px-6 py-6 flex items-center justify-between max-w-7xl mx-auto">
-        <Link to="/" className="flex items-center gap-2 text-slate-900 group">
-          <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center text-white shadow-lg shadow-primary-600/20 group-hover:scale-105 transition-transform">
-            <GraduationCap size={22} />
-          </div>
-          <span className="text-xl font-black tracking-tight">College Ready</span>
-        </Link>
+        <BrandLogo size="md" />
         <Link to="/login" className="text-sm font-bold text-primary-600 hover:text-primary-700 bg-primary-50 px-5 py-2.5 rounded-full transition-colors">
           Log in
         </Link>
@@ -126,12 +122,7 @@ export default function PrivacyPage() {
 
       <footer className="bg-white py-10 border-t border-slate-100">
         <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4 text-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white">
-              <GraduationCap size={16} />
-            </div>
-            <span className="text-base font-black tracking-tight text-slate-900">College Ready</span>
-          </div>
+          <BrandLogo size="sm" />
           <div className="flex gap-6 text-sm font-bold text-slate-400">
             <Link to="/faq" className="hover:text-primary-600 transition-colors">FAQ</Link>
             <Link to="/privacy" className="hover:text-primary-600 transition-colors">Privacy Policy</Link>

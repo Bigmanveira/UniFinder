@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { signInWithEmailAndPassword, signInWithPopup, getAdditionalUserInfo, deleteUser } from "firebase/auth";
 import { auth, googleProvider } from "../lib/firebase";
-import { GraduationCap, ArrowRight, Mail, Lock } from "lucide-react";
+import { ArrowRight, Mail, Lock } from "lucide-react";
+import BrandLogo from "../components/BrandLogo";
 import { motion } from "framer-motion";
 
 // Only honour next-paths that are same-site (start with "/" but not "//").
@@ -101,12 +102,9 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent"></div>
       </div>
 
-      <Link to="/" className="absolute top-6 left-6 z-20 flex items-center gap-2 text-white hover:opacity-80 transition-opacity">
-        <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center">
-          <GraduationCap size={22} />
-        </div>
-        <span className="text-xl font-black tracking-tight hidden sm:block">College Ready</span>
-      </Link>
+      <div className="absolute top-6 left-6 z-20">
+        <BrandLogo size="md" tone="light" />
+      </div>
 
       {/* Login Card */}
       <motion.div 

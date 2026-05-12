@@ -8,6 +8,7 @@ import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage
 import { httpsCallable } from "firebase/functions";
 import { functions } from "../lib/firebase";
 import { LogOut, Plus, Wallet, Bookmark, FileText, ChevronRight, User, GraduationCap, MapPin, Sparkles, Camera, Globe, Trash2, ChevronDown, ChevronUp, ArrowRight, Heart, Map, Gift, Copy, Check, Send, Mail, Home, ShieldAlert, Menu, X, Bell, Mic, KeyRound, Loader2, AlertTriangle } from "lucide-react";
+import BrandLogo from "../components/BrandLogo";
 import { motion, AnimatePresence } from "framer-motion";
 import { collection, query, where } from "firebase/firestore";
 import { FadeIn, FadeInItem } from "../components/FadeIn";
@@ -142,11 +143,8 @@ export default function DashboardPage() {
         DESKTOP SIDEBAR 
       */}
       <aside className="hidden md:flex w-72 bg-white border-r border-slate-100 flex-col p-6 sticky top-0 h-screen overflow-y-auto">
-        <div className="flex items-center gap-2 mb-10 px-2">
-          <div className="w-8 h-8 rounded-xl bg-primary-600 flex items-center justify-center text-white shadow-lg shadow-primary-600/30">
-            <GraduationCap size={20} />
-          </div>
-          <span className="text-xl font-black tracking-tight text-slate-900">College Ready</span>
+        <div className="mb-10 px-2">
+          <BrandLogo size="md" />
         </div>
 
         <nav className="flex-1 space-y-2">
@@ -477,12 +475,7 @@ export default function DashboardPage() {
           >
             <Menu size={20} />
           </button>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-primary-600 flex items-center justify-center text-white shadow-md shadow-primary-600/30">
-              <GraduationCap size={18} />
-            </div>
-            <span className="text-lg font-black tracking-tight text-slate-900">College Ready</span>
-          </div>
+          <BrandLogo size="sm" />
           <button
             onClick={() => setNotifOpen((v) => !v)}
             className="w-10 h-10 rounded-2xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 active:scale-95 transition-transform relative"
@@ -535,12 +528,7 @@ export default function DashboardPage() {
               aria-modal="true"
             >
               <div className="flex items-center justify-between p-5 border-b border-slate-100">
-                <div className="flex items-center gap-2">
-                  <div className="w-9 h-9 rounded-xl bg-primary-600 flex items-center justify-center text-white shadow-md shadow-primary-600/30">
-                    <GraduationCap size={18} />
-                  </div>
-                  <span className="text-xl font-black tracking-tight text-slate-900">College Ready</span>
-                </div>
+                <BrandLogo size="md" />
                 <button
                   onClick={() => setMobileNavOpen(false)}
                   className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700"

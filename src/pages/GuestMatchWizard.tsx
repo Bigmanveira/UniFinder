@@ -1,6 +1,7 @@
 import { useState, useRef } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { GraduationCap, MapPin, BookOpen, Calculator, DollarSign, FileCheck, ArrowRight, ArrowLeft } from "lucide-react";
+import BrandLogo from "../components/BrandLogo";
 import { motion } from "framer-motion";
 import { useAuth } from "../hooks/useAuth";
 import { doc, setDoc } from "firebase/firestore";
@@ -194,7 +195,7 @@ export default function GuestMatchWizard() {
   return (
     <div className="min-h-screen bg-slate-50 dot-grid-bg font-sans selection:bg-primary-500 selection:text-white flex flex-col">
       <header className="p-6 flex justify-center">
-        <Link to="/" className="text-2xl font-black tracking-tight text-primary-600">College Ready</Link>
+        <BrandLogo size="md" />
       </header>
 
       <main className="flex-1 w-full max-w-xl mx-auto px-6 pb-12 pt-4">

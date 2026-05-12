@@ -1,8 +1,9 @@
 import { Link, useNavigate } from "react-router-dom";
 import {
   Lock, ArrowRight, Sparkles, AlertTriangle, Info,
-  MapPin, GraduationCap, Star, ChevronRight, Send,
+  MapPin, Star, ChevronRight, Send,
 } from "lucide-react";
+import BrandLogo from "../components/BrandLogo";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { getActiveSchools } from "../lib/schools/getSchools";
@@ -228,12 +229,7 @@ export default function LockedPreviewPage() {
 
       {/* Header — logo + avatar */}
       <header className="relative px-5 py-5 max-w-6xl mx-auto flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2">
-          <div className="w-9 h-9 rounded-2xl bg-slate-900 flex items-center justify-center text-white">
-            <GraduationCap size={16} />
-          </div>
-          <span className="text-lg font-bold tracking-tight">College Ready</span>
-        </Link>
+        <BrandLogo size="sm" />
         {user ? (
           <Link to="/app" className="w-10 h-10 rounded-full ring-2 ring-white shadow-md bg-gradient-to-br from-blue-500 to-cyan-600 text-white flex items-center justify-center font-bold">
             {initial}

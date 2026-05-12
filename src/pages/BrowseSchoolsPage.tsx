@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { getActiveSchools } from "../lib/schools/getSchools";
 import type { School } from "../types";
+import BrandLogo from "../components/BrandLogo";
 import {
-  GraduationCap, MapPin, Building, DollarSign, Search,
+  MapPin, Building, DollarSign, Search,
   ChevronLeft, ChevronRight, X,
 } from "lucide-react";
 import { FadeIn, FadeInItem } from "../components/FadeIn";
@@ -91,12 +92,7 @@ export default function BrowseSchoolsPage() {
     <div className="min-h-screen bg-slate-50 font-sans pb-24 selection:bg-primary-500 selection:text-white">
       {/* Header */}
       <header className="p-6 flex justify-between items-center max-w-6xl mx-auto relative z-20">
-        <Link to="/" className="flex items-center gap-2 text-slate-900 group">
-          <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center text-white shadow-lg shadow-primary-600/20 group-hover:scale-105 transition-transform">
-            <GraduationCap size={22} />
-          </div>
-          <span className="text-xl font-black tracking-tight">College Ready</span>
-        </Link>
+        <BrandLogo size="md" />
         <Link to="/login" className="text-sm font-bold text-slate-600 hover:text-primary-600 transition-colors">Log In</Link>
       </header>
 

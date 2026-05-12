@@ -1,7 +1,7 @@
 import { Link } from "react-router-dom";
-import { ArrowRight, GraduationCap, CheckCircle2, Sparkles, BrainCircuit, Target, ShieldCheck, Mic, Video, ShieldAlert } from "lucide-react";
+import { ArrowRight, CheckCircle2, Sparkles, BrainCircuit, Target, ShieldCheck, Mic, Video, ShieldAlert } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
-import webLogo from "../assets/weblogo.png";
+import BrandLogo from "../components/BrandLogo";
 
 // Performance notes for future-me:
 //   - We deliberately do NOT use framer-motion here — first-paint entry
@@ -43,48 +43,7 @@ export default function LandingPage() {
       {/* Navigation */}
       <header className="fixed top-0 left-0 right-0 p-4 md:p-6 z-50">
         <div className="max-w-6xl mx-auto bg-white md:bg-white/80 md:backdrop-blur-xl border border-slate-100 md:border-white/50 shadow-sm rounded-full px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
-          {/* Old icon-square + "College Ready" wordmark layout, with the
-              GraduationCap swapped for the brand mark from weblogo.png.
-              The PNG contains the icon AND the wordmark side-by-side on a
-              large whitespace canvas. We render the image well-oversized
-              and anchor it to the top-left of the icon box so only the
-              icon glyph is visible; the wordmark and surrounding
-              whitespace get clipped by overflow-hidden. The colored
-              background is gone — the icon has its own colours.
-              Tweak the `h-36 / h-40` and translate offsets if the icon
-              isn't perfectly framed once you see it live. */}
-          <Link to="/" className="flex items-center gap-3" aria-label="College Ready home">
-            {/* Circular blue radial-gradient backdrop so the icon pops off
-                the white pill. The PNG ships with a solid white background
-                rather than transparency, so we apply `mix-blend-multiply`
-                to the <img> — white pixels become transparent under
-                multiply, revealing the gradient, while the dark mark stays
-                intact. Without this you'd see a white square sitting on
-                top of the blue circle. */}
-            {/* Lighter radial gradient (sky-300 → blue-400 → blue-500) for a
-                friendlier brand badge. The icon in the source PNG sits in
-                the upper-middle of the canvas (not the geometric centre),
-                so a small translate-y nudge centres it visually inside the
-                circle. The brightness(0)+invert(1) filter forces every
-                visible stroke to pure white for sharp contrast. */}
-            <div
-              className="w-11 h-11 md:w-12 md:h-12 rounded-full overflow-hidden flex-shrink-0 shadow-lg shadow-primary-500/40 flex items-center justify-center p-2 ring-1 ring-white/20"
-              style={{
-                background:
-                  "radial-gradient(circle at 30% 30%, #7dd3fc 0%, #60a5fa 50%, #3b82f6 100%)",
-              }}
-            >
-              <img
-                src={webLogo}
-                alt=""
-                aria-hidden
-                className="w-full h-full object-contain scale-[1.55] translate-y-[3px] select-none"
-                style={{ filter: "brightness(0) invert(1)" }}
-                draggable={false}
-              />
-            </div>
-            <span className="text-xl md:text-2xl font-black tracking-tight text-slate-900">College Ready</span>
-          </Link>
+          <BrandLogo size="lg" />
           <nav className="hidden md:flex items-center gap-8">
             <a href="#how-it-works" className="text-sm font-bold text-slate-500 hover:text-primary-600 transition-colors">How it Works</a>
             <a href="#pricing" className="text-sm font-bold text-slate-500 hover:text-primary-600 transition-colors">Pricing</a>
@@ -329,12 +288,7 @@ export default function LandingPage() {
       {/* Footer */}
       <footer className="bg-white py-12 border-t border-slate-100 relative z-20">
         <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-slate-900 flex items-center justify-center text-white">
-              <GraduationCap size={16} />
-            </div>
-            <span className="text-xl font-black tracking-tight text-slate-900">College Ready</span>
-          </div>
+          <BrandLogo size="sm" />
           <div className="flex gap-6 text-sm font-bold text-slate-400">
             <Link to="/faq" className="hover:text-primary-600 transition-colors">FAQ</Link>
             <Link to="/privacy" className="hover:text-primary-600 transition-colors">Privacy Policy</Link>
