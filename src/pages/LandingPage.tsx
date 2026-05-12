@@ -61,12 +61,18 @@ export default function LandingPage() {
                 multiply, revealing the gradient, while the dark mark stays
                 intact. Without this you'd see a white square sitting on
                 top of the blue circle. */}
-            {/* Blue gradient backdrop with the centred icon scaled to fit
-                inside the circle with visible padding all around. The
-                wrapper's p-2 leaves a 4-pixel ring of blue between the
-                circle edge and the icon; the scale-[1.6] zooms the icon
-                within that padded box without pushing past the rim. */}
-            <div className="w-11 h-11 md:w-12 md:h-12 rounded-full overflow-hidden flex-shrink-0 shadow-lg shadow-primary-500/30 bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center p-2">
+            {/* Multi-stop radial gradient — cyan highlight at the top-left
+                glints, deep indigo in the bottom-right adds depth. Reads as
+                a polished "branded" badge instead of a flat blue disc. The
+                centred icon is scaled-down with p-2 padding so a clear
+                gradient ring is visible around it. */}
+            <div
+              className="w-11 h-11 md:w-12 md:h-12 rounded-full overflow-hidden flex-shrink-0 shadow-lg shadow-primary-500/40 flex items-center justify-center p-2 ring-1 ring-white/15"
+              style={{
+                background:
+                  "radial-gradient(circle at 28% 22%, #38bdf8 0%, #3b82f6 45%, #4f46e5 100%)",
+              }}
+            >
               <img
                 src={webLogo}
                 alt=""
