@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { Loader2 } from "lucide-react";
-import { AuthProvider } from "./hooks/useAuth";
+import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 
 // Landing is eager so the very first paint doesn't wait on an extra
@@ -27,6 +27,14 @@ const InterviewReportDetailPage = lazy(() => import("./pages/InterviewReportDeta
 const PrivacyPage        = lazy(() => import("./pages/PrivacyPage"));
 const TermsPage          = lazy(() => import("./pages/TermsPage"));
 const ContactPage        = lazy(() => import("./pages/ContactPage"));
+const WaitlistPage       = lazy(() => import("./pages/WaitlistPage"));
+
+// Set VITE_WAITLIST_MODE=true in Vercel to gate the public site behind the
+// waitlist. Anyone hitting "/" while signed out sees WaitlistPage instead of
+// LandingPage. Signed-in users still get the full app, and /login + /signup
+// remain reachable so the founder + early testers can authenticate normally.
+// Flip to false (or remove the env var) to go public.
+const WAITLIST_MODE = import.meta.env.VITE_WAITLIST_MODE === "true";
 
 function PageLoader() {
   return (
@@ -42,6 +50,25 @@ function PageLoader() {
 // Skipped when a `#hash` is in the URL — those anchors target a specific
 // section on the destination page, so we honour them. `instant` keeps the
 // snap imperceptible; users on slow devices won't see a smooth-scroll lag.
+// Decides what shows at "/" depending on the waitlist flag and auth state.
+//   - WAITLIST_MODE off  → always LandingPage (current public behaviour).
+//   - WAITLIST_MODE on   → signed-in users still see LandingPage (they can
+//     navigate into /app themselves), signed-out users see WaitlistPage.
+// Auth still loading? Show a minimal loader so we don't flash the waitlist
+// at users who are about to be recognised as logged-in.
+function HomeGate() {
+  const { user, loading } = useAuth();
+  if (!WAITLIST_MODE) return <LandingPage />;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <Loader2 size={20} className="text-slate-400 animate-spin" />
+      </div>
+    );
+  }
+  return user ? <LandingPage /> : <WaitlistPage />;
+}
+
 function ScrollToTopOnNavigation() {
   const { pathname, hash } = useLocation();
   useEffect(() => {
@@ -59,7 +86,7 @@ function App() {
         <Suspense fallback={<PageLoader />}>
           <Routes>
             {/* Public Routes */}
-            <Route path="/" element={<LandingPage />} />
+            <Route path="/" element={<HomeGate />} />
             <Route path="/intake" element={<GuestMatchWizard />} />
             <Route path="/results" element={<LockedPreviewPage />} />
             <Route path="/login" element={<LoginPage />} />

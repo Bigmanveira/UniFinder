@@ -85,6 +85,18 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Waitlist — public can append their own email while we're soft-
+    // launching. Nobody can read or modify entries from the client; the
+    // founder reads them through the Firebase console.
+    match /waitlist/{entryId} {
+      allow read: if false;
+      allow create: if request.resource.data.email is string
+        && request.resource.data.email.size() > 3
+        && request.resource.data.email.size() < 200
+        && request.resource.data.email.matches('^[^@]+@[^@]+\\.[^@]+$');
+      allow update, delete: if false;
+    }
+
     // Dodo Payments — one record per fulfilled purchase, written by the
     // dodoWebhook Cloud Function via Admin SDK (so the write side is
     // already protected). Users can read their own purchase history.
