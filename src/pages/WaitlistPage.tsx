@@ -88,7 +88,7 @@ const SLIDES: Array<{
 // other page.
 const SOCIALS = {
   instagram: "https://instagram.com/233labs",
-  twitter:   "https://x.com/233labs",
+  facebook:  "https://facebook.com/233labs",
   linkedin:  "https://linkedin.com/company/233labs",
 };
 
@@ -228,7 +228,7 @@ export default function WaitlistPage() {
             Single visual element, three icons inside. */}
         <div className="relative inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-full bg-slate-900/70 backdrop-blur-md ring-1 ring-white/10 shadow-[0_0_18px_rgba(56,189,248,0.18)]">
           <SocialIcon href={SOCIALS.instagram} label="Instagram"><InstagramGlyph /></SocialIcon>
-          <SocialIcon href={SOCIALS.twitter}   label="X (Twitter)"><XGlyph /></SocialIcon>
+          <SocialIcon href={SOCIALS.facebook}  label="Facebook"><FacebookGlyph /></SocialIcon>
           <SocialIcon href={SOCIALS.linkedin}  label="LinkedIn"><LinkedInGlyph /></SocialIcon>
         </div>
       </header>
@@ -418,11 +418,11 @@ function InstagramGlyph() {
   );
 }
 
-function XGlyph() {
-  // The "X" wordmark glyph (formerly Twitter). Two diagonal strokes.
+function FacebookGlyph() {
+  // Facebook "f" mark inside its rounded square.
   return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
-      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M22 12.06C22 6.51 17.52 2 12 2S2 6.51 2 12.06C2 17.07 5.66 21.21 10.44 22v-7.03H7.9v-2.91h2.54V9.85c0-2.52 1.49-3.91 3.78-3.91 1.09 0 2.24.2 2.24.2v2.47H15.2c-1.24 0-1.63.78-1.63 1.57v1.89h2.78l-.45 2.91h-2.34V22C18.34 21.21 22 17.07 22 12.06z" />
     </svg>
   );
 }
