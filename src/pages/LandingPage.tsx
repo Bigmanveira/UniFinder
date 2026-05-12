@@ -62,8 +62,12 @@ export default function LandingPage() {
                 intact. Without this you'd see a white square sitting on
                 top of the blue circle. */}
             <div
-              className="w-10 h-10 md:w-11 md:h-11 rounded-full overflow-hidden flex-shrink-0 relative shadow-lg shadow-primary-500/30 ring-1 ring-white/60"
-              style={{ background: "radial-gradient(circle at 30% 30%, #dbeafe 0%, #93c5fd 60%, #60a5fa 100%)" }}
+              className="w-10 h-10 md:w-11 md:h-11 rounded-full overflow-hidden flex-shrink-0 relative shadow-lg shadow-primary-500/30 ring-1 ring-white/80"
+              // Very pale blueish radial gradient. The mark in the PNG is a
+              // medium blue (~#5b87fb), so the backdrop must stay much
+              // lighter than the icon to keep contrast. mix-blend-multiply
+              // still does its job of removing the PNG's white background.
+              style={{ background: "radial-gradient(circle at 30% 30%, #ffffff 0%, #f0f9ff 55%, #bae6fd 100%)" }}
             >
               <img
                 src={webLogo}
