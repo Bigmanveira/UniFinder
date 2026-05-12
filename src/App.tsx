@@ -1,5 +1,5 @@
-import { lazy, Suspense } from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { lazy, Suspense, useEffect } from "react";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { AuthProvider } from "./hooks/useAuth";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -36,10 +36,26 @@ function PageLoader() {
   );
 }
 
+// React Router doesn't restore scroll position on navigation, so a fresh
+// route would open mid-page if the previous one was scrolled. This sits
+// inside <BrowserRouter> and snaps to the top on every pathname change.
+// Skipped when a `#hash` is in the URL — those anchors target a specific
+// section on the destination page, so we honour them. `instant` keeps the
+// snap imperceptible; users on slow devices won't see a smooth-scroll lag.
+function ScrollToTopOnNavigation() {
+  const { pathname, hash } = useLocation();
+  useEffect(() => {
+    if (hash) return;
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" as ScrollBehavior });
+  }, [pathname, hash]);
+  return null;
+}
+
 function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <ScrollToTopOnNavigation />
         <Suspense fallback={<PageLoader />}>
           <Routes>
             {/* Public Routes */}
