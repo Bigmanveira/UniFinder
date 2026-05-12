@@ -43,18 +43,20 @@ export default function LandingPage() {
       {/* Navigation */}
       <header className="fixed top-0 left-0 right-0 p-4 md:p-6 z-50">
         <div className="max-w-6xl mx-auto bg-white md:bg-white/80 md:backdrop-blur-xl border border-slate-100 md:border-white/50 shadow-sm rounded-full px-4 md:px-6 py-3 md:py-4 flex items-center justify-between">
-          {/* Wordmark logo. The source PNG has whitespace padding baked in, so
-              we set an explicit height and let width auto-scale — the
-              whitespace becomes harmless transparent margin inside the pill.
-              No fallback text is needed beside it because the asset already
-              includes the "COLLEGEREADY.IO" wordmark. */}
-          <Link to="/" className="flex items-center" aria-label="College Ready home">
+          {/* Wordmark logo. The source PNG has substantial whitespace baked
+              in around the actual mark — using `object-contain` shows that
+              whitespace and makes the logo look tiny. Instead we wrap the
+              image in a fixed-size box, render the <img> several times
+              larger than the box, and let `overflow-hidden` clip the
+              whitespace. The mark sits in the upper portion of the PNG so
+              we anchor the image to the top-left of the wrapper.
+              If you re-export the PNG with a tight crop, you can swap this
+              back to a simple `<img className="h-10 w-auto" />`. */}
+          <Link to="/" className="block relative overflow-hidden h-10 md:h-12 w-44 md:w-52" aria-label="College Ready home">
             <img
               src={webLogo}
               alt="College Ready"
-              width={160}
-              height={40}
-              className="h-8 md:h-10 w-auto select-none"
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-44 md:h-52 w-auto max-w-none select-none pointer-events-none"
               draggable={false}
             />
           </Link>
