@@ -88,7 +88,7 @@ const SLIDES: Array<{
 // other page.
 const SOCIALS = {
   instagram: "https://instagram.com/233labs",
-  twitter:   "https://twitter.com/233labs",
+  twitter:   "https://x.com/233labs",
   linkedin:  "https://linkedin.com/company/233labs",
 };
 
