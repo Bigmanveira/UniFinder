@@ -5,8 +5,13 @@
 @layer base {
   html {
     scroll-behavior: smooth;
+    /* Global clearance for the fixed navbar — every anchor scroll
+       (#pricing, #how-it-works, the in-app deep-links) lands below the
+       pill instead of behind it. 6rem ≈ navbar pill height + outer
+       padding. Per-section scroll-mt-* still works for finer overrides. */
+    scroll-padding-top: 6rem;
   }
-  
+
   body {
     @apply antialiased text-slate-900 bg-slate-50 selection:bg-primary-500 selection:text-white;
   }

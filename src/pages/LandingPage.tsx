@@ -90,8 +90,11 @@ export default function LandingPage() {
         </div>
       </header>
 
-      {/* Hero */}
-      <section className="pt-32 md:pt-40 pb-16 md:pb-20 px-6 max-w-6xl mx-auto relative z-20 flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
+      {/* Hero — `pt-40 md:pt-48` keeps the "AI-Powered College Match
+          Engine" pill clearly below the fixed navbar even when the
+          browser chrome (mobile URL bar, etc.) shifts viewport math
+          a few pixels around. */}
+      <section className="pt-40 md:pt-48 pb-16 md:pb-20 px-6 max-w-6xl mx-auto relative z-20 flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
         <div className="flex-1 text-center lg:text-left animate-fade-up">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 text-slate-600 text-xs font-bold tracking-widest uppercase mb-8 shadow-sm">
             <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse"></span>
