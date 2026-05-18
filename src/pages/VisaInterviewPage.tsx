@@ -145,6 +145,30 @@ export default function VisaInterviewPage() {
     setStage("connecting");
     setFatalReason(null);
     spokenOfficerIdsRef.current.clear();
+
+    // Prompt for mic + speech permission BEFORE creating the session, so we
+    // don't burn a 15-credit interview on a doomed mic. iOS Safari especially
+    // requires the prompt to happen inside this user-gesture handler — by the
+    // time the avatar finishes its greeting and we try to auto-arm the mic
+    // from a callback, the gesture is consumed and the prompt silently fails.
+    const perm = await speech.requestPermission();
+    if (!perm.ok) {
+      setStarting(false);
+      setStage("connecting");
+      if (perm.code === "not-allowed") {
+        setError("Microphone access is blocked. Enable it for this site in your browser settings (tap the address-bar lock icon on iOS Safari), then try again.");
+      } else if (perm.code === "no-microphone") {
+        setError("No microphone detected on this device. Plug one in or switch devices to start the interview.");
+      } else if (perm.code === "insecure-context") {
+        setError("Microphone access requires a secure connection. Open College Ready over HTTPS to start the interview.");
+      } else if (perm.code === "not-supported") {
+        setError("This browser doesn't support voice input. Open College Ready in Chrome, Edge, Brave, or Safari.");
+      } else {
+        setError(perm.message || "Could not access the microphone. Check browser permissions and try again.");
+      }
+      return;
+    }
+
     try {
       const fn = httpsCallable(functions, "startVisaInterviewSession");
       const res = await fn({ mode: "avatar", disclaimerAccepted: accepted });

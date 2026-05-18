@@ -72,6 +72,14 @@ service cloud.firestore {
     // Document upload metadata. Users CAN create entries themselves
     // because the actual upload goes straight to Storage from the client;
     // metadata fields are validated below to prevent tampering.
+    //
+    // SECURITY (P0 audit 2026-05-15): storagePath MUST live under the
+    // caller's own users/{uid}/ prefix. Without this check, a malicious
+    // client could create a doc pointing at another user's uploaded file
+    // and have the recordVisaInterviewDocument Cloud Function (which uses
+    // the Admin SDK, bypassing Storage rules) read & extract it back to
+    // the attacker's session. The Cloud Function also re-validates this
+    // path inside loadLatestDocument as belt-and-braces.
     match /visaInterviewDocuments/{documentId} {
       allow read: if request.auth != null && request.auth.uid == resource.data.userId;
       allow create: if request.auth != null
@@ -80,7 +88,9 @@ service cloud.firestore {
           'i20', 'ds160_confirmation',
           'bank_statement', 'employment_letter', 'sponsor_letter', 'transcript'
         ]
-        && request.resource.data.status in ['uploaded', 'processing', 'ready', 'failed'];
+        && request.resource.data.status in ['uploaded', 'processing', 'ready', 'failed']
+        && request.resource.data.storagePath is string
+        && request.resource.data.storagePath.matches('^users/' + request.auth.uid + '/visa-interviews/.*');
       // Only Cloud Functions update / delete (e.g. mark as processed)
       allow update, delete: if false;
     }
@@ -88,12 +98,18 @@ service cloud.firestore {
     // Waitlist — public can append their own email while we're soft-
     // launching. Nobody can read or modify entries from the client; the
     // founder reads them through the Firebase console.
+    //
+    // Audit 2026-05-15: tightened the regex so attackers can't sneak
+    // newlines/semicolons/quotes into the email field for Resend
+    // header-injection or noisy DB entries. Old regex `^[^@]+@[^@]+\.[^@]+$`
+    // would match e.g. "foo\nBcc: victim@x.com@host.com" in CEL's regex
+    // engine. The new pattern explicitly whitelists RFC-ish characters.
     match /waitlist/{entryId} {
       allow read: if false;
       allow create: if request.resource.data.email is string
         && request.resource.data.email.size() > 3
         && request.resource.data.email.size() < 200
-        && request.resource.data.email.matches('^[^@]+@[^@]+\\.[^@]+$');
+        && request.resource.data.email.matches('^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$');
       allow update, delete: if false;
     }
 

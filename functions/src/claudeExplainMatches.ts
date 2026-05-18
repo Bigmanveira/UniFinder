@@ -221,6 +221,10 @@ export async function generateClaudeMatchExplanation({
       matchedSchools: prepareMatchSummaries(topMatches),
     });
 
+    // Prompt caching (audit 2026-05-15): SYSTEM_PROMPT is static — mark it
+    // ephemeral so back-to-back unlocks within the 5-min TTL hit the cache
+    // at 1/10× input cost. This is the most-called Sonnet endpoint in the
+    // app at scale.
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-5",
       // 10 schools × ~120 tokens each (after trimming tips array sizes) +
@@ -228,7 +232,9 @@ export async function generateClaudeMatchExplanation({
       // healthy headroom while roughly halving generation latency vs 6000.
       max_tokens: 3500,
       temperature: 0.5,
-      system: SYSTEM_PROMPT,
+      system: [
+        { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
+      ],
       messages: [{ role: "user", content: userPayload }],
     });
 

@@ -164,11 +164,21 @@ Rank the top ${TARGET_TOP_K} for this student and return the JSON described in t
   try {
     // Sonnet for the matching ranking — this is the headline product surface;
     // worth the extra ~10s vs Haiku for the quality bump.
+    //
+    // Prompt caching (audit 2026-05-15): the SYSTEM_PROMPT is static across
+    // every call, so mark it cache_control:ephemeral. When the same user re-
+    // runs matching within the 5-minute TTL — or two different users hit
+    // back-to-back — Anthropic charges 1/10× input tokens for the cached
+    // block. At 1M DAU this is the single biggest cost lever in this file.
+    // Sonnet's minimum cacheable prompt is 1024 tokens; the system prompt is
+    // borderline, so cache hits will be inconsistent until the prompt grows.
     const response = await anthropic.messages.create({
       model:      "claude-sonnet-4-5",
       max_tokens: 4000,
       temperature: 0.3,
-      system:     SYSTEM_PROMPT,
+      system: [
+        { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
+      ],
       messages: [{ role: "user", content: userMessage }],
     });
     raw = response.content

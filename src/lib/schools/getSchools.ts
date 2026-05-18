@@ -203,31 +203,59 @@ export function getFieldMatchScore(school: School, fieldLower: string): { score:
 // Fetch ALL active schools in a single Firestore query.
 // Degree-level and field filtering happen in getDeterministicMatches,
 // which has access to the full student profile.
+//
+// Audit 2026-05-15: this pulls ~6,000 docs (~3-5 MB) every call. At 1M DAU
+// with 30% reaching results, that's ~63B reads/month ≈ $38k/month in
+// Firestore reads, plus a slow mobile page-load. The proper fix is a
+// CDN-served precompiled JSON bundle; until then, we cache the result in
+// an SPA-lifetime in-memory promise. A user navigating around the app
+// during one session now triggers exactly one fetch instead of N.
+//
+// The cache key separates undergraduate vs graduate because graduate
+// callers get a server-side filtered subset; we'd otherwise mix the two.
+// We cache the PROMISE (not the resolved value) so parallel callers in
+// the same tick share a single in-flight request — no duplicate fetches
+// while the first one is still loading.
 // ─────────────────────────────────────────────────────────────
+const _schoolsCache = new Map<string, Promise<School[]>>();
+
 export async function getActiveSchools(
   degreeLevel?: "undergraduate" | "graduate"
 ): Promise<School[]> {
-  try {
-    const schoolsRef = collection(db, "schools");
-    const q = query(schoolsRef, where("status", "==", "active"));
-    const snapshot = await getDocs(q);
+  const cacheKey = degreeLevel ?? "all";
+  const cached = _schoolsCache.get(cacheKey);
+  if (cached) return cached;
 
-    const schools: School[] = [];
-    snapshot.forEach((doc) => {
-      schools.push(doc.data() as School);
-    });
+  const promise = (async () => {
+    try {
+      const schoolsRef = collection(db, "schools");
+      const q = query(schoolsRef, where("status", "==", "active"));
+      const snapshot = await getDocs(q);
 
-    let filtered = schools;
+      const schools: School[] = [];
+      snapshot.forEach((doc) => {
+        schools.push(doc.data() as School);
+      });
 
-    if (degreeLevel === "graduate") {
-      // Hard filter: only four-year universities for graduate applicants
-      filtered = schools.filter((s) => canOfferGraduateDegrees(s));
+      let filtered = schools;
+
+      if (degreeLevel === "graduate") {
+        // Hard filter: only four-year universities for graduate applicants
+        filtered = schools.filter((s) => canOfferGraduateDegrees(s));
+      }
+
+      filtered.sort((a, b) => a.name.localeCompare(b.name));
+      return filtered;
+    } catch (error) {
+      // On failure, drop the cached promise so the next caller retries.
+      // Without this, a transient error would poison the cache for the
+      // lifetime of the page.
+      _schoolsCache.delete(cacheKey);
+      console.error("Error fetching schools:", error);
+      throw error;
     }
+  })();
 
-    filtered.sort((a, b) => a.name.localeCompare(b.name));
-    return filtered;
-  } catch (error) {
-    console.error("Error fetching schools:", error);
-    throw error;
-  }
+  _schoolsCache.set(cacheKey, promise);
+  return promise;
 }

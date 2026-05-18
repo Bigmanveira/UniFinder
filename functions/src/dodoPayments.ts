@@ -195,3 +195,75 @@ export async function applyPaymentSucceeded(event: DodoWebhookEvent): Promise<{
     return { applied: true };
   });
 }
+
+/**
+ * Apply a `payment.refunded` (or `dispute.created` → chargeback) webhook by
+ * reversing the credit grant. Idempotent: each refund row in `dodoPayments`
+ * gets a sub-doc tag (`refundedAt`) so re-firings of the same refund don't
+ * double-deduct.
+ *
+ * Audit 2026-05-15 surfaced that we previously had no refund handler — a
+ * chargeback or admin-initiated refund left the credited credits in the
+ * attacker's wallet. This closes the loop.
+ *
+ * Negative-balance behaviour: if the user has already SPENT the credits we
+ * issued, the reversal drives their wallet negative. We allow that — it's
+ * better than letting fraud net out for free, and the next purchase brings
+ * them back into positive territory. Honest users hitting this case can
+ * contact support.
+ */
+export async function applyPaymentRefunded(event: DodoWebhookEvent): Promise<{
+  applied: boolean;
+  duplicated?: boolean;
+  reason?: string;
+}> {
+  const data = event.data;
+  if (!data) return { applied: false, reason: "missing data" };
+
+  const paymentId = data.payment_id;
+  if (!paymentId) return { applied: false, reason: "missing payment_id" };
+
+  const db = admin.firestore();
+  const paymentRef = db.collection("dodoPayments").doc(paymentId);
+  const now        = admin.firestore.FieldValue.serverTimestamp();
+
+  return await db.runTransaction(async (tx) => {
+    const paymentSnap = await tx.get(paymentRef);
+    if (!paymentSnap.exists) {
+      // Refund webhook arrived for a payment we never credited — could be a
+      // test event, a payment created via Dodo dashboard outside our flow,
+      // or a webhook out of order. Log and ignore.
+      return { applied: false, reason: "payment not found locally" };
+    }
+    const payment = paymentSnap.data() ?? {};
+    if (payment.refundedAt) {
+      return { applied: false, duplicated: true, reason: "already refunded" };
+    }
+    const userId = payment.userId as string | undefined;
+    const credits = typeof payment.creditsGranted === "number" ? payment.creditsGranted : 0;
+    if (!userId || credits <= 0) {
+      return { applied: false, reason: "payment missing userId/credits" };
+    }
+
+    const walletRef = db.collection("creditWallets").doc(userId);
+    const txRef     = db.collection("creditTransactions").doc();
+
+    const walletSnap = await tx.get(walletRef);
+    const currentCredits = walletSnap.exists ? (walletSnap.data()?.credits ?? 0) : 0;
+    const nextCredits    = currentCredits - credits; // may go negative — intentional
+
+    tx.set(walletRef, { credits: nextCredits, updatedAt: now }, { merge: true });
+    tx.set(paymentRef, { refundedAt: now, refundedCredits: credits }, { merge: true });
+    tx.set(txRef, {
+      userId,
+      amount:    -credits,
+      type:      "refund_purchase",
+      paymentId,
+      packId:    payment.packId ?? null,
+      priceUsd:  payment.priceUsd ?? null,
+      provider:  "dodo",
+      createdAt: now,
+    });
+    return { applied: true };
+  });
+}

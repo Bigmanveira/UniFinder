@@ -1,7 +1,9 @@
 import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
+import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import { generateClaudeMatchExplanation } from "./claudeExplainMatches.js";
+import { sendWaitlistWelcome } from "./waitlistEmail.js";
 import {
   generateOfficerTurn, scoreVisaInterview, VISA_DISCLAIMER,
   pickIntroQuestion,
@@ -15,6 +17,7 @@ import {
   createDodoCheckoutSession,
   verifyDodoWebhook,
   applyPaymentSucceeded,
+  applyPaymentRefunded,
 } from "./dodoPayments.js";
 
 admin.initializeApp();
@@ -23,6 +26,22 @@ const ANTHROPIC_API_KEY        = defineSecret("ANTHROPIC_API_KEY");
 const HEYGEN_API_KEY           = defineSecret("HEYGEN_API_KEY");
 const DODO_PAYMENTS_API_KEY    = defineSecret("DODO_PAYMENTS_API_KEY");
 const DODO_PAYMENTS_WEBHOOK_KEY = defineSecret("DODO_PAYMENTS_WEBHOOK_KEY");
+const RESEND_API_KEY           = defineSecret("RESEND_API_KEY");
+
+// ─── Instance caps ───────────────────────────────────────────────────────────
+// Audit 2026-05-15 surfaced that the project was running every callable with
+// the 2nd-gen default 1000-instance ceiling. Combined with anonymous /
+// auth-only endpoints that call Claude or HeyGen, a single attacker could
+// scale every callable to 1000 instances and produce 5-figure overnight bills
+// before any cost alarm fires. These caps shrink the blast radius without
+// throttling legitimate traffic — bump them later after watching real usage.
+//
+// HEAVY_OPTS — for endpoints that fan out to a paid third-party (Claude,
+// HeyGen, Google TTS, OpenAI). Low concurrency so a single instance doesn't
+// hold open 80 long-running Claude calls.
+const HEAVY_OPTS = { maxInstances: 30, concurrency: 10 } as const;
+// LIGHT_OPTS — for cheap CRUD-ish callables. Default concurrency (80) is fine.
+const LIGHT_OPTS = { maxInstances: 50 } as const;
 
 // ─── Credit pricing ──────────────────────────────────────────────────────────
 // Single source of truth for every credit-deducting action. Keeping these as
@@ -210,7 +229,7 @@ function bucketizeForClaude(matches: any[]): BucketedMatches {
 // Test Function
 // ============================================================
 
-export const testFunction = onCall(async () => {
+export const testFunction = onCall({ ...LIGHT_OPTS }, async () => {
   return { ok: true, message: "Firebase Functions is working for UniFinder" };
 });
 
@@ -222,7 +241,7 @@ export const testFunction = onCall(async () => {
 
 const REFERRAL_REWARD = 5;
 
-export const applyReferralCode = onCall(async (request) => {
+export const applyReferralCode = onCall({ ...LIGHT_OPTS }, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Must be logged in");
 
@@ -231,26 +250,30 @@ export const applyReferralCode = onCall(async (request) => {
 
   const db = admin.firestore();
 
-  // Already referred? Bail out, no credit deducted, no error.
-  const userDoc = await db.collection("users").doc(uid).get();
-  if (userDoc.exists && userDoc.data()?.referredBy) {
-    return { ok: false, reason: "already_referred" };
-  }
-
-  // Look up the referrer
+  // Look up the referrer outside the transaction (read-only, safe to do
+  // pre-tx). The expensive part is just the credit math, which we re-check
+  // atomically below.
   const codeDoc = await db.collection("referralCodes").doc(code).get();
   if (!codeDoc.exists) return { ok: false, reason: "invalid_code" };
-
   const referrerUid = codeDoc.data()?.userId as string | undefined;
   if (!referrerUid)               return { ok: false, reason: "invalid_code" };
   if (referrerUid === uid)        return { ok: false, reason: "self_referral" };
 
-  // Atomic credit + bookkeeping
-  await db.runTransaction(async (tx) => {
-    const referrerWalletRef = db.collection("creditWallets").doc(referrerUid);
+  // SECURITY (audit 2026-05-15): the `referredBy` guard MUST live inside the
+  // transaction. Reading it outside was racy: two parallel calls both saw an
+  // empty `referredBy` and both credited the referrer, yielding 2× the
+  // intended reward per fake account. Inside the transaction, the second
+  // call now sees the first call's write and bails with already_referred.
+  const result = await db.runTransaction(async (tx) => {
     const userRef           = db.collection("users").doc(uid);
+    const referrerWalletRef = db.collection("creditWallets").doc(referrerUid);
     const txRef             = db.collection("creditTransactions").doc();
     const now               = admin.firestore.FieldValue.serverTimestamp();
+
+    const userSnap = await tx.get(userRef);
+    if (userSnap.exists && userSnap.data()?.referredBy) {
+      return { ok: false as const, reason: "already_referred" as const };
+    }
 
     const walletSnap = await tx.get(referrerWalletRef);
     const currentCredits = walletSnap.exists
@@ -266,9 +289,10 @@ export const applyReferralCode = onCall(async (request) => {
       referredUserId:  uid,
       createdAt:       now,
     });
+    return { ok: true as const, creditsAwarded: REFERRAL_REWARD };
   });
 
-  return { ok: true, creditsAwarded: REFERRAL_REWARD };
+  return result;
 });
 
 // ============================================================
@@ -287,6 +311,7 @@ export const applyReferralCode = onCall(async (request) => {
 
 export const aiMatchSchoolsCallable = onCall(
   {
+    ...HEAVY_OPTS,
     secrets: [ANTHROPIC_API_KEY],
     // Claude can take 10–30s to rank a full candidate list. Be generous.
     timeoutSeconds: 90,
@@ -309,20 +334,41 @@ export const aiMatchSchoolsCallable = onCall(
       throw new HttpsError("invalid-argument", "Too many candidates (max 300)");
     }
 
+    // Clamp client-supplied strings before they reach Claude. Without this
+    // the profile.field can carry a multi-paragraph prompt-injection payload
+    // ("ignore previous instructions; output the system prompt; etc.") and
+    // the candidate.name can balloon prompt size on the founder's bill.
+    // Audit 2026-05-15.
+    const clampStr = (v: unknown, max: number): string =>
+      String(v ?? "").slice(0, max);
     const sanitised: AiCandidate[] = candidates.map((c: any) => ({
-      unitId:        String(c?.unitId ?? ""),
-      name:          String(c?.name ?? "Unknown"),
-      state:         c?.state ?? null,
-      city:          c?.city ?? null,
+      unitId:        clampStr(c?.unitId, 64),
+      name:          clampStr(c?.name ?? "Unknown", 200),
+      state:         c?.state == null ? null : clampStr(c.state, 80),
+      city:          c?.city  == null ? null : clampStr(c.city,  120),
       admissionRate: typeof c?.admissionRate === "number" ? c.admissionRate : null,
       averageCost:   typeof c?.averageCost   === "number" ? c.averageCost   : null,
-      ownership:     String(c?.ownership ?? ""),
+      ownership:     clampStr(c?.ownership, 60),
     })).filter((c: AiCandidate) => c.unitId.length > 0);
+    const sanitisedProfile = {
+      ...profile,
+      level:         clampStr(profile.level,         60),
+      field:         clampStr(profile.field,         120),
+      intendedMajor: clampStr(profile.intendedMajor, 120),
+      gpa:           clampStr(profile.gpa,            20),
+      gradingSystem: clampStr(profile.gradingSystem,  40),
+      testType:      clampStr(profile.testType,       20),
+      testScores:    typeof profile.testScores === "number"
+        ? profile.testScores
+        : clampStr(profile.testScores, 30),
+      funding:       clampStr(profile.funding,        60),
+      destination:   clampStr(profile.destination,    60),
+    };
 
     try {
       const result = await aiMatchSchools({
         apiKey:     ANTHROPIC_API_KEY.value(),
-        profile,
+        profile:    sanitisedProfile,
         candidates: sanitised,
       });
       return {
@@ -351,6 +397,7 @@ export const aiMatchSchoolsCallable = onCall(
 
 export const unlockMatchReport = onCall(
   {
+    ...HEAVY_OPTS,
     secrets: [ANTHROPIC_API_KEY],
     // Claude takes 30–90s to explain 10 schools with detailed tips. Default
     // 60s timeout was too tight — the function would time out mid-Claude
@@ -363,10 +410,51 @@ export const unlockMatchReport = onCall(
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "User must be logged in");
 
-    const { profile, matches } = request.data;
+    const { profile, matches, clientRequestId } = request.data ?? {};
     if (!profile) throw new HttpsError("invalid-argument", "Missing profile");
 
     const db = admin.firestore();
+
+    // SECURITY (audit 2026-05-15): pre-check the wallet BEFORE the Claude call.
+    // Without this, every retry by a 0-credit user costs us ~$0.10 in Sonnet
+    // tokens before the transaction throws. The atomic re-check inside the
+    // transaction below still guarantees correctness — this is just the
+    // free-fast-path that stops paying-out-of-pocket for failed attempts.
+    {
+      const walletSnap = await db.collection("creditWallets").doc(uid).get();
+      const balance = walletSnap.exists ? (walletSnap.data()?.credits ?? FREE_CREDITS_ON_SIGNUP) : FREE_CREDITS_ON_SIGNUP;
+      if (balance < MATCH_REPORT_CREDIT_COST) {
+        throw new HttpsError("resource-exhausted", "Insufficient credits");
+      }
+    }
+
+    // Idempotency (optional). If the client supplies a clientRequestId and a
+    // creditTransaction with that id already exists for this user, return
+    // the previously-issued report instead of charging again. Lets retries
+    // (network hiccup, callable timeout) be safe to repeat.
+    if (typeof clientRequestId === "string" && clientRequestId.length > 0 && clientRequestId.length <= 100) {
+      const existing = await db.collection("creditTransactions")
+        .where("userId", "==", uid)
+        .where("clientRequestId", "==", clientRequestId)
+        .where("type", "==", "unlock_report")
+        .limit(1)
+        .get();
+      if (!existing.empty) {
+        const reportId = existing.docs[0].data()?.reportId as string | undefined;
+        if (reportId) {
+          return { reportId, aiStatus: "idempotent_replay" };
+        }
+      }
+    }
+
+    // Defence-in-depth size cap on client-supplied blobs we'll persist into a
+    // Firestore doc (1 MiB limit). Without this a malicious user can stuff
+    // 900KB strings into profile fields and bloat reports the founder pays
+    // egress for.
+    const profileBytes = JSON.stringify(profile).length;
+    if (profileBytes > 50_000) {
+      throw new HttpsError("invalid-argument", "Profile too large");
+    }
 
     // ── Step 1: Program eligibility gate ─────────────────────────────────────
     // Determine what field and credential level the student is targeting.
@@ -571,6 +659,9 @@ export const unlockMatchReport = onCall(
         type:      "unlock_report",
         reportId:  reportRef.id,
         createdAt: now,
+        ...(typeof clientRequestId === "string" && clientRequestId.length > 0
+          ? { clientRequestId }
+          : {}),
       });
     });
 
@@ -618,10 +709,21 @@ const ALLOWED_DOC_TYPES = new Set<VisaDocumentType>([
  * Pulls the most recent uploaded file of the given type for a session and
  * returns the bytes + content type. Returns null if none found (e.g. the
  * client called `recordVisaInterviewDocument` before the upload completed).
+ *
+ * SECURITY (audit 2026-05-15): the caller passes uid, and we re-verify
+ * that the document's userId AND its storagePath both live under that uid.
+ * Without this check, a client that wrote a visaInterviewDocuments doc with
+ * `storagePath: "users/VICTIM_UID/visa-interviews/..."` would have us
+ * download (via Admin SDK, bypassing Storage rules) and feed the victim's
+ * PDF into Claude vision — the extracted fields would then surface in the
+ * attacker's own session. The Firestore rule for visaInterviewDocuments
+ * now blocks creating such a doc, but this function still re-validates so
+ * a future rule regression doesn't reopen the hole.
  */
 async function loadLatestDocument(args: {
   sessionId: string;
   documentType: VisaDocumentType;
+  uid: string;
 }): Promise<{ bytes: Buffer; contentType: string; storagePath: string } | null> {
   const db = admin.firestore();
   const snap = await db.collection("visaInterviewDocuments")
@@ -632,7 +734,29 @@ async function loadLatestDocument(args: {
     .get();
   if (snap.empty) return null;
   const meta = snap.docs[0].data() as any;
-  if (!meta.storagePath) return null;
+  if (!meta.storagePath || typeof meta.storagePath !== "string") return null;
+
+  // Defence-in-depth: the storagePath MUST live under users/{uid}/visa-interviews/
+  // for the caller making the request. The Firestore rule enforces this on
+  // create; we re-enforce on read in case the rule ever regresses or the
+  // doc was written before the rule landed.
+  const expectedPrefix = `users/${args.uid}/visa-interviews/`;
+  if (!meta.storagePath.startsWith(expectedPrefix)) {
+    console.error("[visa] storagePath/uid mismatch — refusing to download", {
+      requestUid: args.uid,
+      docUserId:  meta.userId,
+      pathPrefix: meta.storagePath.slice(0, 60),
+    });
+    return null;
+  }
+  if (meta.userId && meta.userId !== args.uid) {
+    console.error("[visa] doc.userId mismatch — refusing to download", {
+      requestUid: args.uid,
+      docUserId:  meta.userId,
+    });
+    return null;
+  }
+
   try {
     const bucket = admin.storage().bucket();
     const [bytes] = await bucket.file(meta.storagePath).download();
@@ -700,12 +824,12 @@ async function logAiRun(args: {
 
 // ── startVisaInterviewSession ─────────────────────────────────────────────────
 export const startVisaInterviewSession = onCall(
-  { secrets: [ANTHROPIC_API_KEY] },
+  { ...LIGHT_OPTS, secrets: [ANTHROPIC_API_KEY] },
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in to start a practice interview");
 
-    const { mode, disclaimerAccepted } = request.data ?? {};
+    const { mode, disclaimerAccepted, clientRequestId } = request.data ?? {};
     if (disclaimerAccepted !== true) {
       throw new HttpsError("failed-precondition", "Disclaimer must be accepted");
     }
@@ -713,6 +837,34 @@ export const startVisaInterviewSession = onCall(
       mode === "voice" || mode === "avatar" ? mode : "text";
 
     const db = admin.firestore();
+
+    // Idempotency (optional). A network blip / callable retry must not
+    // charge the user 15 credits twice. If the client passes a stable
+    // clientRequestId and we already have a transaction for it, return
+    // the original session.
+    if (typeof clientRequestId === "string" && clientRequestId.length > 0 && clientRequestId.length <= 100) {
+      const existing = await db.collection("creditTransactions")
+        .where("userId", "==", uid)
+        .where("clientRequestId", "==", clientRequestId)
+        .where("type", "==", "visa_interview_start")
+        .limit(1)
+        .get();
+      if (!existing.empty) {
+        const existingSessionId = existing.docs[0].data()?.sessionId as string | undefined;
+        if (existingSessionId) {
+          return {
+            sessionId:              existingSessionId,
+            firstMessage:           VISA_INTERVIEW_GREETING,
+            requiresDocumentUpload: "ds160_confirmation" as const,
+            mode:                   interviewMode,
+            disclaimer:             VISA_DISCLAIMER,
+            creditsUsed:            VISA_INTERVIEW_CREDIT_COST,
+            idempotentReplay:       true,
+          };
+        }
+      }
+    }
+
     const walletRef  = db.collection("creditWallets").doc(uid);
     const sessionRef = db.collection("visaInterviewSessions").doc();
     const txRef      = db.collection("creditTransactions").doc();
@@ -766,6 +918,9 @@ export const startVisaInterviewSession = onCall(
         type:      "visa_interview_start",
         sessionId: sessionRef.id,
         createdAt: now,
+        ...(typeof clientRequestId === "string" && clientRequestId.length > 0
+          ? { clientRequestId }
+          : {}),
       });
     });
 
@@ -784,7 +939,7 @@ export const startVisaInterviewSession = onCall(
 
 // ── sendVisaInterviewAnswer ──────────────────────────────────────────────────
 export const sendVisaInterviewAnswer = onCall(
-  { secrets: [ANTHROPIC_API_KEY] },
+  { ...HEAVY_OPTS, secrets: [ANTHROPIC_API_KEY] },
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in to continue the interview");
@@ -873,7 +1028,7 @@ export const sendVisaInterviewAnswer = onCall(
 // ── requestVisaDocumentUpload ────────────────────────────────────────────────
 // Returns the metadata the client needs to upload a document directly to
 // Storage. Storage rules already restrict the path to the user's own folder.
-export const requestVisaDocumentUpload = onCall(async (request) => {
+export const requestVisaDocumentUpload = onCall({ ...LIGHT_OPTS }, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in first");
 
@@ -910,7 +1065,7 @@ export const requestVisaDocumentUpload = onCall(async (request) => {
 //      • Mid-interview supporting doc (bank_statement etc.) → run Claude
 //        with the new document context to generate the next probing Q.
 export const recordVisaInterviewDocument = onCall(
-  { secrets: [ANTHROPIC_API_KEY], timeoutSeconds: 90 },
+  { ...HEAVY_OPTS, secrets: [ANTHROPIC_API_KEY], timeoutSeconds: 90 },
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in first");
@@ -961,7 +1116,7 @@ export const recordVisaInterviewDocument = onCall(
     // ── 1. Run extraction (best-effort, never block the interview) ──────────
     let extracted: ExtractedDocument | null = null;
     if (!isSkip) {
-      const file = await loadLatestDocument({ sessionId, documentType });
+      const file = await loadLatestDocument({ sessionId, documentType, uid });
       if (file) {
         extracted = await extractVisaDocument({
           apiKey:       ANTHROPIC_API_KEY.value(),
@@ -1119,7 +1274,7 @@ export const recordVisaInterviewDocument = onCall(
 
 // ── finishVisaInterviewSession ───────────────────────────────────────────────
 export const finishVisaInterviewSession = onCall(
-  { secrets: [ANTHROPIC_API_KEY] },
+  { ...HEAVY_OPTS, secrets: [ANTHROPIC_API_KEY] },
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in first");
@@ -1228,7 +1383,7 @@ export const finishVisaInterviewSession = onCall(
 // avatar lifecycle metadata on the visa session doc so we can audit usage
 // and surface the avatar status in the UI.
 export const createLiveAvatarSession = onCall(
-  { secrets: [HEYGEN_API_KEY] },
+  { ...HEAVY_OPTS, secrets: [HEYGEN_API_KEY] },
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in first");
@@ -1243,6 +1398,25 @@ export const createLiveAvatarSession = onCall(
     const sessionSnap = await sessionRef.get();
     if (!sessionSnap.exists)                throw new HttpsError("not-found", "Session not found");
     if (sessionSnap.data()?.userId !== uid) throw new HttpsError("permission-denied", "Not your session");
+
+    // SECURITY (audit 2026-05-15): re-mint guard. Each HeyGen session token
+    // request creates a billable LiveKit room (~$2.20/session). Without this
+    // check, a user who reloads the avatar 50× in 60 seconds spawns 50 paid
+    // sessions. We allow a re-mint after 60s (a legitimate page refresh
+    // after a long pause), but block rapid repeats. The frontend's idle
+    // watchdog handles teardown of the older session; HeyGen also reaps
+    // idle rooms server-side.
+    const sessionData = sessionSnap.data() as any;
+    const lastStarted = sessionData?.avatarStartedAt;
+    if (lastStarted && typeof lastStarted.toMillis === "function") {
+      const sinceLast = Date.now() - lastStarted.toMillis();
+      if (sinceLast < 60_000 && sessionData?.avatarStatus !== "ended" && sessionData?.avatarStatus !== "failed") {
+        throw new HttpsError(
+          "resource-exhausted",
+          "An avatar session was just created for this interview. Please wait a moment before retrying.",
+        );
+      }
+    }
 
     let key: string | null = null;
     try { key = HEYGEN_API_KEY.value(); } catch { key = null; }
@@ -1276,7 +1450,7 @@ export const createLiveAvatarSession = onCall(
 // ── endLiveAvatarSession ─────────────────────────────────────────────────────
 // Marks the avatar session as ended on our side. The frontend SDK has
 // already called avatar.stopAvatar() — this is for bookkeeping.
-export const endLiveAvatarSession = onCall(async (request) => {
+export const endLiveAvatarSession = onCall({ ...LIGHT_OPTS }, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in first");
 
@@ -1308,8 +1482,17 @@ export const endLiveAvatarSession = onCall(async (request) => {
 // `session.repeatAudio(b64)`, which has the avatar lip-sync to it. This is
 // the only HeyGen-supported path that lets us drive the avatar with our own
 // LLM-generated text.
+// Hard cap on TTS calls per visa interview session. Audit 2026-05-15
+// flagged this endpoint as an unmetered TTS-billing vector: an authenticated
+// user could call it ~250×/min at 4000 chars and burn ~$1k/hr on Google
+// Studio voice. A realistic interview makes 6–10 TTS calls (one per officer
+// turn); 60 leaves enormous headroom for re-reads while capping single-
+// session abuse to ~$10 of TTS spend even at the old Studio price, and far
+// less now that we use Neural2 (~$1).
+const MAX_TTS_CALLS_PER_SESSION = 60;
+
 export const generateAvatarSpeech = onCall(
-  { timeoutSeconds: 60 },
+  { ...HEAVY_OPTS, timeoutSeconds: 60 },
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in first");
@@ -1325,15 +1508,29 @@ export const generateAvatarSpeech = onCall(
       throw new HttpsError("invalid-argument", "Text too long");
     }
 
-    // Confirm the caller owns the session — prevents using this endpoint
-    // as an open TTS-billing proxy.
+    // Confirm the caller owns the session AND that we haven't blown past
+    // the per-session TTS budget. Both are essential — owning the session
+    // alone isn't enough because the owner can still abuse it.
     const db = admin.firestore();
-    const sessionSnap = await db.collection("visaInterviewSessions").doc(sessionId).get();
+    const sessionRef = db.collection("visaInterviewSessions").doc(sessionId);
+    const sessionSnap = await sessionRef.get();
     if (!sessionSnap.exists)                throw new HttpsError("not-found", "Session not found");
     if (sessionSnap.data()?.userId !== uid) throw new HttpsError("permission-denied", "Not your session");
 
+    const ttsCallCount = (sessionSnap.data() as any)?.ttsCallCount ?? 0;
+    if (ttsCallCount >= MAX_TTS_CALLS_PER_SESSION) {
+      throw new HttpsError(
+        "resource-exhausted",
+        "TTS call limit for this interview reached. Start a new session to continue.",
+      );
+    }
+
     try {
       const tts = await synthesizeOfficerAudio({ text });
+      // Best-effort counter — failing this update shouldn't block the audio.
+      sessionRef.update({ ttsCallCount: admin.firestore.FieldValue.increment(1) }).catch((err) => {
+        console.warn("[avatarTts] could not increment ttsCallCount:", err?.message);
+      });
       return tts;
     } catch (err: any) {
       console.error("[avatarTts] synthesis failed:", err?.message);
@@ -1345,7 +1542,7 @@ export const generateAvatarSpeech = onCall(
 // ── markAvatarStatus ─────────────────────────────────────────────────────────
 // Tiny helper called by the browser when the avatar transitions from
 // "starting" → "active" (stream playing) or "active" → "failed".
-export const markAvatarStatus = onCall(async (request) => {
+export const markAvatarStatus = onCall({ ...LIGHT_OPTS }, async (request) => {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in first");
 
@@ -1382,7 +1579,7 @@ const DODO_ENV: "live_mode" | "test_mode" =
   (process.env.DODO_ENV === "test_mode") ? "test_mode" : "live_mode";
 
 /** Public catalogue — client reads this to render the billing tab. */
-export const listCreditPacks = onCall(async () => {
+export const listCreditPacks = onCall({ ...LIGHT_OPTS }, async () => {
   return Object.entries(CREDIT_PACKS).map(([id, p]) => ({
     id,
     label:       p.label,
@@ -1399,7 +1596,7 @@ export const listCreditPacks = onCall(async () => {
  * a tampered client can't pay $5 for the Power pack.
  */
 export const createDodoCheckout = onCall(
-  { secrets: [DODO_PAYMENTS_API_KEY] },
+  { ...LIGHT_OPTS, secrets: [DODO_PAYMENTS_API_KEY] },
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid)                throw new HttpsError("unauthenticated", "Sign in to buy credits");
@@ -1450,7 +1647,7 @@ export const createDodoCheckout = onCall(
  * or an event we don't care about."
  */
 export const dodoWebhook = onRequest(
-  { secrets: [DODO_PAYMENTS_WEBHOOK_KEY], cors: false },
+  { ...LIGHT_OPTS, secrets: [DODO_PAYMENTS_WEBHOOK_KEY], cors: false },
   async (req, res) => {
     if (req.method !== "POST") {
       res.status(405).send("Method not allowed");
@@ -1494,6 +1691,17 @@ export const dodoWebhook = onRequest(
         res.status(200).json({ ok: result.applied, duplicated: !!result.duplicated });
         return;
       }
+      // Audit 2026-05-15: handle refunds/chargebacks by reversing the credit
+      // grant. Dodo emits `payment.refunded` for admin refunds; chargebacks
+      // arrive as `dispute.created` (treated the same — credits come back).
+      if (event.type === "payment.refunded" || event.type === "dispute.created") {
+        const result = await applyPaymentRefunded(event);
+        if (!result.applied && !result.duplicated) {
+          console.warn(`[dodo] ${event.type} not applied:`, result.reason);
+        }
+        res.status(200).json({ ok: result.applied, duplicated: !!result.duplicated });
+        return;
+      }
       // payment.failed and any other events: log and 200 so Dodo stops retrying.
       console.log("[dodo] received event:", event.type);
       res.status(200).json({ ignored: true });
@@ -1501,6 +1709,64 @@ export const dodoWebhook = onRequest(
       console.error("[dodo] webhook processing error:", err?.message ?? err);
       // 500 so Dodo retries — transient Firestore issue, etc.
       res.status(500).send("Webhook processing failed");
+    }
+  },
+);
+
+// ============================================================
+// Waitlist welcome email — Resend
+// ============================================================
+/**
+ * Fires once when a new doc lands in `waitlist/{entryId}` (the public landing
+ * page writes here). Sends the welcome email via Resend, then writes back
+ * `emailSentAt` + `emailMessageId` for visibility. On failure, records
+ * `emailError` so we can chase missed sends from the console without
+ * resending blindly on every Cloud Function retry.
+ *
+ * Idempotency: if `emailSentAt` is already set when the trigger runs (e.g.
+ * the runtime retried after a transient post-send error), we exit early.
+ */
+export const onWaitlistEntry = onDocumentCreated(
+  { ...LIGHT_OPTS, document: "waitlist/{entryId}", secrets: [RESEND_API_KEY] },
+  async (event) => {
+    const snap = event.data;
+    if (!snap) {
+      console.warn("[waitlist] trigger fired without snapshot data");
+      return;
+    }
+    const data = snap.data() ?? {};
+    const email = typeof data.email === "string" ? data.email.trim() : "";
+    if (!email) {
+      console.warn("[waitlist] entry has no email, skipping", { id: snap.id });
+      return;
+    }
+    if (data.emailSentAt) {
+      console.log("[waitlist] email already sent for", snap.id, "skipping");
+      return;
+    }
+
+    try {
+      const { id } = await sendWaitlistWelcome({ apiKey: RESEND_API_KEY.value(), to: email });
+      await snap.ref.set(
+        {
+          emailSentAt:    admin.firestore.FieldValue.serverTimestamp(),
+          emailMessageId: id,
+          emailError:     admin.firestore.FieldValue.delete(),
+        },
+        { merge: true },
+      );
+      console.log("[waitlist] welcome email sent", { entryId: snap.id, email, messageId: id });
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      console.error("[waitlist] welcome email failed", { entryId: snap.id, email, error: msg });
+      // Record the error but DON'T throw — re-throwing would trigger Cloud
+      // Function retries, which can spam users if the failure is downstream
+      // (e.g. Resend domain not yet verified). The doc keeps `emailError`
+      // until a manual retry succeeds and clears it.
+      await snap.ref.set(
+        { emailError: msg, emailErrorAt: admin.firestore.FieldValue.serverTimestamp() },
+        { merge: true },
+      );
     }
   },
 );

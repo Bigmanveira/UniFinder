@@ -111,10 +111,17 @@ export async function extractVisaDocument(args: {
 
   try {
     const anthropic = new Anthropic({ apiKey });
+    // Prompt caching (audit 2026-05-15): system prompt is fully static.
+    // SYSTEM_PROMPT alone is below Sonnet's 1024-token minimum so the
+    // cache_control is a no-op today, but it's the right pattern as the
+    // prompt grows. The document bytes themselves are dynamic and can't be
+    // cached anyway.
     const response = await anthropic.messages.create({
       model:      "claude-sonnet-4-5",
       max_tokens: 700,
-      system:     SYSTEM_PROMPT,
+      system: [
+        { type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
+      ],
       messages: [
         {
           role: "user",

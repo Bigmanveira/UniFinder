@@ -202,11 +202,24 @@ export async function generateOfficerTurn(args: {
     // 1-2s with quality that's plenty for short interview prompts. The
     // post-interview *scoring* pass keeps using sonnet — that's a one-shot
     // analytical task where quality matters more than latency.
+    //
+    // Prompt caching (audit 2026-05-15): the static OFFICER_SYSTEM_PROMPT is
+    // separated into its own cached block; the dynamic wrappingHint +
+    // documentsContext follow as a second uncached block (they change every
+    // turn). Haiku's minimum cacheable prompt is 2048 tokens — the system
+    // prompt alone is around 1500 tokens, so cache hits only kick in for
+    // interviews with documents that push the prompt past the threshold.
+    // Net effect: free win when it applies, no-op when it doesn't.
     const response = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
       max_tokens: 350,
       temperature: 0.4,
-      system: OFFICER_SYSTEM_PROMPT + wrappingHint + documentsContext,
+      system: [
+        { type: "text", text: OFFICER_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
+        ...(wrappingHint || documentsContext
+          ? [{ type: "text" as const, text: wrappingHint + documentsContext }]
+          : []),
+      ],
       messages,
     });
     const raw = response.content
@@ -390,11 +403,17 @@ export async function scoreVisaInterview(args: {
 
   try {
     const anthropic = new Anthropic({ apiKey: args.apiKey });
+    // Prompt caching (audit 2026-05-15): scoring rubric is static across all
+    // interviews — caching the system prompt drops re-process cost to 1/10×
+    // for back-to-back scorings within the 5-min TTL. Sonnet's 1024-token
+    // minimum is comfortably met.
     const response = await anthropic.messages.create({
       model: "claude-sonnet-4-5",
       max_tokens: 2500,
       temperature: 0.3,
-      system: SCORER_SYSTEM_PROMPT,
+      system: [
+        { type: "text", text: SCORER_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
+      ],
       messages: [{ role: "user", content: `Score this practice F-1 visa interview transcript:\n\n${transcriptText}` }],
     });
 

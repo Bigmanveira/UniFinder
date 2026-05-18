@@ -52,6 +52,15 @@ export interface UseSpeechRecognitionResult {
   stop: () => void;
   /** Cancel without emitting. */
   abort: () => void;
+  /**
+   * Prompts for mic + speech-recognition permission in the user-gesture
+   * context of whatever tap calls it (e.g. the "Start interview" button).
+   * iOS Safari treats `getUserMedia` and `SpeechRecognition` as TWO separate
+   * permissions and only shows the prompts from inside a gesture handler —
+   * so calling this lazily from a setTimeout/async callback later silently
+   * fails with `not-allowed`. Call this once on the user's first tap.
+   */
+  requestPermission: () => Promise<{ ok: true } | { ok: false; code: string; message: string }>;
 }
 
 const Ctor: typeof window.SpeechRecognition | undefined =
@@ -195,6 +204,83 @@ export function useSpeechRecognition(
     try { rec.abort(); } catch { /* ignore */ }
   }, []);
 
+  const requestPermission = useCallback(async (): Promise<
+    { ok: true } | { ok: false; code: string; message: string }
+  > => {
+    if (!Ctor) {
+      return { ok: false, code: "not-supported", message: "Speech recognition is not available in this browser." };
+    }
+
+    // 1. Mic permission — getUserMedia is the universal "site can record audio"
+    //    grant. On iOS Safari this is a separate permission from speech
+    //    recognition; on Chrome/Edge it's the only one that matters.
+    if (typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // We don't need the stream open — webkitSpeechRecognition uses the
+        // system mic via its own pipeline. Just close immediately.
+        stream.getTracks().forEach((t) => t.stop());
+      } catch (err: any) {
+        const name: string = err?.name ?? "unknown";
+        // NotAllowedError = user denied, SecurityError = http (not https).
+        const code = name === "NotAllowedError" ? "not-allowed"
+                   : name === "NotFoundError"   ? "no-microphone"
+                   : name === "SecurityError"   ? "insecure-context"
+                   : "mic-permission-failed";
+        return { ok: false, code, message: err?.message ?? code };
+      }
+    }
+
+    // 2. Speech-recognition permission. On iOS Safari this is a separate prompt
+    //    triggered the first time .start() is called. We do it now (still inside
+    //    the user gesture) and abort right away so we don't actually record —
+    //    this primes the permission so later .start() calls from non-gesture
+    //    callbacks (after the avatar finishes speaking) work without re-prompting.
+    //    On Chrome/Edge this is a no-op fast-path; .start()/.abort() returns quickly.
+    try {
+      const rec = ensureRecognition();
+      if (!rec) {
+        return { ok: false, code: "not-supported", message: "Speech recognition is not available in this browser." };
+      }
+      // Suppress onend during the prime so it doesn't flip listening state.
+      const prevOnEnd = rec.onend;
+      const prevOnError = rec.onerror;
+      let primeError: { code: string; message: string } | null = null;
+      await new Promise<void>((resolve) => {
+        rec.onend = () => { rec.onend = prevOnEnd; rec.onerror = prevOnError; resolve(); };
+        rec.onerror = (event: any) => {
+          const code: string = event?.error ?? "unknown";
+          // `aborted` is expected — we abort() ourselves below.
+          if (code !== "aborted" && code !== "no-speech") {
+            primeError = { code, message: event?.message ?? code };
+          }
+        };
+        try {
+          rec.start();
+          // Abort on the next tick so the .start() promise resolves first.
+          setTimeout(() => { try { rec.abort(); } catch { /* ignore */ } }, 50);
+        } catch (err: any) {
+          // `already started` means a previous prime is still in flight — treat as success.
+          const msg = String(err?.message ?? err);
+          if (/already started/i.test(msg)) {
+            rec.onend = prevOnEnd;
+            rec.onerror = prevOnError;
+            resolve();
+          } else {
+            primeError = { code: "start-failed", message: msg };
+            rec.onend = prevOnEnd;
+            rec.onerror = prevOnError;
+            resolve();
+          }
+        }
+      });
+      if (primeError) return { ok: false, ...primeError };
+      return { ok: true };
+    } catch (err: any) {
+      return { ok: false, code: "unknown", message: err?.message ?? "Could not request speech permission." };
+    }
+  }, [ensureRecognition]);
+
   // Tear down on unmount so the page doesn't keep the mic light on.
   useEffect(() => () => {
     if (silenceTimerRef.current) {
@@ -212,5 +298,5 @@ export function useSpeechRecognition(
     recRef.current = null;
   }, []);
 
-  return { isSupported, isListening, transcript, start, stop, abort };
+  return { isSupported, isListening, transcript, start, stop, abort, requestPermission };
 }

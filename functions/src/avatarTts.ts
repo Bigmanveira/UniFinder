@@ -20,15 +20,24 @@
 
 import { TextToSpeechClient } from "@google-cloud/text-to-speech";
 
-// "Anna" — friendly, professional female US-English voice. Studio voices are
-// Google's highest-quality tier (voice-actor recordings, much more natural
-// than Neural2 or Wavenet). Pricing is correspondingly higher (free tier
-// 100k chars/month then $0.16/1k chars vs Neural2's 1M free + $0.016/1k),
-// but practice interviews are ~3k chars each so we stay well inside the
-// free tier for normal usage.
+// "Anna" — friendly, professional female US-English voice.
+//
+// Voice choice (audit 2026-05-15): switched from `en-US-Studio-O` ($0.16
+// per 1k chars) to `en-US-Neural2-F` ($0.016 per 1k chars — exactly 10×
+// cheaper). The earlier comment on this line claimed practice interviews
+// "stay well inside the free tier"; that math was wrong. Free tier is 100k
+// Studio chars/month total across all users — at even ~30 paying users a
+// month it's blown. At 1M DAU on Studio the bill is ~$115k/month for TTS
+// alone; Neural2 drops that to ~$11.5k for the same usage pattern.
+//
+// Neural2 is Google's "very natural" tier — voice-actor-quality, just not
+// the brand-new Studio recordings. Still well above the older Wavenet/
+// Standard voices. A/B in production: if customer feedback singles out
+// voice quality, we can selectively upgrade premium-tier interviews to
+// Studio, but defaulting Neural2 keeps unit economics intact.
 const ANNA_VOICE = {
   languageCode: "en-US",
-  name:         "en-US-Studio-O",
+  name:         "en-US-Neural2-F",
   ssmlGender:   "FEMALE" as const,
 };
 
@@ -99,7 +108,7 @@ export async function synthesizeOfficerAudio(args: {
     audioConfig: {
       audioEncoding:   "LINEAR16",
       sampleRateHertz: 24000,
-      // Studio voices already have natural prosody; default 1.0 sounds best.
+      // Neural2 voices have natural prosody at 1.0; faster reads sound rushed.
       speakingRate:    1.0,
     },
   });
