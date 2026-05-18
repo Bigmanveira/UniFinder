@@ -1040,13 +1040,16 @@ function BillingTab({ credits, userId }: { credits: number; userId: string | und
       )}
 
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[0,1,2,3].map(i => (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {[0,1,2,3,4].map(i => (
             <div key={i} className="bg-white rounded-[32px] p-6 border border-slate-100 shadow-sm h-56 animate-pulse" />
           ))}
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        // 5 packs at lg+ (Try / Starter / Plus / Pro / Power) — collapses to
+        // 2 columns at sm and 1 column on phones. Wrap is fine if the count
+        // changes again.
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {packs.map((pack) => {
             const isBuying = buying === pack.id;
             const perCredit = (pack.priceUsd / pack.credits).toFixed(2);

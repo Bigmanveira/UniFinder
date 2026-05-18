@@ -84,6 +84,34 @@ const MAX_SUPPORTING_DOCS_PER_INTERVIEW = 3;
 //
 // Edit this list when launching new packs; the credit amount and price are
 // also referenced by the client UI via the listCreditPacks callable.
+//
+// ─── Pricing rationale (rebuilt 2026-05-18 for African student market) ────
+// Real unit costs:
+//   • match unlock      → ~$0.10  (one Sonnet call: claudeExplainMatches)
+//   • visa interview    → ~$2.36  (HeyGen $2.20 + Chirp3HD TTS $0.04 +
+//                                  Haiku turns $0.05 + Sonnet scoring $0.04
+//                                  + Sonnet vision $0.024)
+//
+// Profit-margin target: ≥ 50% on EVERY transaction (not blended). At a
+// visa-interview cost of $2.36, a 50% margin requires ≥ $4.72 revenue per
+// 15-credit interview → minimum **$0.315 per credit**. We round to $0.333
+// ($1 = 3 credits) and apply it flat across every pack — bulk discounts
+// would crater the visa-interview margin on Pro/Power, so we don't offer
+// them. Bigger packs sell on convenience + commitment, not unit price.
+//
+// At $0.333/cr the margins are:
+//   • match unlock  →  $0.333 − $0.10 = $0.233 (70% margin)  ✓
+//   • visa interview → $5.00 − $2.36 = $2.64  (52% margin)   ✓
+//
+// Old pricing ($5/5cr Starter) priced the entry tier OUT of the visa
+// interview entirely (it cost 15 credits but Starter only gave 5). New
+// Starter is the visa-interview entry point: $5 buys exactly one full
+// interview, which is the headline product.
+//
+// "Try" pack ($2/6cr) exists to lower the absolute entry price for
+// students who balk at $5. It's not enough for a visa interview but
+// buys 6 match-unlocks. ~70% margin per unlock comfortably absorbs
+// Dodo's per-transaction fee (~$0.30 + 3%) at the $2 level.
 export const CREDIT_PACKS: Record<string, {
   productId: string;     // Dodo product id — set after creating products in dashboard
   label: string;
@@ -91,10 +119,11 @@ export const CREDIT_PACKS: Record<string, {
   credits: number;       // What the user receives
   recommended?: boolean;
 }> = {
-  starter: { productId: "REPLACE_WITH_DODO_PRODUCT_ID_STARTER", label: "Starter", priceUsd:   5, credits:   5 },
-  plus:    { productId: "REPLACE_WITH_DODO_PRODUCT_ID_PLUS",    label: "Plus",    priceUsd:  20, credits:  30, recommended: true },
-  pro:     { productId: "REPLACE_WITH_DODO_PRODUCT_ID_PRO",     label: "Pro",     priceUsd:  50, credits: 100 },
-  power:   { productId: "REPLACE_WITH_DODO_PRODUCT_ID_POWER",   label: "Power",   priceUsd: 120, credits: 250 },
+  try:     { productId: "REPLACE_WITH_DODO_PRODUCT_ID_TRY",     label: "Try",     priceUsd:   2, credits:   6 },
+  starter: { productId: "REPLACE_WITH_DODO_PRODUCT_ID_STARTER", label: "Starter", priceUsd:   5, credits:  15 },
+  plus:    { productId: "REPLACE_WITH_DODO_PRODUCT_ID_PLUS",    label: "Plus",    priceUsd:  15, credits:  45, recommended: true },
+  pro:     { productId: "REPLACE_WITH_DODO_PRODUCT_ID_PRO",     label: "Pro",     priceUsd:  40, credits: 120 },
+  power:   { productId: "REPLACE_WITH_DODO_PRODUCT_ID_POWER",   label: "Power",   priceUsd: 100, credits: 300 },
 };
 // Greeting + DS-160 ask. The interview proper (real questions) doesn't begin
 // until BOTH the DS-160 confirmation page and the I-20 have been uploaded.
