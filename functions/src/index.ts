@@ -34,14 +34,25 @@ const RESEND_API_KEY           = defineSecret("RESEND_API_KEY");
 // auth-only endpoints that call Claude or HeyGen, a single attacker could
 // scale every callable to 1000 instances and produce 5-figure overnight bills
 // before any cost alarm fires. These caps shrink the blast radius without
-// throttling legitimate traffic — bump them later after watching real usage.
+// throttling legitimate traffic.
 //
 // HEAVY_OPTS — for endpoints that fan out to a paid third-party (Claude,
-// HeyGen, Google TTS, OpenAI). Low concurrency so a single instance doesn't
-// hold open 80 long-running Claude calls.
-const HEAVY_OPTS = { maxInstances: 30, concurrency: 10 } as const;
+// HeyGen, Google TTS, OpenAI). These calls are I/O-bound; one instance can
+// happily await many in parallel without contending for CPU, so concurrency
+// of 40 keeps cold-starts rare. Tuned up from the original `concurrency: 10`
+// on 2026-05-18 after the original setting forced a new cold start for each
+// concurrent user during a visa interview — interview turns went from
+// ~2s to ~10s when traffic was bursty.
+const HEAVY_OPTS = { maxInstances: 50, concurrency: 40 } as const;
 // LIGHT_OPTS — for cheap CRUD-ish callables. Default concurrency (80) is fine.
 const LIGHT_OPTS = { maxInstances: 50 } as const;
+// HOT_OPTS — for functions in the interview loop that fire repeatedly during
+// a single user session. minInstances: 1 keeps one instance always-warm so
+// the first request after a quiet period doesn't pay a 3-8s Node + Anthropic
+// SDK cold-start tax. Cost: one always-warm 512MiB instance is ~$3-5/month
+// per function — fine for the latency win on the most-impactful UX path.
+// At higher scale (>10k DAU) raise minInstances proportionally.
+const HOT_OPTS  = { maxInstances: 50, concurrency: 40, minInstances: 1 } as const;
 
 // ─── Credit pricing ──────────────────────────────────────────────────────────
 // Single source of truth for every credit-deducting action. Keeping these as
@@ -938,8 +949,12 @@ export const startVisaInterviewSession = onCall(
 );
 
 // ── sendVisaInterviewAnswer ──────────────────────────────────────────────────
+// HOT_OPTS (not HEAVY): fires N times per interview (once per student turn).
+// A cold-start here is the most painful UX failure mode — user finishes
+// speaking, then stares at a "thinking" pill for 5+ seconds. Always-warm
+// removes that.
 export const sendVisaInterviewAnswer = onCall(
-  { ...HEAVY_OPTS, secrets: [ANTHROPIC_API_KEY] },
+  { ...HOT_OPTS, secrets: [ANTHROPIC_API_KEY] },
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in to continue the interview");
@@ -1491,8 +1506,13 @@ export const endLiveAvatarSession = onCall({ ...LIGHT_OPTS }, async (request) =>
 // less now that we use Neural2 (~$1).
 const MAX_TTS_CALLS_PER_SESSION = 60;
 
+// HOT_OPTS (not HEAVY): fires once per officer turn. If this cold-starts
+// every other call, the avatar takes 3-5s longer to start each line, on
+// top of whatever sendVisaInterviewAnswer added. Compounded latency is
+// the difference between feeling like a conversation and feeling like
+// dial-up.
 export const generateAvatarSpeech = onCall(
-  { ...HEAVY_OPTS, timeoutSeconds: 60 },
+  { ...HOT_OPTS, timeoutSeconds: 60 },
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in first");

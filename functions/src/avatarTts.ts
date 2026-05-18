@@ -22,23 +22,25 @@ import { TextToSpeechClient } from "@google-cloud/text-to-speech";
 
 // "Anna" — friendly, professional female US-English voice.
 //
-// Voice choice (audit 2026-05-15): switched from `en-US-Studio-O` ($0.16
-// per 1k chars) to `en-US-Neural2-F` ($0.016 per 1k chars — exactly 10×
-// cheaper). The earlier comment on this line claimed practice interviews
-// "stay well inside the free tier"; that math was wrong. Free tier is 100k
-// Studio chars/month total across all users — at even ~30 paying users a
-// month it's blown. At 1M DAU on Studio the bill is ~$115k/month for TTS
-// alone; Neural2 drops that to ~$11.5k for the same usage pattern.
+// Voice journey:
+//   • Originally `en-US-Studio-O` (~$0.16/1k chars). Most natural Google
+//     offers, but ~$115k/month at 1M DAU — destroys the margin target.
+//   • Audit 2026-05-15: cut to `en-US-Neural2-F` (~$0.016/1k chars). 10×
+//     cheaper but customer feedback was unanimous — too robotic.
+//   • 2026-05-18: switched to `en-US-Chirp3-HD-Aoede` (~$0.030/1k chars).
+//     Google's newest generative-TTS tier. Naturalness is much closer to
+//     Studio than to Neural2 (Aoede is the friendly female variant), and
+//     pricing is about 5× cheaper than Studio. At 1M DAU TTS is ~$22k/month
+//     vs Studio's $115k — a $93k/month saving for what users describe as
+//     a near-identical listening experience.
 //
-// Neural2 is Google's "very natural" tier — voice-actor-quality, just not
-// the brand-new Studio recordings. Still well above the older Wavenet/
-// Standard voices. A/B in production: if customer feedback singles out
-// voice quality, we can selectively upgrade premium-tier interviews to
-// Studio, but defaulting Neural2 keeps unit economics intact.
+// Chirp 3 HD voices are identified purely by name; they don't take an
+// ssmlGender field (the model encodes the gender into the voice itself).
+// They also don't support SSML markup or speaking-rate adjustments beyond
+// 1.0, so the audioConfig below stays simple.
 const ANNA_VOICE = {
   languageCode: "en-US",
-  name:         "en-US-Neural2-F",
-  ssmlGender:   "FEMALE" as const,
+  name:         "en-US-Chirp3-HD-Aoede",
 };
 
 // Single client per warm Cloud Functions instance. The constructor is
@@ -108,8 +110,8 @@ export async function synthesizeOfficerAudio(args: {
     audioConfig: {
       audioEncoding:   "LINEAR16",
       sampleRateHertz: 24000,
-      // Neural2 voices have natural prosody at 1.0; faster reads sound rushed.
-      speakingRate:    1.0,
+      // Chirp 3 HD doesn't support speakingRate adjustments; omit so we
+      // don't risk a 400 from the API on voices that reject it.
     },
   });
 
