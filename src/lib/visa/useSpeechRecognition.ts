@@ -38,7 +38,14 @@ export interface UseSpeechRecognitionOptions {
   onInterim?: (text: string) => void;
   /** Called when recognition errors — `not-allowed` means the user denied the mic. */
   onError?: (code: string, message: string) => void;
-  /** BCP-47 language code. Defaults to "en-US" (visa interviews are conducted in English). */
+  /** BCP-47 language code. Defaults to "en-GB" — most College Ready users
+   *  are Ghanaian/Nigerian/Kenyan students whose English is closer to British
+   *  varieties; Chrome/Safari STT models trained on en-GB transcribe African
+   *  Englishes more accurately than en-US (which biases toward American
+   *  accents). The recognition still understands American English fine, so
+   *  there's no downside for users in the diaspora. For dramatically better
+   *  multi-accent recognition we'd need backend Whisper, which is the
+   *  longer-term plan. */
   lang?: string;
 }
 
@@ -71,7 +78,7 @@ const Ctor: typeof window.SpeechRecognition | undefined =
 export function useSpeechRecognition(
   opts: UseSpeechRecognitionOptions = {},
 ): UseSpeechRecognitionResult {
-  const { onFinal, onInterim, onError, lang = "en-US" } = opts;
+  const { onFinal, onInterim, onError, lang = "en-GB" } = opts;
 
   const recRef          = useRef<SpeechRecognitionLike | null>(null);
   const finalBufferRef  = useRef("");

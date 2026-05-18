@@ -1141,6 +1141,19 @@ export const recordVisaInterviewDocument = onCall(
         });
       } else {
         console.warn("[visa] no Storage file found for", documentType, "in session", sessionId);
+        // Stash a failed-extraction placeholder so the dedup logic in
+        // generateOfficerTurn (and the fallback bank) knows the user
+        // attempted this upload. Without this, a transient Storage glitch
+        // makes Anna re-request the same doc on the next turn — which is
+        // exactly the "Anna keeps asking for my I-20" bug reported
+        // 2026-05-18.
+        extracted = {
+          documentType: documentType as VisaDocumentType,
+          fields: {},
+          summary: "",
+          status: "failed",
+          errorMessage: "Storage file could not be loaded",
+        };
       }
     }
 

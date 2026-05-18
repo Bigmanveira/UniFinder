@@ -409,7 +409,6 @@ export default function VisaInterviewPage() {
             sessionId={sessionId}
             latestOfficer={latestOfficer}
             stage={stage}
-            transcript={speech.transcript}
             ending={ending}
             messageCount={messages.length}
             fatalReason={fatalReason}
@@ -499,13 +498,12 @@ export default function VisaInterviewPage() {
 // channel only (and in the post-interview report).
 // ─────────────────────────────────────────────────────────────────────────────
 function ActiveInterviewLayout({
-  sessionId, latestOfficer, stage, transcript, ending, messageCount, fatalReason,
+  sessionId, latestOfficer, stage, ending, messageCount, fatalReason,
   onAvatarLive, onAvatarSpeakStarted, onAvatarSpeakEnded, onAvatarTtsFailed, onAvatarFallback, onMicRetry, onEnd,
 }: {
   sessionId:            string;
   latestOfficer:        string | undefined;
   stage:                ActiveStage;
-  transcript:           string;
   ending:               boolean;
   messageCount:         number;
   fatalReason:          string | null;
@@ -533,13 +531,15 @@ function ActiveInterviewLayout({
 
       <StatusPill stage={stage} />
 
-      {/* Live transcription preview — gives the user visual feedback that the
-          mic actually picked up their voice. Disappears between turns. */}
+      {/* Listening indicator — kept as a minimal "your turn" affordance, but
+          NOT showing the live transcript text. Users said reading their own
+          words being typed back at them was distracting; the StatusPill
+          already communicates "your turn" clearly enough. */}
       {stage === "listening" && (
         <div className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 shadow-sm min-h-[3rem]">
           <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">You</p>
-          <p className="text-sm text-slate-800 leading-relaxed">
-            {transcript || <span className="text-slate-400">Listening… speak when ready.</span>}
+          <p className="text-sm text-slate-400 leading-relaxed">
+            Listening… speak when ready.
           </p>
         </div>
       )}

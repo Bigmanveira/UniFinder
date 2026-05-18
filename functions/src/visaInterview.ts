@@ -104,7 +104,11 @@ const VALID_STAGES = new Set([
   "career_plan", "home_ties", "documents", "wrap_up",
 ]);
 
-function safeOfficerFallback(turnIndex: number, lastUser: string | undefined): OfficerTurnResult {
+function safeOfficerFallback(
+  turnIndex: number,
+  lastUser: string | undefined,
+  extractedDocuments?: ExtractedDocument[],
+): OfficerTurnResult {
   // Deterministic fallback so the practice can continue if Claude is unreachable.
   const fallbackBank: { text: string; stage: string }[] = [
     { text: "Thank you. Could you tell me which college you'll be attending and why you chose it?",       stage: "school_choice" },
@@ -123,10 +127,27 @@ function safeOfficerFallback(turnIndex: number, lastUser: string | undefined): O
   if (lastUser && lastUser.trim().length < 8 && f.stage !== "wrap_up") {
     text = "Could you give me a bit more detail on that, please?";
   }
+  // If the student has already attempted to upload an I-20 (even one we
+  // couldn't read), DON'T re-request it. The Claude path has its own dedup
+  // via the system prompt + sanity check; the fallback path was previously
+  // bypassing it and asking for the I-20 a second time even when the
+  // session.extractedDocuments showed it had been attempted — that was the
+  // bug user hit on 2026-05-18.
+  const i20AlreadyAttempted = !!extractedDocuments?.some((d) => d.documentType === "i20");
+  let requiresDocumentUpload: "i20" | "ds160_confirmation" | null = null;
+  let fallbackText = text;
+  if (idx === 5) {
+    if (i20AlreadyAttempted) {
+      // Swap the I-20 line for a follow-up that doesn't ask for an upload.
+      fallbackText = "Has anyone in your family travelled to or studied in the United States before?";
+    } else {
+      requiresDocumentUpload = "i20";
+    }
+  }
   return {
-    text,
+    text: fallbackText,
     stage: f.stage,
-    requiresDocumentUpload: idx === 5 ? "i20" : null,
+    requiresDocumentUpload,
     isFinalQuestion: f.stage === "wrap_up",
     status: "fallback",
   };
@@ -180,7 +201,7 @@ export async function generateOfficerTurn(args: {
     : "";
 
   if (!apiKey) {
-    return safeOfficerFallback(questionCount, lastUser);
+    return safeOfficerFallback(questionCount, lastUser, extractedDocuments);
   }
 
   try {
@@ -234,10 +255,10 @@ export async function generateOfficerTurn(args: {
       .trim();
     let parsed: any;
     try { parsed = JSON.parse(cleaned); }
-    catch { return safeOfficerFallback(questionCount, lastUser); }
+    catch { return safeOfficerFallback(questionCount, lastUser, extractedDocuments); }
 
     const text = typeof parsed.text === "string" ? parsed.text.trim() : "";
-    if (!text) return safeOfficerFallback(questionCount, lastUser);
+    if (!text) return safeOfficerFallback(questionCount, lastUser, extractedDocuments);
 
     const stage = VALID_STAGES.has(parsed.stage) ? parsed.stage : "study_plan";
     const ALLOWED_DOC_REQUESTS = new Set([
@@ -281,7 +302,7 @@ export async function generateOfficerTurn(args: {
     return { text, stage, requiresDocumentUpload, isFinalQuestion, status: "completed" };
   } catch (err: any) {
     console.error("[visaInterview] Claude officer error:", err?.message);
-    const fb = safeOfficerFallback(questionCount, lastUser);
+    const fb = safeOfficerFallback(questionCount, lastUser, extractedDocuments);
     return { ...fb, status: "failed", errorMessage: err?.message ?? "Unknown" };
   }
 }
