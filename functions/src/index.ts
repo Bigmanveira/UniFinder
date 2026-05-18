@@ -1754,9 +1754,10 @@ export const dodoWebhook = onRequest(
         return;
       }
       // Audit 2026-05-15: handle refunds/chargebacks by reversing the credit
-      // grant. Dodo emits `payment.refunded` for admin refunds; chargebacks
-      // arrive as `dispute.created` (treated the same — credits come back).
-      if (event.type === "payment.refunded" || event.type === "dispute.created") {
+      // grant. Dodo's actual event names (confirmed against dashboard
+      // 2026-05-18) are `refund.succeeded` for admin refunds and
+      // `dispute.opened` for chargebacks. Both reverse the credit grant.
+      if (event.type === "refund.succeeded" || event.type === "dispute.opened") {
         const result = await applyPaymentRefunded(event);
         if (!result.applied && !result.duplicated) {
           console.warn(`[dodo] ${event.type} not applied:`, result.reason);
