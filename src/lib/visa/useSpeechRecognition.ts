@@ -281,7 +281,11 @@ export function useSpeechRecognition(
           }
         }
       });
-      if (primeError) return { ok: false, ...primeError };
+      // `tsc -b` (Vercel's build mode) narrows `primeError` to `never` here
+      // because it can't prove the in-Promise-callback assignments reach this
+      // line. The runtime IS correct — explicit cast tells the type checker.
+      const finalError = primeError as { code: string; message: string } | null;
+      if (finalError) return { ok: false, code: finalError.code, message: finalError.message };
       return { ok: true };
     } catch (err: any) {
       return { ok: false, code: "unknown", message: err?.message ?? "Could not request speech permission." };
