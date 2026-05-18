@@ -119,11 +119,11 @@ export const CREDIT_PACKS: Record<string, {
   credits: number;       // What the user receives
   recommended?: boolean;
 }> = {
-  try:     { productId: "REPLACE_WITH_DODO_PRODUCT_ID_TRY",     label: "Try",     priceUsd:   2, credits:   6 },
-  starter: { productId: "REPLACE_WITH_DODO_PRODUCT_ID_STARTER", label: "Starter", priceUsd:   5, credits:  15 },
-  plus:    { productId: "REPLACE_WITH_DODO_PRODUCT_ID_PLUS",    label: "Plus",    priceUsd:  15, credits:  45, recommended: true },
-  pro:     { productId: "REPLACE_WITH_DODO_PRODUCT_ID_PRO",     label: "Pro",     priceUsd:  40, credits: 120 },
-  power:   { productId: "REPLACE_WITH_DODO_PRODUCT_ID_POWER",   label: "Power",   priceUsd: 100, credits: 300 },
+  try:     { productId: "pdt_0Nf7vOA8zsn1zSnsMRfp4", label: "Try",     priceUsd:   2, credits:   6 },
+  starter: { productId: "pdt_0Nf7vZAZA3tbthN3LljwO", label: "Starter", priceUsd:   5, credits:  15 },
+  plus:    { productId: "pdt_0Nf7w8zJF1lc9NCTR86bg", label: "Plus",    priceUsd:  15, credits:  45, recommended: true },
+  pro:     { productId: "pdt_0Nf7wK2sInrt7WEyXNItP", label: "Pro",     priceUsd:  40, credits: 120 },
+  power:   { productId: "pdt_0Nf7wUVLfwQ3WxRJ2vyKD", label: "Power",   priceUsd: 100, credits: 300 },
 };
 // Greeting + DS-160 ask. The interview proper (real questions) doesn't begin
 // until BOTH the DS-160 confirmation page and the I-20 have been uploaded.
