@@ -8,6 +8,16 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // ─── Helper: ops portal access ────────────────────────────────────────
+    // True when the requester carries the `admin: true` custom claim. Set
+    // out-of-band via the Identity Toolkit REST API (the ops portal at
+    // ../UniFinder-ops reads Firestore directly using this claim). We're
+    // ADD-ONLY to existing read rules — never widening writes, only
+    // permitting ops to *read* user-owned collections for support work.
+    function isAdmin() {
+      return request.auth != null && request.auth.token.admin == true;
+    }
+
     // Public Read Data (University database)
     match /schools/{schoolId} {
       allow read: if true;
@@ -19,7 +29,7 @@ service cloud.firestore {
 
     // Protected Owner-Only Data
     match /users/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
+      allow read: if (request.auth != null && request.auth.uid == userId) || isAdmin();
       allow create: if request.auth != null && request.auth.uid == userId;
       allow update: if request.auth != null && request.auth.uid == userId
         && !("role" in request.resource.data.diff(resource.data).changedKeys());
@@ -29,11 +39,11 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
     match /creditWallets/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
+      allow read: if (request.auth != null && request.auth.uid == userId) || isAdmin();
       allow write: if false; // Protected. Modified only by Cloud Functions
     }
     match /creditTransactions/{transactionId} {
-      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow read: if (request.auth != null && request.auth.uid == resource.data.userId) || isAdmin();
       allow write: if false; // Protected. Modified only by Cloud Functions
     }
     match /savedSchools/{userId} {
@@ -43,11 +53,11 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
     match /matchReports/{reportId} {
-      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow read: if (request.auth != null && request.auth.uid == resource.data.userId) || isAdmin();
       allow write: if false; // Protected. Modified only by Cloud Functions
     }
     match /aiRuns/{aiRunId} {
-      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow read: if (request.auth != null && request.auth.uid == resource.data.userId) || isAdmin();
       allow write: if false; // Protected. Written only by Cloud Functions via Admin SDK
     }
 
@@ -57,15 +67,15 @@ service cloud.firestore {
     // Sessions, messages, and reports are written exclusively by Cloud
     // Functions (Admin SDK). Users can read their own.
     match /visaInterviewSessions/{sessionId} {
-      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow read: if (request.auth != null && request.auth.uid == resource.data.userId) || isAdmin();
       allow write: if false;
     }
     match /visaInterviewMessages/{messageId} {
-      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow read: if (request.auth != null && request.auth.uid == resource.data.userId) || isAdmin();
       allow write: if false;
     }
     match /visaInterviewReports/{reportId} {
-      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow read: if (request.auth != null && request.auth.uid == resource.data.userId) || isAdmin();
       allow write: if false;
     }
 
@@ -81,7 +91,7 @@ service cloud.firestore {
     // the attacker's session. The Cloud Function also re-validates this
     // path inside loadLatestDocument as belt-and-braces.
     match /visaInterviewDocuments/{documentId} {
-      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow read: if (request.auth != null && request.auth.uid == resource.data.userId) || isAdmin();
       allow create: if request.auth != null
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.documentType in [
@@ -105,7 +115,7 @@ service cloud.firestore {
     // would match e.g. "foo\nBcc: victim@x.com@host.com" in CEL's regex
     // engine. The new pattern explicitly whitelists RFC-ish characters.
     match /waitlist/{entryId} {
-      allow read: if false;
+      allow read: if isAdmin();
       allow create: if request.resource.data.email is string
         && request.resource.data.email.size() > 3
         && request.resource.data.email.size() < 200
@@ -117,7 +127,7 @@ service cloud.firestore {
     // dodoWebhook Cloud Function via Admin SDK (so the write side is
     // already protected). Users can read their own purchase history.
     match /dodoPayments/{paymentId} {
-      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow read: if (request.auth != null && request.auth.uid == resource.data.userId) || isAdmin();
       allow write: if false;
     }
 
