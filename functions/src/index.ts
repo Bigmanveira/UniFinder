@@ -19,6 +19,7 @@ import {
   applyPaymentSucceeded,
   applyPaymentRefunded,
 } from "./dodoPayments.js";
+import { sendPurchaseReceipt } from "./paymentReceiptEmail.js";
 
 admin.initializeApp();
 
@@ -1729,7 +1730,7 @@ export const createDodoCheckout = onCall(
  * or an event we don't care about."
  */
 export const dodoWebhook = onRequest(
-  { ...LIGHT_OPTS, secrets: [DODO_PAYMENTS_WEBHOOK_KEY], cors: false },
+  { ...LIGHT_OPTS, secrets: [DODO_PAYMENTS_WEBHOOK_KEY, RESEND_API_KEY], cors: false },
   async (req, res) => {
     if (req.method !== "POST") {
       res.status(405).send("Method not allowed");
@@ -1770,7 +1771,35 @@ export const dodoWebhook = onRequest(
         if (!result.applied && !result.duplicated) {
           console.warn("[dodo] payment.succeeded not applied:", result.reason);
         }
-        res.status(200).json({ ok: result.applied, duplicated: !!result.duplicated });
+        // Receipt email — fire-and-forget. We've already credited the
+        // wallet; if Resend fails the customer still has their credits and
+        // Dodo's auto-receipt covers the legal/compliance side. Log only.
+        if (result.applied) {
+          const pack = CREDIT_PACKS[result.packId];
+          const packLabel = pack?.label ?? result.packId;
+          if (result.customerEmail) {
+            sendPurchaseReceipt({
+              apiKey:     RESEND_API_KEY.value(),
+              to:         result.customerEmail,
+              packLabel,
+              credits:    result.creditsGranted,
+              priceUsd:   result.priceUsd,
+              newBalance: result.newCredits,
+              paymentId:  result.paymentId,
+            }).then(
+              ({ id }) => console.log("[dodo] receipt email sent", { paymentId: result.paymentId, messageId: id }),
+              (err) => console.warn("[dodo] receipt email failed (credits already granted)", err?.message ?? err),
+            );
+          } else {
+            console.warn("[dodo] no customer email on payment.succeeded — skipping receipt", { paymentId: result.paymentId });
+          }
+        }
+        // `duplicated` only exists on the applied:false branch — narrow the
+        // discriminated union so TypeScript doesn't complain.
+        res.status(200).json({
+          ok:         result.applied,
+          duplicated: result.applied ? false : !!result.duplicated,
+        });
         return;
       }
       // Audit 2026-05-15: handle refunds/chargebacks by reversing the credit

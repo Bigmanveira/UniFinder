@@ -130,11 +130,18 @@ export function verifyDodoWebhook(args: {
  * creating the checkout session. We never trust webhook-supplied email
  * for crediting (it's only used for support audit).
  */
-export async function applyPaymentSucceeded(event: DodoWebhookEvent): Promise<{
-  applied: boolean;
-  duplicated?: boolean;
-  reason?: string;
-}> {
+export async function applyPaymentSucceeded(event: DodoWebhookEvent): Promise<
+  | { applied: false; duplicated?: boolean; reason?: string }
+  | {
+      applied:        true;
+      newCredits:     number;
+      customerEmail:  string | null;
+      packId:         string;
+      creditsGranted: number;
+      priceUsd:       number;
+      paymentId:      string;
+    }
+> {
   const data = event.data;
   if (!data) return { applied: false, reason: "missing data" };
 
@@ -194,7 +201,18 @@ export async function applyPaymentSucceeded(event: DodoWebhookEvent): Promise<{
       provider:  "dodo",
       createdAt: now,
     });
-    return { applied: true };
+    // Return the data the caller needs to fire a custom receipt email
+    // AFTER the transaction commits — sending email is a side effect that
+    // doesn't belong inside the transaction (which can retry).
+    return {
+      applied:         true as const,
+      newCredits:      nextCredits,
+      customerEmail:   data.customer?.email ?? null,
+      packId,
+      creditsGranted:  creditsToGrant,
+      priceUsd,
+      paymentId,
+    };
   });
 }
 
