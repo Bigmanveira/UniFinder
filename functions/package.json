@@ -16,6 +16,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
     "@google-cloud/text-to-speech": "^6.4.1",
+    "@sentry/node": "^10.53.1",
     "dodopayments": "^2.31.1",
     "firebase-admin": "^13.0.0",
     "firebase-functions": "^6.0.0",
