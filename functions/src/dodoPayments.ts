@@ -39,8 +39,9 @@ export async function createDodoCheckoutSession(args: {
   userId:      string;
   userEmail:   string;
   returnUrl:   string;
+  cancelUrl?:  string;
 }): Promise<{ checkoutUrl: string; sessionId: string }> {
-  const { apiKey, environment, pack, packId, userId, userEmail, returnUrl } = args;
+  const { apiKey, environment, pack, packId, userId, userEmail, returnUrl, cancelUrl } = args;
 
   // SDK construction is dynamic so we don't pay the Anthropic-style cold
   // import cost when this function isn't being used.
@@ -51,6 +52,7 @@ export async function createDodoCheckoutSession(args: {
     product_cart: [{ product_id: pack.productId, quantity: 1 }],
     customer:     { email: userEmail },
     return_url:   returnUrl,
+    ...(cancelUrl ? { cancel_url: cancelUrl } : {}),
     metadata: {
       // The webhook MUST be able to map back to "which Firebase user gets
       // how many credits". We stash both pieces in metadata so the webhook

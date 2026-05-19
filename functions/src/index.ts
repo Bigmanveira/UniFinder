@@ -1635,10 +1635,24 @@ export const markAvatarStatus = onCall({ ...LIGHT_OPTS }, async (request) => {
 // Dodo Payments — credit-pack checkout + webhook
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Toggle live vs. test by env. We default to live so production isn't an
-// opt-in; set DODO_ENV=test_mode in the function config when developing.
-const DODO_ENV: "live_mode" | "test_mode" =
-  (process.env.DODO_ENV === "test_mode") ? "test_mode" : "live_mode";
+// Dodo environment. Hardcoded to "test_mode" while the merchant account is
+// still pending Dodo's verification (verification of business KYC, bank
+// settlement, etc.). With a test-mode API key set as the secret, this MUST
+// be "test_mode" or Dodo rejects every checkout creation with 401.
+//
+// Switch to "live_mode" when:
+//   1. Dodo dashboard shows the account as verified, AND
+//   2. DODO_PAYMENTS_API_KEY Firebase Secret has been rotated to a live key
+//      (`printf '%s' 'sk_live_...' | firebase functions:secrets:set DODO_PAYMENTS_API_KEY ...`), AND
+//   3. DODO_PAYMENTS_WEBHOOK_KEY has been rotated to the live-mode webhook
+//      signing secret.
+// Then redeploy createDodoCheckout + dodoWebhook.
+//
+// (Earlier this was a process.env lookup with a .env.unifinder-dev-d61aa
+// file. Firebase v2 didn't reliably pick up the project-specific file in
+// our deploys, so the function silently kept defaulting to live_mode and
+// every checkout 401'd. Hardcoding the constant removed the moving part.)
+const DODO_ENV: "live_mode" | "test_mode" = "test_mode";
 
 /** Public catalogue — client reads this to render the billing tab. */
 export const listCreditPacks = onCall({ ...LIGHT_OPTS }, async () => {
@@ -1667,10 +1681,15 @@ export const createDodoCheckout = onCall(
 
     const packId    = String(request.data?.packId ?? "");
     const returnUrl = String(request.data?.returnUrl ?? "");
+    const cancelUrl = request.data?.cancelUrl ? String(request.data.cancelUrl) : "";
     const pack = CREDIT_PACKS[packId];
     if (!pack)               throw new HttpsError("invalid-argument", "Unknown credit pack");
-    if (!returnUrl.startsWith("https://") && !returnUrl.startsWith("http://localhost"))
+    const isAllowedUrl = (url: string) =>
+      url.startsWith("https://") || url.startsWith("http://localhost") || url.startsWith("http://127.0.0.1");
+    if (!isAllowedUrl(returnUrl))
       throw new HttpsError("invalid-argument", "Invalid returnUrl");
+    if (cancelUrl && !isAllowedUrl(cancelUrl))
+      throw new HttpsError("invalid-argument", "Invalid cancelUrl");
     if (pack.productId.startsWith("REPLACE_WITH"))
       throw new HttpsError("failed-precondition", "Credit pack not configured — admin must set Dodo product IDs.");
 
@@ -1683,6 +1702,7 @@ export const createDodoCheckout = onCall(
         userId:      uid,
         userEmail,
         returnUrl,
+        cancelUrl:   cancelUrl || undefined,
       });
       return { checkoutUrl, sessionId };
     } catch (err: any) {
