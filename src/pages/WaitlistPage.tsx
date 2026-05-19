@@ -366,20 +366,19 @@ export default function WaitlistPage() {
 
       {/* ── Footer ───────────────────────────────────────────────────────── */}
       <footer className="relative z-10 shrink-0 border-t border-white/10">
-        <div className="max-w-6xl mx-auto px-5 sm:px-8 lg:px-12 py-3 sm:py-4 flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-3 text-[10px] sm:text-[11px]">
+        <div className="max-w-6xl mx-auto px-5 sm:px-8 lg:px-12 py-4 sm:py-5 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4 text-xs sm:text-sm">
           <p className="text-slate-400 font-medium text-center">
             © 2026 CollegeReady. Practice tools only. Not affiliated with any government, embassy, or consular service.
           </p>
-          {/* Privacy / Terms / Contact rendered as inert spans while we're in
-              waitlist mode. Once the site goes public these will turn back
-              into <Link> components — keeping them visible (just unclickable)
-              signals that the policies exist without driving traffic to them
-              pre-launch. */}
-          <div className="flex gap-5 font-bold text-slate-500 select-none">
-            <span className="cursor-not-allowed" aria-disabled="true">Privacy</span>
-            <span className="cursor-not-allowed" aria-disabled="true">Terms</span>
-            <span className="cursor-not-allowed" aria-disabled="true">Contact</span>
-          </div>
+          {/* Waitlist-specific info pages. Distinct namespace (/waitlist/*) so
+              they don't collide with the main app's /privacy /terms /contact
+              /faq routes — production users see different pages. */}
+          <nav className="flex flex-wrap justify-center gap-x-5 gap-y-2 font-bold text-slate-400">
+            <Link to="/waitlist/privacy" className="hover:text-white transition-colors">Privacy</Link>
+            <Link to="/waitlist/terms"   className="hover:text-white transition-colors">Terms</Link>
+            <Link to="/waitlist/faq"     className="hover:text-white transition-colors">FAQ</Link>
+            <Link to="/waitlist/support" className="hover:text-white transition-colors">Support</Link>
+          </nav>
         </div>
       </footer>
     </div>

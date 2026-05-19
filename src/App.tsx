@@ -29,6 +29,13 @@ const TermsPage          = lazy(() => import("./pages/TermsPage"));
 const ContactPage        = lazy(() => import("./pages/ContactPage"));
 const WaitlistPage       = lazy(() => import("./pages/WaitlistPage"));
 
+// Waitlist-specific info pages — pre-launch tone, distinct from the main
+// app's /privacy /terms /contact /faq routes which serve production users.
+const WaitlistPrivacyPage = lazy(() => import("./pages/waitlist/PrivacyPage"));
+const WaitlistTermsPage   = lazy(() => import("./pages/waitlist/TermsPage"));
+const WaitlistSupportPage = lazy(() => import("./pages/waitlist/SupportPage"));
+const WaitlistFAQPage     = lazy(() => import("./pages/waitlist/FAQPage"));
+
 // Set VITE_WAITLIST_MODE=true in Vercel to gate the public site behind the
 // waitlist. Anyone hitting "/" while signed out sees WaitlistPage instead of
 // LandingPage. Signed-in users still get the full app, and /login + /signup
@@ -96,6 +103,14 @@ function App() {
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/contact" element={<ContactPage />} />
+
+            {/* Waitlist-specific info pages — reachable only from the
+                waitlist footer; distinct namespace so they never collide
+                with the main app's policy/help routes above. */}
+            <Route path="/waitlist/privacy" element={<WaitlistPrivacyPage />} />
+            <Route path="/waitlist/terms"   element={<WaitlistTermsPage />} />
+            <Route path="/waitlist/support" element={<WaitlistSupportPage />} />
+            <Route path="/waitlist/faq"     element={<WaitlistFAQPage />} />
 
             {/* Protected Routes */}
             <Route element={<ProtectedRoute />}>
