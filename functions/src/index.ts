@@ -1,9 +1,5 @@
-// Sentry-wrapped versions of Firebase's onCall / onRequest / onDocumentCreated.
-// Every handler in this file is now automatically captured by Sentry when it
-// throws something unexpected — no per-handler boilerplate. Intentional 4xx
-// HttpsErrors (insufficient credits, sign-in-first, etc.) are filtered out
-// so the Sentry inbox stays signal-heavy. See sentry.ts for details.
-import { onCall, onRequest, onDocumentCreated, HttpsError } from "./sentry.js";
+import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
+import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import { generateClaudeMatchExplanation } from "./claudeExplainMatches.js";
