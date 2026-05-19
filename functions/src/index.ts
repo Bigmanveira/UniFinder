@@ -19,12 +19,6 @@ import {
   applyPaymentSucceeded,
   applyPaymentRefunded,
 } from "./dodoPayments.js";
-import {
-  initPaystackTransaction,
-  verifyPaystackWebhook,
-  applyPaystackChargeSuccess,
-  applyPaystackRefund,
-} from "./paystackPayments.js";
 
 admin.initializeApp();
 
@@ -33,7 +27,6 @@ const HEYGEN_API_KEY           = defineSecret("HEYGEN_API_KEY");
 const DODO_PAYMENTS_API_KEY    = defineSecret("DODO_PAYMENTS_API_KEY");
 const DODO_PAYMENTS_WEBHOOK_KEY = defineSecret("DODO_PAYMENTS_WEBHOOK_KEY");
 const RESEND_API_KEY           = defineSecret("RESEND_API_KEY");
-const PAYSTACK_SECRET_KEY      = defineSecret("PAYSTACK_SECRET_KEY");
 
 // ─── Instance caps ───────────────────────────────────────────────────────────
 // Audit 2026-05-15 surfaced that the project was running every callable with
@@ -119,29 +112,18 @@ const MAX_SUPPORTING_DOCS_PER_INTERVIEW = 3;
 // students who balk at $5. It's not enough for a visa interview but
 // buys 6 match-unlocks. ~70% margin per unlock comfortably absorbs
 // Dodo's per-transaction fee (~$0.30 + 3%) at the $2 level.
-//
-// Paystack switch (2026-05-18): we now charge in Ghana Cedis natively
-// instead of converting USD at checkout. `priceGhs` is the canonical
-// price the user sees and is charged. `priceUsd` is kept for analytics /
-// internal reporting only. `productId` is the legacy Dodo product id —
-// unused while Dodo is soft-disconnected, kept so a future re-enable is
-// a single flag flip.
-//
-// FX assumption: ₵13 ≈ $1 with a small buffer. Margins stay ≥ 50% even
-// if the Cedi weakens to ₵13.5/USD; below that we'd need to bump prices.
 export const CREDIT_PACKS: Record<string, {
-  productId:     string;   // Legacy Dodo product id (unused while disconnected)
-  label:         string;
-  priceGhs:      number;   // Canonical price: Ghana Cedis (₵)
-  priceUsd:      number;   // Historical / analytics reference only
-  credits:       number;
-  recommended?:  boolean;
+  productId: string;     // Dodo product id — set after creating products in dashboard
+  label: string;
+  priceUsd: number;      // What we charge
+  credits: number;       // What the user receives
+  recommended?: boolean;
 }> = {
-  try:     { productId: "pdt_0Nf7vOA8zsn1zSnsMRfp4", label: "Try",     priceGhs:   25, priceUsd:   2, credits:   6 },
-  starter: { productId: "pdt_0Nf7vZAZA3tbthN3LljwO", label: "Starter", priceGhs:   65, priceUsd:   5, credits:  15 },
-  plus:    { productId: "pdt_0Nf7w8zJF1lc9NCTR86bg", label: "Plus",    priceGhs:  195, priceUsd:  15, credits:  45, recommended: true },
-  pro:     { productId: "pdt_0Nf7wK2sInrt7WEyXNItP", label: "Pro",     priceGhs:  520, priceUsd:  40, credits: 120 },
-  power:   { productId: "pdt_0Nf7wUVLfwQ3WxRJ2vyKD", label: "Power",   priceGhs: 1300, priceUsd: 100, credits: 300 },
+  try:     { productId: "pdt_0Nf7vOA8zsn1zSnsMRfp4", label: "Try",     priceUsd:   2, credits:   6 },
+  starter: { productId: "pdt_0Nf7vZAZA3tbthN3LljwO", label: "Starter", priceUsd:   5, credits:  15 },
+  plus:    { productId: "pdt_0Nf7w8zJF1lc9NCTR86bg", label: "Plus",    priceUsd:  15, credits:  45, recommended: true },
+  pro:     { productId: "pdt_0Nf7wK2sInrt7WEyXNItP", label: "Pro",     priceUsd:  40, credits: 120 },
+  power:   { productId: "pdt_0Nf7wUVLfwQ3WxRJ2vyKD", label: "Power",   priceUsd: 100, credits: 300 },
 };
 // Greeting + DS-160 ask. The interview proper (real questions) doesn't begin
 // until BOTH the DS-160 confirmation page and the I-20 have been uploaded.
@@ -1663,8 +1645,7 @@ export const listCreditPacks = onCall({ ...LIGHT_OPTS }, async () => {
   return Object.entries(CREDIT_PACKS).map(([id, p]) => ({
     id,
     label:       p.label,
-    priceGhs:    p.priceGhs,
-    priceUsd:    p.priceUsd,    // analytics-only; client renders priceGhs
+    priceUsd:    p.priceUsd,
     credits:     p.credits,
     recommended: !!p.recommended,
   }));
@@ -1790,136 +1771,6 @@ export const dodoWebhook = onRequest(
     } catch (err: any) {
       console.error("[dodo] webhook processing error:", err?.message ?? err);
       // 500 so Dodo retries — transient Firestore issue, etc.
-      res.status(500).send("Webhook processing failed");
-    }
-  },
-);
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Paystack — credit-pack checkout + webhook
-// ─────────────────────────────────────────────────────────────────────────────
-// Same callable/webhook shape as Dodo. Frontend swaps one function name.
-// Switched to as primary on 2026-05-18 for the African market launch (better
-// fee structure, supports local cards + MTN MoMo + Vodafone Cash, faster KYC).
-
-/**
- * Create a Paystack transaction for the requested credit pack and return
- * the hosted-checkout URL the browser should redirect to. The client
- * supplies only the packId — pricing and credit amount come from the
- * server-side CREDIT_PACKS so a tampered client can't pay for the Try
- * pack and receive Power credits.
- */
-export const createPaystackCheckout = onCall(
-  { ...LIGHT_OPTS, secrets: [PAYSTACK_SECRET_KEY] },
-  async (request) => {
-    const uid = request.auth?.uid;
-    if (!uid)                throw new HttpsError("unauthenticated", "Sign in to buy credits");
-    const userEmail = request.auth?.token?.email;
-    if (!userEmail)          throw new HttpsError("failed-precondition", "Your account has no email — contact support");
-
-    const packId    = String(request.data?.packId ?? "");
-    const returnUrl = String(request.data?.returnUrl ?? "");
-    const pack = CREDIT_PACKS[packId];
-    if (!pack)               throw new HttpsError("invalid-argument", "Unknown credit pack");
-    if (!returnUrl.startsWith("https://") && !returnUrl.startsWith("http://localhost"))
-      throw new HttpsError("invalid-argument", "Invalid returnUrl");
-
-    const amountPesewas = pack.priceGhs * 100;
-
-    try {
-      const { checkoutUrl, reference } = await initPaystackTransaction({
-        secretKey:     PAYSTACK_SECRET_KEY.value(),
-        amountPesewas,
-        email:         userEmail,
-        callbackUrl:   returnUrl,
-        // Everything the webhook needs to credit the right user. Paystack
-        // echoes this back verbatim in the `data.metadata` field.
-        metadata: {
-          userId:         uid,
-          packId,
-          creditsToGrant: String(pack.credits),
-          amountPesewas:  String(amountPesewas),
-          priceGhs:       String(pack.priceGhs),
-        },
-      });
-      return { checkoutUrl, reference };
-    } catch (err: any) {
-      console.error("[paystack] checkout creation failed:", err?.message ?? err);
-      throw new HttpsError("internal", "Could not start checkout. Please try again.");
-    }
-  },
-);
-
-/**
- * Paystack webhook receiver. Verifies HMAC-SHA512 of the raw body using the
- * secret key, then dispatches by event type. Returns 200 for all known
- * outcomes (including duplicates and ignored event types) so Paystack
- * doesn't retry pointlessly. Bad signatures get 401 so Paystack stops too —
- * if it really IS Paystack and we're wrong, the dashboard will surface the
- * delivery failure and we can investigate.
- */
-export const paystackWebhook = onRequest(
-  { ...LIGHT_OPTS, secrets: [PAYSTACK_SECRET_KEY], cors: false },
-  async (req, res) => {
-    if (req.method !== "POST") {
-      res.status(405).send("Method not allowed");
-      return;
-    }
-
-    const rawBody   = (req.rawBody ?? Buffer.from("")).toString("utf8");
-    const signature = String(req.header("x-paystack-signature") ?? "");
-    if (!signature) {
-      res.status(400).send("Missing signature");
-      return;
-    }
-
-    const valid = verifyPaystackWebhook({
-      rawBody,
-      signature,
-      secretKey: PAYSTACK_SECRET_KEY.value(),
-    });
-    if (!valid) {
-      console.warn("[paystack] webhook signature invalid");
-      // 401 because the signature is wrong, not because Paystack is being
-      // weird. Returning 401 stops Paystack from retrying the same bad payload.
-      res.status(401).send("Invalid signature");
-      return;
-    }
-
-    let event;
-    try {
-      event = JSON.parse(rawBody);
-    } catch {
-      res.status(400).send("Invalid JSON");
-      return;
-    }
-
-    try {
-      if (event.event === "charge.success") {
-        const result = await applyPaystackChargeSuccess(event);
-        if (!result.applied && !result.duplicated) {
-          console.warn("[paystack] charge.success not applied:", result.reason);
-        }
-        res.status(200).json({ ok: result.applied, duplicated: !!result.duplicated });
-        return;
-      }
-      // Refunds + chargebacks reverse the credit grant. Paystack emits
-      // `refund.processed` for admin refunds and `charge.dispute.create`
-      // (or similar) for chargebacks.
-      if (event.event === "refund.processed" || event.event === "charge.dispute.create") {
-        const result = await applyPaystackRefund(event);
-        if (!result.applied && !result.duplicated) {
-          console.warn(`[paystack] ${event.event} not applied:`, result.reason);
-        }
-        res.status(200).json({ ok: result.applied, duplicated: !!result.duplicated });
-        return;
-      }
-      // Other events (charge.failed, transfer.success, etc.): log and 200.
-      console.log("[paystack] received event:", event.event);
-      res.status(200).json({ ignored: true });
-    } catch (err: any) {
-      console.error("[paystack] webhook processing error:", err?.message ?? err);
-      // 500 so Paystack retries on transient Firestore issues.
       res.status(500).send("Webhook processing failed");
     }
   },

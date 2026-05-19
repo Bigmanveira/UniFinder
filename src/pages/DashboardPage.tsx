@@ -5,6 +5,8 @@ import { auth, db, storage } from "../lib/firebase";
 import { signOut, sendPasswordResetEmail } from "firebase/auth";
 import { doc, getDoc, onSnapshot, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "../lib/firebase";
 import { LogOut, Plus, Wallet, Bookmark, FileText, ChevronRight, User, GraduationCap, MapPin, Sparkles, Camera, Globe, Trash2, ChevronDown, ChevronUp, ArrowRight, Heart, Map, Gift, Copy, Check, Send, Mail, Home, ShieldAlert, Menu, X, Bell, Mic, KeyRound, Loader2, AlertTriangle } from "lucide-react";
 import BrandLogo from "../components/BrandLogo";
 import { motion, AnimatePresence } from "framer-motion";
@@ -901,21 +903,27 @@ function ProfileTab({ user, username, onSignOut }: { user: any, username: string
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Billing tab — paid top-ups temporarily disabled while we switch payment
-// providers (away from Dodo Payments, toward Paystack for the African
-// market). Wallet balance + referral earnings remain fully active; the
-// pack-picker UI and checkout handler are hidden until Paystack is wired.
-// Return-from-Dodo banner kept so any in-flight tab returning to /app via
-// the old return URL still gets a sensible message instead of a blank page.
+// Billing tab — pulls credit packs from the backend, kicks off Dodo Payments
+// hosted checkout, and surfaces a success/cancel banner when the user is
+// bounced back from Dodo via return_url.
 // ─────────────────────────────────────────────────────────────────────────────
+type CreditPack = {
+  id:          string;
+  label:       string;
+  priceUsd:    number;
+  credits:     number;
+  recommended: boolean;
+};
 
 function BillingTab({ credits, userId }: { credits: number; userId: string | undefined }) {
+  const [packs, setPacks]   = useState<CreditPack[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [buying, setBuying] = useState<string | null>(null);
+  const [error, setError]   = useState("");
   const [returnStatus, setReturnStatus] = useState<"paid" | "cancelled" | null>(null);
 
-  // Read return_url query param Dodo bounced back with. We strip it from
-  // the URL so refreshing the page doesn't keep showing the banner. Kept
-  // post-disconnect so any user with a stale checkout tab landing here
-  // sees a graceful message.
+  // Read return_url query param Dodo bounces back with. We strip it from
+  // the URL so refreshing the page doesn't keep showing the banner.
   useEffect(() => {
     const url = new URL(window.location.href);
     const paid      = url.searchParams.get("paid");
@@ -930,6 +938,48 @@ function BillingTab({ credits, userId }: { credits: number; userId: string | und
       window.history.replaceState({}, "", url.toString());
     }
   }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const fn  = httpsCallable(functions, "listCreditPacks");
+        const res = await fn({});
+        if (mounted) setPacks(res.data as CreditPack[]);
+      } catch (err) {
+        console.error("Could not load credit packs:", err);
+        if (mounted) setError("Could not load pricing. Refresh and try again.");
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  const handleBuy = async (packId: string) => {
+    if (!userId) return;
+    setBuying(packId);
+    setError("");
+    try {
+      const base = window.location.origin;
+      // Dodo bounces back here with the same URL on success or failure; we
+      // use query params to know which happened. (Dodo doesn't currently
+      // differentiate success/cancel return URLs in their public docs, so
+      // we surface both as ?paid=1 and rely on the webhook for ground truth.)
+      const returnUrl = `${base}/app?tab=billing&paid=1`;
+      const fn  = httpsCallable(functions, "createDodoCheckout");
+      const res = await fn({ packId, returnUrl });
+      const data = res.data as { checkoutUrl?: string };
+      if (!data?.checkoutUrl) throw new Error("No checkout URL returned");
+      // Hard navigate — leaving SPA so on return the page boots fresh and
+      // wallet snapshot reflects the new balance.
+      window.location.href = data.checkoutUrl;
+    } catch (err: any) {
+      console.error("Checkout failed:", err);
+      setError(err?.message ?? "Could not start checkout. Please try again.");
+      setBuying(null);
+    }
+  };
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl">
@@ -979,35 +1029,74 @@ function BillingTab({ credits, userId }: { credits: number; userId: string | und
       {/* Referral card — earn 5 credits per friend */}
       <ReferralCard userId={userId} />
 
-      {/* Paid top-ups are temporarily hidden while we finalise our payment
-          partner for the African market (Paystack — coming soon; cards +
-          mobile money). Free credits, signup grant, and referral rewards
-          still work exactly as before. Backend code for the previous
-          processor is intact behind this flag; flip back when the new
-          provider is wired. */}
       <h3 className="text-xl font-black text-slate-900 mb-2">Top Up Credits</h3>
-      <p className="text-sm text-slate-500 mb-6">
-        Earn more credits today by inviting friends — paid top-ups are launching shortly with local payment options for African students.
-      </p>
+      <p className="text-sm text-slate-500 mb-6">Secure checkout by Dodo Payments. Credits post automatically once payment confirms.</p>
 
-      <div className="rounded-[32px] bg-gradient-to-br from-primary-50 via-white to-white border-2 border-primary-200 p-6 md:p-8">
-        <div className="flex items-start gap-4">
-          <div className="hidden sm:flex w-12 h-12 rounded-2xl bg-primary-100 items-center justify-center flex-shrink-0">
-            <Wallet size={22} className="text-primary-700" />
-          </div>
-          <div className="flex-1">
-            <p className="text-[10px] font-black tracking-widest text-primary-700 uppercase mb-1">Coming soon</p>
-            <h4 className="text-lg font-black text-slate-900 mb-2">Paid credit packs are launching shortly</h4>
-            <p className="text-sm text-slate-600 leading-relaxed mb-4">
-              We're finalising a payment partner that supports local African cards, mobile money (MTN MoMo, M-Pesa), and bank transfers — so paying for credits won't require an international card. In the meantime, every friend who joins via your link earns you 5 free credits, with no cap.
-            </p>
-            <p className="text-xs text-slate-500">
-              Have a question or want to be notified when packs are live? Email{" "}
-              <a className="underline font-bold text-primary-700" href="mailto:support@collegeready.io">support@collegeready.io</a>.
-            </p>
-          </div>
+      {error && (
+        <div className="mb-4 bg-rose-50 border border-rose-200 rounded-2xl p-3 text-sm text-rose-700 flex items-start gap-2">
+          <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
+          <span>{error}</span>
         </div>
-      </div>
+      )}
+
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {[0,1,2,3,4].map(i => (
+            <div key={i} className="bg-white rounded-[32px] p-6 border border-slate-100 shadow-sm h-56 animate-pulse" />
+          ))}
+        </div>
+      ) : (
+        // 5 packs at lg+ (Try / Starter / Plus / Pro / Power) — collapses to
+        // 2 columns at sm and 1 column on phones. Wrap is fine if the count
+        // changes again.
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+          {packs.map((pack) => {
+            const isBuying = buying === pack.id;
+            const perCredit = (pack.priceUsd / pack.credits).toFixed(2);
+            return (
+              <div
+                key={pack.id}
+                className={`relative rounded-[32px] p-6 md:p-7 shadow-sm transition-all ${
+                  pack.recommended
+                    ? "bg-primary-50 border-2 border-primary-500 shadow-lg sm:-translate-y-1"
+                    : "bg-white border border-slate-100 hover:border-primary-300 hover:shadow-xl"
+                }`}
+              >
+                {pack.recommended && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary-600 text-white text-[10px] font-black tracking-widest uppercase px-3 py-1 rounded-full whitespace-nowrap">
+                    Most Popular
+                  </div>
+                )}
+                <h4 className={`text-lg font-black mb-1 ${pack.recommended ? "text-primary-900" : "text-slate-900"}`}>{pack.label}</h4>
+                <p className={`text-xs font-medium mb-5 ${pack.recommended ? "text-primary-700/80" : "text-slate-500"}`}>
+                  ${perCredit} per credit
+                </p>
+                <div className="mb-5">
+                  <span className={`text-4xl font-black ${pack.recommended ? "text-primary-900" : "text-slate-900"}`}>${pack.priceUsd}</span>
+                  <span className={`font-bold ${pack.recommended ? "text-primary-700" : "text-slate-500"}`}> / {pack.credits} credits</span>
+                </div>
+                <button
+                  onClick={() => handleBuy(pack.id)}
+                  disabled={!!buying}
+                  className={`w-full inline-flex items-center justify-center gap-2 font-bold py-3.5 rounded-2xl transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+                    pack.recommended
+                      ? "bg-primary-600 text-white hover:bg-primary-700 shadow-lg shadow-primary-600/30"
+                      : "bg-slate-100 text-slate-900 hover:bg-slate-200"
+                  }`}
+                >
+                  {isBuying ? <Loader2 size={14} className="animate-spin" /> : null}
+                  {isBuying ? "Opening checkout…" : "Buy Now"}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <p className="text-[11px] text-slate-400 mt-6 leading-relaxed">
+        Payments are processed by Dodo Payments. We don't see or store your card details.
+        Refunds and disputes: contact <a className="underline" href="mailto:support@collegeready.io">support@collegeready.io</a>.
+      </p>
     </motion.div>
   );
 }
