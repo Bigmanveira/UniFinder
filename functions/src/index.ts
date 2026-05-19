@@ -20,6 +20,7 @@ import {
   applyPaymentRefunded,
 } from "./dodoPayments.js";
 import { sendPurchaseReceipt } from "./paymentReceiptEmail.js";
+import { sendWelcomeEmail } from "./welcomeEmail.js";
 
 admin.initializeApp();
 
@@ -1877,6 +1878,83 @@ export const onWaitlistEntry = onDocumentCreated(
       // until a manual retry succeeds and clears it.
       await snap.ref.set(
         { emailError: msg, emailErrorAt: admin.firestore.FieldValue.serverTimestamp() },
+        { merge: true },
+      );
+    }
+  },
+);
+
+// ============================================================
+// New-user welcome email — Resend
+// ============================================================
+/**
+ * Fires once when a new doc lands in `users/{userId}`. The client writes
+ * this doc as part of signup (rules allow create where auth.uid == userId).
+ * We look the user up in Firebase Auth to get their verified email +
+ * displayName, then send the welcome via Resend.
+ *
+ * Idempotency: the same `welcomeEmailSentAt` field guard the waitlist
+ * trigger uses. If a Cloud Function retry runs the trigger twice for the
+ * same user doc, the second run sees the stamp and exits early.
+ *
+ * Why we read the email from Auth instead of trusting the Firestore doc:
+ * the doc is client-written under permissive rules — a malicious client
+ * could write `email: "victim@x.com"` to send Joe-jobs through our domain.
+ * Auth holds the verified email from the IdP (Google/Apple); always trust
+ * that side.
+ */
+export const onUserCreated = onDocumentCreated(
+  { ...LIGHT_OPTS, document: "users/{userId}", secrets: [RESEND_API_KEY] },
+  async (event) => {
+    const snap = event.data;
+    if (!snap) {
+      console.warn("[users] trigger fired without snapshot data");
+      return;
+    }
+    const uid = event.params.userId;
+    const data = snap.data() ?? {};
+    if (data.welcomeEmailSentAt) {
+      console.log("[users] welcome email already sent for", uid, "skipping");
+      return;
+    }
+
+    // Authoritative email comes from Firebase Auth, NOT the Firestore doc.
+    let authUser: admin.auth.UserRecord;
+    try {
+      authUser = await admin.auth().getUser(uid);
+    } catch (err: any) {
+      console.warn("[users] no Firebase Auth record for", uid, "— skipping welcome", err?.message ?? err);
+      return;
+    }
+    const email = authUser.email;
+    if (!email) {
+      console.warn("[users] auth user has no email, skipping welcome", { uid });
+      return;
+    }
+
+    try {
+      const { id } = await sendWelcomeEmail({
+        apiKey:      RESEND_API_KEY.value(),
+        to:          email,
+        displayName: authUser.displayName,
+      });
+      await snap.ref.set(
+        {
+          welcomeEmailSentAt:    admin.firestore.FieldValue.serverTimestamp(),
+          welcomeEmailMessageId: id,
+          welcomeEmailError:     admin.firestore.FieldValue.delete(),
+        },
+        { merge: true },
+      );
+      console.log("[users] welcome email sent", { uid, email, messageId: id });
+    } catch (err: any) {
+      const msg = err?.message ?? String(err);
+      console.error("[users] welcome email failed", { uid, email, error: msg });
+      // Record but don't throw — Cloud Function retries would otherwise
+      // spam the user. Manual fix: clear welcomeEmailError on the doc and
+      // re-trigger (rewrite the doc) when Resend is healthy.
+      await snap.ref.set(
+        { welcomeEmailError: msg, welcomeEmailErrorAt: admin.firestore.FieldValue.serverTimestamp() },
         { merge: true },
       );
     }
