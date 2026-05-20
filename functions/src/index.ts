@@ -21,6 +21,7 @@ import {
 } from "./dodoPayments.js";
 import { sendPurchaseReceipt } from "./paymentReceiptEmail.js";
 import { sendWelcomeEmail } from "./welcomeEmail.js";
+import { logError } from "./errorLogger.js";
 
 admin.initializeApp();
 
@@ -809,6 +810,18 @@ async function loadLatestDocument(args: {
     };
   } catch (err: any) {
     console.warn("[visa] storage download failed:", err?.message);
+    void logError({
+      category: "storage",
+      source:   "visa.storage_download_failed",
+      severity: "error",
+      message:  err?.message ?? String(err),
+      userId:    args.uid,
+      sessionId: args.sessionId,
+      context:   {
+        documentType: args.documentType,
+        storagePath:  meta.storagePath,
+      },
+    });
     return null;
   }
 }
@@ -1598,6 +1611,15 @@ export const generateAvatarSpeech = onCall(
       return tts;
     } catch (err: any) {
       console.error("[avatarTts] synthesis failed:", err?.message);
+      void logError({
+        category: "tts",
+        source:   "google_tts.synthesis_failed",
+        severity: "error",
+        message:  err?.message ?? String(err),
+        userId:    uid,
+        sessionId,
+        context:   { textLength: text.length },
+      });
       throw new HttpsError("internal", err?.message ?? "TTS synthesis failed");
     }
   },
@@ -1761,6 +1783,13 @@ export const dodoWebhook = onRequest(
       });
     } catch (err: any) {
       console.warn("[dodo] webhook signature invalid:", err?.message ?? err);
+      void logError({
+        category: "payment_webhook",
+        source:   "dodo.signature_invalid",
+        severity: "error",
+        message:  err?.message ?? String(err),
+        context:  { webhookId, webhookTimestamp },
+      });
       // 400 so Dodo retries — could be a transient timestamp drift.
       res.status(400).send("Invalid signature");
       return;
@@ -1771,6 +1800,19 @@ export const dodoWebhook = onRequest(
         const result = await applyPaymentSucceeded(event);
         if (!result.applied && !result.duplicated) {
           console.warn("[dodo] payment.succeeded not applied:", result.reason);
+          // Pull correlation IDs from the event itself, not `result` —
+          // the not-applied result shape doesn't expose them.
+          const evData: any = (event as any).data ?? {};
+          const evMd: any   = evData.metadata ?? {};
+          void logError({
+            category: "payment_webhook",
+            source:   "dodo.payment_succeeded_not_applied",
+            severity: "error",
+            message:  result.reason ?? "payment.succeeded not applied",
+            paymentId: typeof evData.payment_id === "string" ? evData.payment_id : null,
+            userId:    typeof evMd.userId === "string" ? evMd.userId : null,
+            context:   { eventType: event.type, webhookId, packId: evMd.packId },
+          });
         }
         // Receipt email — fire-and-forget. We've already credited the
         // wallet; if Resend fails the customer still has their credits and
@@ -1789,10 +1831,34 @@ export const dodoWebhook = onRequest(
               paymentId:  result.paymentId,
             }).then(
               ({ id }) => console.log("[dodo] receipt email sent", { paymentId: result.paymentId, messageId: id }),
-              (err) => console.warn("[dodo] receipt email failed (credits already granted)", err?.message ?? err),
+              (err) => {
+                console.warn("[dodo] receipt email failed (credits already granted)", err?.message ?? err);
+                void logError({
+                  category: "email_send",
+                  source:   "dodo.receipt_email_failed",
+                  severity: "warning",   // non-fatal: credits already granted
+                  message:  err?.message ?? String(err),
+                  paymentId: result.paymentId,
+                  // applied:true shape doesn't expose userId; pull from
+                  // the webhook event metadata to keep ops correlation.
+                  userId:   typeof ((event as any).data?.metadata?.userId) === "string"
+                            ? (event as any).data.metadata.userId : null,
+                  context:  { packId: result.packId, customerEmail: result.customerEmail },
+                });
+              },
             );
           } else {
             console.warn("[dodo] no customer email on payment.succeeded — skipping receipt", { paymentId: result.paymentId });
+            void logError({
+              category: "payment_webhook",
+              source:   "dodo.no_customer_email",
+              severity: "warning",
+              message:  "payment.succeeded with no customer email — receipt skipped",
+              paymentId: result.paymentId,
+              userId:   typeof ((event as any).data?.metadata?.userId) === "string"
+                        ? (event as any).data.metadata.userId : null,
+              context:  { packId: result.packId },
+            });
           }
         }
         // `duplicated` only exists on the applied:false branch — narrow the
@@ -1811,6 +1877,17 @@ export const dodoWebhook = onRequest(
         const result = await applyPaymentRefunded(event);
         if (!result.applied && !result.duplicated) {
           console.warn(`[dodo] ${event.type} not applied:`, result.reason);
+          const evData: any = (event as any).data ?? {};
+          const evMd: any   = evData.metadata ?? {};
+          void logError({
+            category: "payment_webhook",
+            source:   `dodo.${event.type}_not_applied`,
+            severity: "error",
+            message:  result.reason ?? `${event.type} not applied`,
+            paymentId: typeof evData.payment_id === "string" ? evData.payment_id : null,
+            userId:    typeof evMd.userId === "string" ? evMd.userId : null,
+            context:   { eventType: event.type, webhookId },
+          });
         }
         res.status(200).json({ ok: result.applied, duplicated: !!result.duplicated });
         return;
@@ -1820,6 +1897,17 @@ export const dodoWebhook = onRequest(
       res.status(200).json({ ignored: true });
     } catch (err: any) {
       console.error("[dodo] webhook processing error:", err?.message ?? err);
+      void logError({
+        category: "payment_webhook",
+        source:   "dodo.webhook_processing_error",
+        severity: "error",
+        message:  err?.message ?? String(err),
+        context:  {
+          eventType: (event as any)?.type,
+          webhookId,
+          stack: typeof err?.stack === "string" ? err.stack.slice(0, 1000) : undefined,
+        },
+      });
       // 500 so Dodo retries — transient Firestore issue, etc.
       res.status(500).send("Webhook processing failed");
     }
@@ -1872,6 +1960,13 @@ export const onWaitlistEntry = onDocumentCreated(
     } catch (err: any) {
       const msg = err?.message ?? String(err);
       console.error("[waitlist] welcome email failed", { entryId: snap.id, email, error: msg });
+      void logError({
+        category: "email_send",
+        source:   "resend.waitlist_welcome_failed",
+        severity: "warning",   // non-fatal: entry persists, can be manually retried
+        message:  msg,
+        context:  { entryId: snap.id, email },
+      });
       // Record the error but DON'T throw — re-throwing would trigger Cloud
       // Function retries, which can spam users if the failure is downstream
       // (e.g. Resend domain not yet verified). The doc keeps `emailError`
@@ -1950,6 +2045,14 @@ export const onUserCreated = onDocumentCreated(
     } catch (err: any) {
       const msg = err?.message ?? String(err);
       console.error("[users] welcome email failed", { uid, email, error: msg });
+      void logError({
+        category: "email_send",
+        source:   "resend.user_welcome_failed",
+        severity: "warning",   // non-fatal: signup completed
+        message:  msg,
+        userId:   uid,
+        context:  { email },
+      });
       // Record but don't throw — Cloud Function retries would otherwise
       // spam the user. Manual fix: clear welcomeEmailError on the doc and
       // re-trigger (rewrite the doc) when Resend is healthy.

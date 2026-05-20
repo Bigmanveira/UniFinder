@@ -1,4 +1,5 @@
 import { logger } from "firebase-functions";
+import { logError } from "./errorLogger.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HeyGen LiveAvatar — backend token issuance.
@@ -89,12 +90,30 @@ export async function createHeyGenSessionToken(args: {
     });
   } catch (err: any) {
     logger.error("[liveAvatar] LiveAvatar network error:", err?.message);
+    void logError({
+      category: "external_api",
+      source:   "heygen.token_network_error",
+      severity: "error",
+      message:  err?.message ?? String(err),
+      userId:    args.userId,
+      sessionId: args.sessionId,
+      context:   { url: LIVEAVATAR_TOKEN_URL },
+    });
     return { ready: false, reason: "Could not reach the avatar service. Try again in a moment." };
   }
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     logger.warn(`[liveAvatar] LiveAvatar ${res.status}: ${body.slice(0, 300)}`);
+    void logError({
+      category: "external_api",
+      source:   "heygen.token_non_2xx",
+      severity: res.status === 429 ? "warning" : "error",   // 429 = transient
+      message:  `HeyGen token endpoint returned ${res.status}`,
+      userId:    args.userId,
+      sessionId: args.sessionId,
+      context:   { status: res.status, bodyPreview: body.slice(0, 300) },
+    });
     if (res.status === 401 || res.status === 403) {
       return { ready: false, reason: "LiveAvatar service rejected our key. Verify the key has streaming access." };
     }
