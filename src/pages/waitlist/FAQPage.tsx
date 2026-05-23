@@ -45,8 +45,7 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
       <>
         Yes, but the entry is low. New accounts start with{" "}
         <strong className="text-white">5 free credits</strong> (about 5 free match-report unlocks). Beyond that you
-        top up in small packs starting at $2. The full visa interview practice runs $5 at the entry tier. Final
-        pricing may shift before launch; current targets keep margin at 50%+ so we can keep building.
+        top up in small packs starting at $2. The full visa interview practice runs $5 at the entry tier.
       </>
     ),
   },
@@ -66,7 +65,7 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
     a: (
       <>
         You enter your academic profile (level, field, GPA, test scores, funding situation, target country). An AI
-        ranks U.S. schools against your specific situation, buckets them into reach / target / safety, and explains
+        ranks schools against your specific situation, buckets them into reach / target / safety, and explains
         in plain English why each one fits — including programme availability, funding paths, and what to strengthen
         in your application. Every match is cross-checked against verified programme data so you don't waste
         application fees on programmes that don't exist.
