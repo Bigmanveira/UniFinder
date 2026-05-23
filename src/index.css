@@ -19,11 +19,18 @@
 
 /* Hide the floating reCAPTCHA v3 badge globally. App Check still mints
    tokens in the background; we just don't want the badge in the corner
-   of every page. Per Google's TOS we MUST display the attribution text
-   wherever reCAPTCHA actually protects user input — that's done in-line
-   on the SignupPage and LoginPage via <RecaptchaAttribution />. */
+   of every page (including the waitlist). Per Google's TOS we MUST
+   display the attribution text wherever reCAPTCHA actually protects
+   user input — that's done in-line on the SignupPage and LoginPage via
+   <RecaptchaAttribution />. The waitlist signup form doesn't get
+   attribution because the user explicitly didn't want any reCAPTCHA UI
+   on that surface; the token mint still happens silently for the
+   Firestore write that adds the email.
+   `display: none` removes it from layout entirely (stronger than
+   visibility:hidden which keeps a hidden box). */
 .grecaptcha-badge {
   visibility: hidden !important;
+  display: none !important;
 }
 
 @layer utilities {
