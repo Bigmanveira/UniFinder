@@ -17,6 +17,15 @@
   }
 }
 
+/* Hide the floating reCAPTCHA v3 badge globally. App Check still mints
+   tokens in the background; we just don't want the badge in the corner
+   of every page. Per Google's TOS we MUST display the attribution text
+   wherever reCAPTCHA actually protects user input — that's done in-line
+   on the SignupPage and LoginPage via <RecaptchaAttribution />. */
+.grecaptcha-badge {
+  visibility: hidden !important;
+}
+
 @layer utilities {
   .dot-grid-bg {
     background-image: radial-gradient(circle at 1px 1px, #e2e8f0 1px, transparent 0);

@@ -6,6 +6,7 @@ import { httpsCallable } from "firebase/functions";
 import { auth, googleProvider, db, functions } from "../lib/firebase";
 import { ArrowRight, Mail, Lock } from "lucide-react";
 import BrandLogo from "../components/BrandLogo";
+import RecaptchaAttribution from "../components/RecaptchaAttribution";
 import { motion } from "framer-motion";
 import {
   captureReferralCodeFromUrl,
@@ -230,14 +231,18 @@ export default function SignupPage() {
               </div>
             </div>
 
-            <button 
-              disabled={loading} 
-              type="submit" 
+            <button
+              disabled={loading}
+              type="submit"
               className="w-full bg-primary-600 text-white font-bold py-4 rounded-2xl mt-4 hover:bg-primary-700 transition-transform active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg shadow-primary-600/25 disabled:opacity-50"
             >
               {loading ? "Creating..." : "Sign Up Free"} <ArrowRight size={18} />
             </button>
           </form>
+
+          <div className="mt-5">
+            <RecaptchaAttribution />
+          </div>
 
           <p className="text-sm font-medium text-slate-500 text-center mt-8">
             Already have an account? <Link to={loginHref} className="text-primary-600 font-black hover:underline">Log in</Link>
