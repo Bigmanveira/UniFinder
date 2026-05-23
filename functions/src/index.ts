@@ -22,6 +22,7 @@ import {
 import { sendPurchaseReceipt } from "./paymentReceiptEmail.js";
 import { sendWelcomeEmail } from "./welcomeEmail.js";
 import { logError } from "./errorLogger.js";
+import { createRateLimiter, extractClientIp } from "./rateLimiter.js";
 
 admin.initializeApp();
 
@@ -56,6 +57,31 @@ const LIGHT_OPTS = { maxInstances: 50 } as const;
 // per function — fine for the latency win on the most-impactful UX path.
 // At higher scale (>10k DAU) raise minInstances proportionally.
 const HOT_OPTS  = { maxInstances: 50, concurrency: 40, minInstances: 1 } as const;
+
+// ─── Rate limiters (replace the App Check we removed 2026-05-23) ─────────
+// Per-IP, in-memory, persist on each warm Cloud Run instance. Module-scope
+// so the same Map serves every invocation on a hot instance. See
+// rateLimiter.ts for the threat-model reasoning behind in-memory vs
+// Firestore-backed.
+
+// aiMatchSchoolsCallable: anonymous endpoint (used by the /results preview
+// before signup). 50 calls per IP per hour is comfortable for a real user
+// session — they'd typically run 2-5 — and tight enough that a curl loop
+// from one IP burns at most ~$4 of Claude before the cap. Combined with
+// maxInstances:50, total damage rate stays bounded even if multiple IPs
+// collude.
+const aiMatchRateLimit = createRateLimiter({
+  maxPerWindow: 50,
+  windowMs:     60 * 60 * 1000,   // 1 hour
+});
+
+// submitWaitlist: anonymous public-form endpoint. Legit users hit this
+// once. 5 per hour per IP comfortably covers people on shared NAT (cafe,
+// school, office) without letting a single IP spam-sign fake emails.
+const waitlistRateLimit = createRateLimiter({
+  maxPerWindow: 5,
+  windowMs:     60 * 60 * 1000,   // 1 hour
+});
 
 // ─── Credit pricing ──────────────────────────────────────────────────────────
 // Single source of truth for every credit-deducting action. Keeping these as
@@ -363,6 +389,20 @@ export const aiMatchSchoolsCallable = onCall(
   async (request) => {
     const uid = request.auth?.uid;
     void uid; // anonymous matching is allowed (used during /results preview)
+
+    // Per-IP rate limit. Anonymous endpoint that calls Claude Sonnet —
+    // without this, a curl loop from one IP could burn Anthropic budget
+    // until maxInstances saturates. 50/hour gives real users plenty of
+    // headroom; abusers hit the wall fast.
+    const ip = extractClientIp(request.rawRequest);
+    const check = aiMatchRateLimit(ip);
+    if (!check.allowed) {
+      const retrySec = Math.ceil(check.retryAfterMs / 1000);
+      throw new HttpsError(
+        "resource-exhausted",
+        `Too many match-ranking requests from your IP. Try again in ${retrySec}s.`,
+      );
+    }
 
     const { profile, candidates } = request.data ?? {};
     if (!profile || typeof profile !== "object") {
@@ -1913,6 +1953,89 @@ export const dodoWebhook = onRequest(
     }
   },
 );
+
+// ============================================================
+// Waitlist submission (rate-limited public callable)
+// ============================================================
+/**
+ * Public-facing callable that the waitlist landing form invokes instead
+ * of writing to Firestore directly. Replaces the direct-write path on
+ * 2026-05-23 when we removed App Check enforcement — the function is
+ * the chokepoint where we can validate input + rate-limit per IP +
+ * dedupe per email so the abuse surface stays small.
+ *
+ * Validation:
+ *   • Email regex (same shape we used in the old Firestore rule)
+ *   • Length bounds (3 < len < 200)
+ *   • Lowercased + trimmed before storage
+ *
+ * Rate limit:
+ *   • 5 submissions per IP per hour. Real users sign up once; this
+ *     covers shared-NAT scenarios (cafe / school) without inviting spam.
+ *
+ * Dedup:
+ *   • Email is the document id, so the same address can't be spam-
+ *     submitted. addDoc with merge:false on an existing doc would fail;
+ *     we explicitly check existence and return idempotently.
+ *
+ * The existing onWaitlistEntry trigger still fires on the resulting
+ * doc create and sends the Resend welcome email — no change to that
+ * pipeline.
+ */
+export const submitWaitlist = onCall({ ...LIGHT_OPTS }, async (request) => {
+  const ip = extractClientIp(request.rawRequest);
+
+  // Rate limit FIRST so a flood hits the lightest possible code path.
+  const check = waitlistRateLimit(ip);
+  if (!check.allowed) {
+    const retrySec = Math.ceil(check.retryAfterMs / 1000);
+    throw new HttpsError(
+      "resource-exhausted",
+      `Too many signup attempts from your network. Try again in ${retrySec}s.`,
+    );
+  }
+
+  // Validate input
+  const rawEmail = String(request.data?.email ?? "").trim().toLowerCase();
+  if (rawEmail.length < 4 || rawEmail.length > 200) {
+    throw new HttpsError("invalid-argument", "Invalid email length.");
+  }
+  // Same RFC-ish regex we kept in firestore.rules for the old direct-write
+  // path; keeps validation consistent between the two surfaces.
+  if (!/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(rawEmail)) {
+    throw new HttpsError("invalid-argument", "That doesn't look like a valid email.");
+  }
+
+  const ref = String(request.data?.ref ?? "").slice(0, 200) || null;
+  const ua  = typeof request.rawRequest?.headers?.["user-agent"] === "string"
+    ? String(request.rawRequest.headers["user-agent"]).slice(0, 200)
+    : null;
+
+  const db = admin.firestore();
+  // Use the email itself as the doc id so duplicate submissions are a
+  // no-op rather than an additional Resend send. Firestore doc ids
+  // can't contain slashes; emails don't either, so a direct use is
+  // safe. We collapse the `@` to keep the doc id printable in the
+  // console but unique to this email.
+  const docId = rawEmail.replace(/[^A-Za-z0-9._-]/g, "_");
+  const docRef = db.collection("waitlist").doc(docId);
+
+  const existing = await docRef.get();
+  if (existing.exists) {
+    // Idempotent: same email already on the list. Don't fire the trigger
+    // again (which would send another welcome email).
+    return { ok: true, status: "already_on_list" };
+  }
+
+  await docRef.set({
+    email:     rawEmail,
+    ref,
+    userAgent: ua,
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+  });
+
+  return { ok: true, status: "added" };
+});
 
 // ============================================================
 // Waitlist welcome email — Resend

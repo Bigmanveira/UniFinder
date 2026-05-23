@@ -2,8 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { ArrowRight, Check, AlertTriangle } from "lucide-react";
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
-import { db } from "../lib/firebase";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "../lib/firebase";
 import webLogo from "../assets/weblogo.png";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -125,16 +125,28 @@ export default function WaitlistPage() {
     }
     setStatus({ kind: "submitting" });
     try {
-      await addDoc(collection(db, "waitlist"), {
-        email:     trimmedEmail,
-        ref:       new URLSearchParams(window.location.search).get("ref") ?? null,
-        userAgent: typeof navigator !== "undefined" ? navigator.userAgent.slice(0, 200) : null,
-        createdAt: serverTimestamp(),
+      // Calls submitWaitlist Cloud Function (rate-limited per IP, validates
+      // email, dedupes per address). Replaces the old direct-write path
+      // when we removed App Check on 2026-05-23.
+      const fn = httpsCallable(functions, "submitWaitlist");
+      await fn({
+        email: trimmedEmail,
+        ref:   new URLSearchParams(window.location.search).get("ref") ?? null,
       });
       setStatus({ kind: "submitted" });
     } catch (err: any) {
       console.error("Waitlist submit failed:", err);
-      setStatus({ kind: "error", message: "Couldn't save your spot — please try again in a moment." });
+      // The function throws HttpsError("resource-exhausted") on rate-limit;
+      // surface a friendlier message in that case so the user understands
+      // what to do.
+      const code = err?.code ?? "";
+      if (code === "functions/resource-exhausted" || /resource-exhausted/i.test(String(err?.message ?? ""))) {
+        setStatus({ kind: "error", message: "Too many signup attempts from your network. Try again in a few minutes." });
+      } else if (code === "functions/invalid-argument") {
+        setStatus({ kind: "error", message: err?.message ?? "That doesn't look like a valid email." });
+      } else {
+        setStatus({ kind: "error", message: "Couldn't save your spot — please try again in a moment." });
+      }
     }
   };
 

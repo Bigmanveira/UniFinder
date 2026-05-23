@@ -114,13 +114,13 @@ service cloud.firestore {
     // header-injection or noisy DB entries. Old regex `^[^@]+@[^@]+\.[^@]+$`
     // would match e.g. "foo\nBcc: victim@x.com@host.com" in CEL's regex
     // engine. The new pattern explicitly whitelists RFC-ish characters.
+    // Waitlist signups now flow through the `submitWaitlist` Cloud Function
+    // (validation + per-IP rate limit + per-email dedup). Direct client
+    // writes are blocked — the function uses Admin SDK which bypasses
+    // these rules anyway. Reads stay admin-only for the ops portal.
     match /waitlist/{entryId} {
       allow read: if isAdmin();
-      allow create: if request.resource.data.email is string
-        && request.resource.data.email.size() > 3
-        && request.resource.data.email.size() < 200
-        && request.resource.data.email.matches('^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$');
-      allow update, delete: if false;
+      allow write: if false;
     }
 
     // Dodo Payments — one record per fulfilled purchase, written by the
