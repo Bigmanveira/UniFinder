@@ -364,6 +364,82 @@ export default function VisaInterviewPage() {
     );
   }
 
+  // Active phase renders a full-bleed dark layout (Zoom/Meet-style) so the
+  // avatar dominates the screen and the controls float as overlays. Intro
+  // and report phases keep the existing light page chrome — they're more
+  // document-like and deserve the standard header+main shell.
+  if (phase === "active" && sessionId) {
+    return (
+      <>
+        <FullScreenInterview
+          sessionId={sessionId}
+          latestOfficer={latestOfficer}
+          stage={stage}
+          ending={ending}
+          messageCount={messages.length}
+          fatalReason={fatalReason}
+          error={error}
+          onAvatarLive={handleAvatarLive}
+          onAvatarSpeakStarted={handleAvatarSpeakStarted}
+          onAvatarSpeakEnded={handleAvatarSpeakEnded}
+          onAvatarTtsFailed={handleAvatarTtsFailed}
+          onAvatarFallback={handleAvatarFallback}
+          onMicRetry={handleMicRetry}
+          onEnd={endInterview}
+        />
+        {/* Document upload modal sits at the page level so it overlays the
+            full-screen interview without any z-index gymnastics. */}
+        {user && pendingUpload && (
+          <DocumentUploadModal
+            open
+            onClose={() => setPendingUpload(null)}
+            userId={user.uid}
+            sessionId={sessionId}
+            documentType={pendingUpload}
+            allowSkip={pendingUpload !== "i20" && pendingUpload !== "ds160_confirmation"}
+            onUploaded={async (docType) => {
+              try {
+                const fn = httpsCallable(functions, "recordVisaInterviewDocument", { timeout: 90_000 });
+                const res = await fn({ sessionId, documentType: docType });
+                const data = res.data as {
+                  requiresDocumentUpload: VisaDocumentType | null;
+                  interviewStarted: boolean;
+                  isFinalQuestion?: boolean;
+                };
+                if (data.requiresDocumentUpload) {
+                  setPendingUploadAfterSpeech(data.requiresDocumentUpload);
+                }
+                if (data.isFinalQuestion) setPendingEndAfterSpeech(true);
+              } catch (e: any) {
+                console.error("[visa] recordVisaInterviewDocument failed:", e);
+                setError(e?.message ?? "Could not record the upload. Try again.");
+              }
+            }}
+            onSkipped={async (docType) => {
+              try {
+                const fn = httpsCallable(functions, "recordVisaInterviewDocument", { timeout: 90_000 });
+                const res = await fn({ sessionId, documentType: docType, skipped: true });
+                const data = res.data as {
+                  requiresDocumentUpload: VisaDocumentType | null;
+                  isFinalQuestion?: boolean;
+                };
+                if (data.requiresDocumentUpload) {
+                  setPendingUploadAfterSpeech(data.requiresDocumentUpload);
+                }
+                if (data.isFinalQuestion) setPendingEndAfterSpeech(true);
+              } catch (e: any) {
+                console.error("[visa] skip failed:", e);
+                setError(e?.message ?? "Could not skip the document. Try again.");
+                setStage("listening");
+                speech.start();
+              }
+            }}
+          />
+        )}
+      </>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-blue-50/30 to-white text-slate-900 antialiased pb-20 relative overflow-hidden">
       <div className="pointer-events-none absolute top-[-100px] right-[-100px] w-[440px] h-[440px] bg-blue-200/40 rounded-full blur-[120px]" aria-hidden />
@@ -402,24 +478,6 @@ export default function VisaInterviewPage() {
               speechSupported={speech.isSupported}
             />
           </div>
-        )}
-
-        {phase === "active" && sessionId && (
-          <ActiveInterviewLayout
-            sessionId={sessionId}
-            latestOfficer={latestOfficer}
-            stage={stage}
-            ending={ending}
-            messageCount={messages.length}
-            fatalReason={fatalReason}
-            onAvatarLive={handleAvatarLive}
-            onAvatarSpeakStarted={handleAvatarSpeakStarted}
-            onAvatarSpeakEnded={handleAvatarSpeakEnded}
-            onAvatarTtsFailed={handleAvatarTtsFailed}
-            onAvatarFallback={handleAvatarFallback}
-            onMicRetry={handleMicRetry}
-            onEnd={endInterview}
-          />
         )}
 
         {phase === "report" && report && (
@@ -493,12 +551,13 @@ export default function VisaInterviewPage() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Active interview layout: avatar centered, status pill, end button.
-// No chat — the user's answers and officer questions live in the audio
-// channel only (and in the post-interview report).
+// FullScreenInterview — immersive Zoom/Meet-style layout for the active
+// phase. Dark backdrop, avatar centred and dominant, all chrome floats as
+// overlays. Reuses every callback and the state machine wholesale; only
+// the visual presentation changed.
 // ─────────────────────────────────────────────────────────────────────────────
-function ActiveInterviewLayout({
-  sessionId, latestOfficer, stage, ending, messageCount, fatalReason,
+function FullScreenInterview({
+  sessionId, latestOfficer, stage, ending, messageCount, fatalReason, error,
   onAvatarLive, onAvatarSpeakStarted, onAvatarSpeakEnded, onAvatarTtsFailed, onAvatarFallback, onMicRetry, onEnd,
 }: {
   sessionId:            string;
@@ -507,6 +566,7 @@ function ActiveInterviewLayout({
   ending:               boolean;
   messageCount:         number;
   fatalReason:          string | null;
+  error:                string;
   onAvatarLive:         () => void;
   onAvatarSpeakStarted: () => void;
   onAvatarSpeakEnded:   () => void;
@@ -516,109 +576,178 @@ function ActiveInterviewLayout({
   onEnd:                () => Promise<void>;
 }) {
   return (
-    <div className="max-w-2xl mx-auto flex flex-col items-center gap-5">
-      <div className="w-full">
-        <LiveAvatarPanel
-          sessionId={sessionId}
-          officerSpeech={latestOfficer}
-          onLive={onAvatarLive}
-          onSpeakStarted={onAvatarSpeakStarted}
-          onSpeakEnded={onAvatarSpeakEnded}
-          onTtsFailed={onAvatarTtsFailed}
-          onFallback={onAvatarFallback}
-        />
+    <div className="fixed inset-0 z-40 bg-slate-950 text-white overflow-hidden">
+      {/* Soft ambient glow behind the avatar — gives the dark background
+          some life without distracting from the video. */}
+      <div className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80vmin] h-[80vmin] bg-blue-500/10 rounded-full blur-[120px]" aria-hidden />
+      <div className="pointer-events-none absolute bottom-0 right-0 w-[40vmin] h-[40vmin] bg-cyan-500/10 rounded-full blur-[100px]" aria-hidden />
+
+      {/* ── Avatar — centered, sized to fit the viewport. The internal
+            LiveAvatarPanel maintains its own aspect ratio (3:4 on mobile,
+            16:9 on sm+). We just give it room to breathe. ───────────── */}
+      <div className="absolute inset-0 flex items-center justify-center px-4 sm:px-8 pt-20 pb-44 sm:pb-40">
+        <div className="w-full h-full max-w-5xl flex items-center justify-center">
+          <div className="w-full max-h-full">
+            <LiveAvatarPanel
+              sessionId={sessionId}
+              officerSpeech={latestOfficer}
+              onLive={onAvatarLive}
+              onSpeakStarted={onAvatarSpeakStarted}
+              onSpeakEnded={onAvatarSpeakEnded}
+              onTtsFailed={onAvatarTtsFailed}
+              onFallback={onAvatarFallback}
+            />
+          </div>
+        </div>
       </div>
 
-      <StatusPill stage={stage} />
+      {/* ── Top overlay — back link + simulation badge ────────────────── */}
+      <div className="absolute top-0 left-0 right-0 z-10 px-4 sm:px-6 py-4 flex items-center justify-between pointer-events-none">
+        <Link
+          to="/app"
+          className="pointer-events-auto inline-flex items-center gap-2 px-3 py-2 rounded-full bg-white/5 hover:bg-white/15 backdrop-blur-md border border-white/10 text-sm font-semibold text-white/90 hover:text-white transition-colors"
+          aria-label="Back to dashboard"
+        >
+          <ArrowLeft size={14} />
+          <span className="hidden sm:inline">Dashboard</span>
+        </Link>
+        <span className="pointer-events-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/15 backdrop-blur-md border border-amber-400/30 text-amber-200 text-[11px] font-bold tracking-widest uppercase">
+          <ShieldAlert size={11} /> Simulation
+        </span>
+      </div>
 
-      {/* Listening indicator — kept as a minimal "your turn" affordance, but
-          NOT showing the live transcript text. Users said reading their own
-          words being typed back at them was distracting; the StatusPill
-          already communicates "your turn" clearly enough. */}
-      {stage === "listening" && (
-        <div className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 shadow-sm min-h-[3rem]">
-          <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">You</p>
-          <p className="text-sm text-slate-400 leading-relaxed">
-            Listening… speak when ready.
-          </p>
+      {/* ── Bottom overlay — status pill + end button ─────────────────── */}
+      <div className="absolute bottom-0 left-0 right-0 z-10 px-4 sm:px-6 pb-5 sm:pb-7 flex flex-col items-center gap-4 pointer-events-none">
+        {/* Error banner (rendered above the pill when present). Surfaces
+            credit-exhausted etc. inside the immersive shell. */}
+        {error && (
+          <div className="pointer-events-auto max-w-md w-full bg-rose-500/15 backdrop-blur-md border border-rose-400/40 rounded-2xl px-4 py-3 text-sm text-rose-100 flex items-start gap-2.5 shadow-lg shadow-rose-900/30">
+            <AlertTriangle size={14} className="mt-0.5 flex-shrink-0 text-rose-300" />
+            <span className="flex-1 leading-relaxed">{error}</span>
+            {error.includes("credits") && (
+              <Link to="/app" className="text-xs font-bold underline text-rose-200 hover:text-white flex-shrink-0">Get credits</Link>
+            )}
+          </div>
+        )}
+
+        {/* Mic-blocked recovery card — only shown when the speech hook says
+            permission was denied. Overlays everything else with a clear
+            call-to-action. */}
+        {stage === "micBlocked" && (
+          <div className="pointer-events-auto max-w-md w-full bg-amber-500/15 backdrop-blur-md border border-amber-400/40 rounded-2xl px-5 py-4 text-sm text-amber-50 shadow-xl shadow-amber-900/30">
+            <p className="font-bold mb-2 flex items-center gap-2"><MicOff size={15} /> Microphone access blocked</p>
+            <p className="leading-relaxed mb-3 text-amber-100/90">
+              Enable microphone access for this site in your browser (look for the mic icon in the address bar), then tap Retry.
+            </p>
+            <button
+              onClick={onMicRetry}
+              className="inline-flex items-center gap-2 bg-amber-400 hover:bg-amber-300 text-amber-950 text-sm font-bold px-4 py-2.5 rounded-xl transition-colors active:scale-[0.99]"
+            >
+              <Mic size={14} /> Retry microphone
+            </button>
+          </div>
+        )}
+
+        {/* Fatal-error card — interview can't continue. Stops the user
+            from tapping End on an empty transcript. */}
+        {stage === "failed" && (
+          <div className="pointer-events-auto max-w-md w-full bg-rose-500/15 backdrop-blur-md border border-rose-400/40 rounded-2xl px-5 py-4 text-sm text-rose-50 shadow-xl shadow-rose-900/30">
+            <p className="font-bold mb-1.5">Interview cannot continue.</p>
+            <p className="leading-relaxed text-rose-100/90">{fatalReason ?? "The avatar service is unavailable. Try again in a few minutes; your credit will be refunded if no answers were recorded."}</p>
+          </div>
+        )}
+
+        {/* Status pill — the centrepiece "what's happening" indicator. */}
+        <div className="pointer-events-auto">
+          <BeautifulStatusPill stage={stage} />
         </div>
-      )}
 
-      {stage === "failed" && (
-        <div className="w-full bg-rose-50 border border-rose-200 rounded-2xl px-4 py-3 text-sm text-rose-800">
-          <p className="font-semibold mb-1">Interview cannot continue.</p>
-          <p className="leading-relaxed">{fatalReason ?? "The avatar service is unavailable. Try again in a few minutes; your credit will be refunded if no answers were recorded."}</p>
-        </div>
-      )}
-
-      {stage === "micBlocked" && (
-        <div className="w-full bg-amber-50 border border-amber-200 rounded-2xl px-4 py-4 text-sm text-amber-900">
-          <p className="font-semibold mb-2 flex items-center gap-2"><MicOff size={15} /> Microphone access blocked</p>
-          <p className="leading-relaxed mb-3">
-            Enable microphone access for this site in your browser (look for the mic icon in the address bar), then tap Retry. Your interview will pick up where it left off.
-          </p>
-          <button
-            onClick={onMicRetry}
-            className="inline-flex items-center gap-2 bg-amber-900 hover:bg-amber-950 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-colors active:scale-[0.99]"
-          >
-            <Mic size={14} /> Retry microphone
-          </button>
-        </div>
-      )}
-
-      <button
-        onClick={onEnd}
-        disabled={ending || messageCount === 0}
-        className="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold px-5 py-3 rounded-2xl transition-all active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-slate-900/20"
-      >
-        {ending ? <Loader2 size={14} className="animate-spin" /> : <StopCircle size={14} />}
-        {ending ? "Scoring your interview…" : "End interview & get feedback"}
-      </button>
-
-      <p className="text-[11px] text-slate-500 text-center max-w-md leading-relaxed">
-        Tap the button above when you're ready to wrap up. You'll get a written score and feedback on what to improve.
-      </p>
+        {/* End interview CTA — the only persistent control besides the
+            top-left back button. Subtle glass treatment matches the rest
+            of the overlay vocabulary. */}
+        <button
+          onClick={onEnd}
+          disabled={ending || messageCount === 0}
+          className="pointer-events-auto inline-flex items-center justify-center gap-2 bg-white text-slate-900 hover:bg-slate-100 disabled:bg-white/20 disabled:text-white/60 disabled:cursor-not-allowed text-sm font-bold px-5 py-3 rounded-2xl transition-all active:scale-[0.99] shadow-xl shadow-black/40"
+        >
+          {ending ? <Loader2 size={14} className="animate-spin" /> : <StopCircle size={14} />}
+          {ending ? "Scoring your interview…" : "End interview & get feedback"}
+        </button>
+      </div>
     </div>
   );
 }
 
-function StatusPill({ stage }: { stage: ActiveStage }) {
-  const map: Record<ActiveStage, { icon: React.ReactNode; label: string; className: string }> = {
+// ─────────────────────────────────────────────────────────────────────────────
+// BeautifulStatusPill — glassmorphism, per-stage colourway, animated mic
+// halo + audio-bar EQ on the "Listening" state. Designed to sit on a dark
+// backdrop so every variant uses translucent fills with subtle borders.
+// ─────────────────────────────────────────────────────────────────────────────
+function BeautifulStatusPill({ stage }: { stage: ActiveStage }) {
+  // "Listening" gets its own treatment because it's the user's turn —
+  // the moment that needs to feel alive. Animated halo around the mic
+  // plus EQ bars communicate "we hear you" before the user even speaks.
+  if (stage === "listening") {
+    return (
+      <div className="inline-flex items-center gap-3 pl-2 pr-5 py-2 rounded-full bg-emerald-500/15 backdrop-blur-xl border border-emerald-300/40 text-emerald-50 shadow-xl shadow-emerald-900/30">
+        {/* Mic chip with pulsing halo. The outer span animates a ping
+            that radiates outward; the inner circle holds the icon. */}
+        <span className="relative flex items-center justify-center w-9 h-9 flex-shrink-0">
+          <span className="absolute inset-0 rounded-full bg-emerald-400/40 animate-ping" />
+          <span className="absolute inset-0 rounded-full bg-emerald-400/20" />
+          <span className="relative w-7 h-7 rounded-full bg-gradient-to-br from-emerald-300 to-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/40">
+            <Mic size={13} className="text-emerald-950" />
+          </span>
+        </span>
+        <span className="text-sm font-bold tracking-tight">Listening</span>
+        {/* EQ bars — five staggered vertical bars, each on its own
+            scaleY animation delay so the dance looks organic. */}
+        <span className="flex items-end gap-[3px] h-4 ml-0.5" aria-hidden>
+          <span className="w-[3px] h-full rounded-full bg-emerald-200/90 animate-audio-bar" />
+          <span className="w-[3px] h-full rounded-full bg-emerald-200/90 animate-audio-bar animate-audio-bar-delay-1" />
+          <span className="w-[3px] h-full rounded-full bg-emerald-200/90 animate-audio-bar animate-audio-bar-delay-2" />
+          <span className="w-[3px] h-full rounded-full bg-emerald-200/90 animate-audio-bar animate-audio-bar-delay-3" />
+          <span className="w-[3px] h-full rounded-full bg-emerald-200/90 animate-audio-bar animate-audio-bar-delay-4" />
+        </span>
+      </div>
+    );
+  }
+
+  // Every other state shares the same glassmorphism shell — just different
+  // colour + icon. Keeps the visual rhythm coherent as the pill transitions.
+  const variant: Record<Exclude<ActiveStage, "listening">, { icon: React.ReactNode; label: string; cls: string }> = {
     connecting: {
-      icon: <Loader2 size={13} className="animate-spin" />,
+      icon:  <Loader2 size={13} className="animate-spin" />,
       label: "Connecting officer…",
-      className: "bg-slate-100 text-slate-700 border-slate-200",
+      cls:   "bg-slate-500/15 border-slate-300/30 text-slate-100",
     },
     speaking: {
-      icon: <Volume2 size={13} />,
+      icon:  <Volume2 size={14} className="text-blue-200" />,
       label: "Officer is speaking",
-      className: "bg-blue-50 text-blue-700 border-blue-200",
-    },
-    listening: {
-      icon: <Mic size={13} className="animate-pulse" />,
-      label: "Listening — your turn",
-      className: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      cls:   "bg-blue-500/15 border-blue-300/40 text-blue-50",
     },
     processing: {
-      icon: <Loader2 size={13} className="animate-spin" />,
+      icon:  <Loader2 size={13} className="animate-spin text-amber-200" />,
       label: "Officer is thinking…",
-      className: "bg-amber-50 text-amber-700 border-amber-200",
+      cls:   "bg-amber-500/15 border-amber-300/40 text-amber-50",
     },
     micBlocked: {
-      icon: <MicOff size={13} />,
+      icon:  <MicOff size={13} className="text-amber-200" />,
       label: "Microphone needed",
-      className: "bg-amber-50 text-amber-800 border-amber-200",
+      cls:   "bg-amber-500/15 border-amber-300/40 text-amber-50",
     },
     failed: {
-      icon: <AlertTriangle size={13} />,
+      icon:  <AlertTriangle size={13} className="text-rose-200" />,
       label: "Connection failed",
-      className: "bg-rose-50 text-rose-700 border-rose-200",
+      cls:   "bg-rose-500/15 border-rose-300/40 text-rose-50",
     },
   };
-  const s = map[stage];
+  const v = variant[stage];
+
   return (
-    <div className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-full border text-sm font-semibold ${s.className}`}>
-      {s.icon} {s.label}
+    <div className={`inline-flex items-center gap-2.5 px-4 py-2.5 rounded-full backdrop-blur-xl border text-sm font-bold tracking-tight shadow-xl shadow-black/30 ${v.cls}`}>
+      {v.icon}
+      {v.label}
     </div>
   );
 }

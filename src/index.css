@@ -23,6 +23,22 @@
     background-size: 24px 24px;
   }
 
+  /* Audio-bar pulse — used on the visa interview's "Listening" status pill
+     to convey "we're capturing your voice". Five bars with staggered
+     scaleY keyframes give the eq-bar dance without any JS. */
+  @keyframes audio-bar {
+    0%, 100% { transform: scaleY(0.35); }
+    50%      { transform: scaleY(1); }
+  }
+  .animate-audio-bar { animation: audio-bar 0.95s ease-in-out infinite; transform-origin: center; }
+  .animate-audio-bar-delay-1 { animation-delay: -0.10s; }
+  .animate-audio-bar-delay-2 { animation-delay: -0.30s; }
+  .animate-audio-bar-delay-3 { animation-delay: -0.50s; }
+  .animate-audio-bar-delay-4 { animation-delay: -0.70s; }
+  @media (prefers-reduced-motion: reduce) {
+    .animate-audio-bar { animation: none; transform: scaleY(0.7); }
+  }
+
   /* Cheap one-shot entry fades — replace framer-motion on the landing page
      so we don't ship ~150 KB of JS just to show a 500ms animation once.
      Honor prefers-reduced-motion so accessibility settings are respected. */
