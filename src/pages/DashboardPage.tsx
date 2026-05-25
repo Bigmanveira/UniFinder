@@ -951,6 +951,25 @@ function BillingTab({ credits, userId }: { credits: number; userId: string | und
     }
   }, []);
 
+  // bfcache reset — clicking "Buy now" redirects to Paystack. If the
+  // user cancels on Paystack and hits the browser back button, modern
+  // browsers restore the page from the back-forward cache with all JS
+  // state intact, which leaves the button stuck on "Opening checkout…"
+  // forever because the `buying` state was set right before redirect
+  // and never cleared. `pageshow` with persisted=true is the canonical
+  // signal for a bfcache restore — clear the in-flight state and any
+  // stale error so the user can retry.
+  useEffect(() => {
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) {
+        setBuying(null);
+        setError("");
+      }
+    };
+    window.addEventListener("pageshow", onPageShow);
+    return () => window.removeEventListener("pageshow", onPageShow);
+  }, []);
+
   useEffect(() => {
     let mounted = true;
     (async () => {
