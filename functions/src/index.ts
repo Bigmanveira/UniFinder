@@ -24,6 +24,12 @@ import { sendWelcomeEmail } from "./welcomeEmail.js";
 import { sendOpsSignInLinkEmail } from "./opsSignInEmail.js";
 import { runCleanupTestPayments } from "./cleanupTestPayments.js";
 import { assertNotInMaintenance, setMaintenanceFlag } from "./maintenanceMode.js";
+import {
+  createMarketerCode,
+  listMarketerCodes,
+  setMarketerCodeEnabled,
+  applyMarketerCode,
+} from "./marketerCodes.js";
 import { logError } from "./errorLogger.js";
 import { createRateLimiter, extractClientIp } from "./rateLimiter.js";
 
@@ -357,12 +363,24 @@ export const applyReferralCode = onCall({ ...LIGHT_OPTS }, async (request) => {
 
   const db = admin.firestore();
 
-  // Look up the referrer outside the transaction (read-only, safe to do
+  // Look up the code outside the transaction (read-only, safe to do
   // pre-tx). The expensive part is just the credit math, which we re-check
-  // atomically below.
+  // atomically below — for marketer codes inside applyMarketerCode,
+  // for user codes inside the runTransaction further down.
   const codeDoc = await db.collection("referralCodes").doc(code).get();
   if (!codeDoc.exists) return { ok: false, reason: "invalid_code" };
-  const referrerUid = codeDoc.data()?.userId as string | undefined;
+  const codeData = codeDoc.data() ?? {};
+
+  // Marketer code — admin-issued for campaigns. Credits flow to the NEW
+  // USER (not the marketer, who's paid out-of-band). The applyMarketerCode
+  // helper handles the full transaction including expiry / cap / disabled
+  // checks, atomic increment of redemptionCount, etc.
+  if (codeData.type === "marketer") {
+    return await applyMarketerCode({ uid, code });
+  }
+
+  // User-generated code (existing 6-char auto-hash flow).
+  const referrerUid = codeData.userId as string | undefined;
   if (!referrerUid)               return { ok: false, reason: "invalid_code" };
   if (referrerUid === uid)        return { ok: false, reason: "self_referral" };
 
@@ -2553,5 +2571,98 @@ export const setMaintenanceMode = onCall(
     }
 
     return result;
+  },
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Marketer referral codes — admin-issued custom codes for campaigns.
+//
+// These live in the same /referralCodes collection as user-generated codes,
+// distinguished by `type: "marketer"`. The signup-time application flow
+// (applyReferralCode above) dispatches user vs marketer codes
+// transparently — the marketer code path credits the NEW USER with
+// the configured bonus, increments the code's redemptionCount, and
+// stamps `referredByMarketerCode` on the user doc so it's traceable
+// in support / analytics.
+//
+// All three callables are admin-only, audit-logged, and write through
+// the marketerCodes module which centralises validation + transaction
+// logic.
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function writeMarketerCodeAudit(
+  request: any,
+  action: "marketer_code_created" | "marketer_code_toggled",
+  targetCode: string,
+  metadata: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await admin.firestore().collection("auditLogs").add({
+      actorUid:    request.auth!.uid,
+      actorEmail:  request.auth?.token?.email ?? null,
+      action,
+      targetType:  "referralCode",
+      targetId:    targetCode,
+      metadata,
+      ip:          extractClientIp(request.rawRequest),
+      userAgent:   String(request.rawRequest?.headers?.["user-agent"] ?? "").slice(0, 240),
+      createdAt:   admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    console.warn("[marketer-code] audit write failed:", err);
+  }
+}
+
+export const createMarketerReferralCode = onCall(
+  { ...LIGHT_OPTS },
+  async (request) => {
+    const token = request.auth?.token;
+    if (!token || token.admin !== true) {
+      throw new HttpsError("permission-denied", "Admin only.");
+    }
+    const result = await createMarketerCode({
+      code:                    String(request.data?.code ?? ""),
+      marketerName:            String(request.data?.marketerName ?? ""),
+      bonusCreditsForNewUser:  typeof request.data?.bonusCreditsForNewUser === "number"
+        ? request.data.bonusCreditsForNewUser
+        : undefined,
+      expiresAtMs:             typeof request.data?.expiresAtMs === "number" ? request.data.expiresAtMs : null,
+      maxRedemptions:          typeof request.data?.maxRedemptions === "number" ? request.data.maxRedemptions : null,
+      actorUid:                request.auth!.uid,
+    });
+    await writeMarketerCodeAudit(request, "marketer_code_created", result.code, {
+      marketerName:            request.data?.marketerName ?? null,
+      bonusCreditsForNewUser:  request.data?.bonusCreditsForNewUser ?? null,
+      expiresAtMs:             request.data?.expiresAtMs ?? null,
+      maxRedemptions:          request.data?.maxRedemptions ?? null,
+    });
+    return result;
+  },
+);
+
+export const listMarketerReferralCodes = onCall(
+  { ...LIGHT_OPTS },
+  async (request) => {
+    const token = request.auth?.token;
+    if (!token || token.admin !== true) {
+      throw new HttpsError("permission-denied", "Admin only.");
+    }
+    const rows = await listMarketerCodes();
+    return { rows };
+  },
+);
+
+export const setMarketerReferralCodeEnabled = onCall(
+  { ...LIGHT_OPTS },
+  async (request) => {
+    const token = request.auth?.token;
+    if (!token || token.admin !== true) {
+      throw new HttpsError("permission-denied", "Admin only.");
+    }
+    const code    = String(request.data?.code ?? "");
+    const enabled = request.data?.enabled === true;
+    await setMarketerCodeEnabled(code, enabled);
+    await writeMarketerCodeAudit(request, "marketer_code_toggled", code.toUpperCase(), { enabled });
+    return { ok: true as const, code: code.toUpperCase(), enabled };
   },
 );
