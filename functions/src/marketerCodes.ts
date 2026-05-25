@@ -208,8 +208,17 @@ export type ApplyMarketerCodeResult =
   | { ok: false; reason: "code_disabled" | "code_expired" | "code_exhausted" | "already_referred" | "invalid_code" };
 
 export async function applyMarketerCode(args: {
-  uid:  string;
-  code: string;
+  uid:                  string;
+  code:                 string;
+  /** The implicit starting balance a new user is entitled to before
+   *  any redemption. Passed in by the caller (applyReferralCode) so
+   *  this module doesn't have to import the FREE_CREDITS_ON_SIGNUP
+   *  constant from the main app. Used as the default when the
+   *  wallet doc doesn't exist yet — without this, applying a
+   *  marketer code on a fresh account would wipe the free signup
+   *  grant by writing `0 + bonus` to a previously-non-existent
+   *  wallet. */
+  freeSignupCredits:    number;
 }): Promise<ApplyMarketerCodeResult> {
   const db      = admin.firestore();
   const codeRef = db.collection("referralCodes").doc(args.code);
@@ -249,10 +258,16 @@ export async function applyMarketerCode(args: {
       ? codeData.bonusCreditsForNewUser
       : 5;
 
+    // When a wallet doc doesn't exist yet, the implicit balance is
+    // the free-signup grant — every spending callable (unlockMatchReport,
+    // startVisaInterviewSession, etc.) treats a missing wallet as
+    // "user has FREE_CREDITS_ON_SIGNUP available". We need to materialise
+    // that same grant here, otherwise this is the first wallet write and
+    // we'd overwrite the implicit grant with `0 + bonus`.
     const walletSnap = await tx.get(walletRef);
     const currentCredits = walletSnap.exists
-      ? (walletSnap.data()?.credits ?? 0)
-      : 0;
+      ? (walletSnap.data()?.credits ?? args.freeSignupCredits)
+      : args.freeSignupCredits;
 
     tx.set(walletRef, {
       credits:   currentCredits + bonus,

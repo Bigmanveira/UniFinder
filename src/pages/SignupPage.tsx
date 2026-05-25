@@ -181,7 +181,7 @@ export default function SignupPage() {
           
           <div className="text-center mb-8">
             <h1 className="text-3xl font-black text-slate-900 mb-2">Create Account</h1>
-            <p className="text-slate-500 font-medium text-sm">Join today and get 20 free credits.</p>
+            <p className="text-slate-500 font-medium text-sm">Join today and get 2 free credits.</p>
           </div>
 
           <button onClick={handleGoogle} className="w-full bg-slate-50 border border-slate-200 text-slate-700 font-bold py-3.5 rounded-2xl mb-6 hover:bg-slate-100 transition-colors flex items-center justify-center gap-3">

@@ -44,8 +44,8 @@ const FAQ: { q: string; a: React.ReactNode }[] = [
     a: (
       <>
         Yes, but the entry is low. New accounts start with{" "}
-        <strong className="text-white">5 free credits</strong> (about 5 free match-report unlocks). Beyond that you
-        top up in small packs starting at $2. The full visa interview practice runs $5 at the entry tier.
+        <strong className="text-white">2 free credits</strong> (good for 2 match-report unlocks). Beyond that you
+        top up in small packs starting at ₵24. The full visa interview practice runs ₵60 at the entry tier.
       </>
     ),
   },

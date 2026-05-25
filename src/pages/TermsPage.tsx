@@ -82,7 +82,7 @@ export default function TermsPage() {
           <Block title="Credits and billing">
             <ul className="list-disc ml-5 space-y-1.5">
               <li>Some features cost credits (unlocking a full match report, running an interview practice).</li>
-              <li>New accounts receive 20 free credits. Successful referrals earn 5 more.</li>
+              <li>New accounts receive 2 free credits. Successful referrals earn 5 more.</li>
               <li>Purchased credits are non-refundable except where required by law, and don't expire.</li>
               <li>Prices may change. If you've already bought a credit pack, that purchase is honoured at the price you paid.</li>
             </ul>

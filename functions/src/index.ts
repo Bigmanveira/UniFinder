@@ -134,12 +134,15 @@ function isAllowedOpsPortalOrigin(origin: string): boolean {
 //   • Visa interview = 15 credits. HeyGen avatar streaming dominates the
 //     real cost (~$2.20/session); 15 credits leaves >70% margin even on
 //     the most discounted pack.
-//   • Free-on-signup grant was 20; cut to 5 so anonymous farming isn't a
-//     loss-leader. A new user can run 5 match reports before paying.
+//   • Free-on-signup grant cut from 20 → 5 → 2 over time. At 2, every
+//     new account can unlock 2 match reports before paying — enough
+//     to feel the product without making anonymous farming attractive.
+//     Marketer referral codes layer additional credits on top via
+//     `bonusCreditsForNewUser` on the code doc.
 //   • Successful referrals award 5 credits to the referrer.
 const MATCH_REPORT_CREDIT_COST = 1;
 const VISA_INTERVIEW_CREDIT_COST = 15;
-const FREE_CREDITS_ON_SIGNUP   = 5;
+const FREE_CREDITS_ON_SIGNUP   = 2;
 
 // Supporting-doc cap per interview. Each upload runs a Sonnet vision
 // extraction (~$0.012). Without a cap, one bad actor uploading 20 PDFs
@@ -376,7 +379,11 @@ export const applyReferralCode = onCall({ ...LIGHT_OPTS }, async (request) => {
   // helper handles the full transaction including expiry / cap / disabled
   // checks, atomic increment of redemptionCount, etc.
   if (codeData.type === "marketer") {
-    return await applyMarketerCode({ uid, code });
+    return await applyMarketerCode({
+      uid,
+      code,
+      freeSignupCredits: FREE_CREDITS_ON_SIGNUP,
+    });
   }
 
   // User-generated code (existing 6-char auto-hash flow).

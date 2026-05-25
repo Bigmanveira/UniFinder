@@ -45,7 +45,7 @@ const htmlBody = (opts: { displayName?: string | null }) => `
             <tr>
               <td style="padding:28px 32px 8px 32px;font-size:15px;line-height:1.6;color:#1e293b;">
                 <p style="margin:0 0 14px 0;">${greeting(opts.displayName)}</p>
-                <p style="margin:0 0 14px 0;">Thanks for signing up. We've dropped <strong>5 free credits</strong> into your wallet so you can try the app before paying for anything.</p>
+                <p style="margin:0 0 14px 0;">Thanks for signing up. We've dropped <strong>2 free credits</strong> into your wallet so you can try the app before paying for anything.</p>
 
                 <p style="margin:0 0 8px 0;"><strong>What credits unlock:</strong></p>
                 <ul style="margin:0 0 18px 0;padding-left:20px;font-size:14px;color:#475569;">
@@ -53,7 +53,7 @@ const htmlBody = (opts: { displayName?: string | null }) => `
                   <li style="margin-bottom:6px;"><strong style="color:#0f172a;">15 credits</strong> — full F-1 visa interview practice with a live AI consular officer (with scored feedback)</li>
                 </ul>
 
-                <p style="margin:0 0 14px 0;">Your 5 free credits cover five match-report unlocks — enough to get a real feel for which U.S. schools are realistic for you before you spend anything.</p>
+                <p style="margin:0 0 14px 0;">Your 2 free credits cover two match-report unlocks — enough to get a real feel for which U.S. schools are realistic for you before you spend anything.</p>
 
                 <p style="margin:0 0 18px 0;">
                   <a href="https://collegeready.io/app" style="display:inline-block;background:#1e3a8a;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:12px;font-size:14px;">Open the dashboard →</a>
@@ -85,13 +85,13 @@ const textBody = (opts: { displayName?: string | null }) =>
     ``,
     greeting(opts.displayName) + ",",
     ``,
-    `Thanks for signing up. We've dropped 5 free credits into your wallet so you can try the app before paying for anything.`,
+    `Thanks for signing up. We've dropped 2 free credits into your wallet so you can try the app before paying for anything.`,
     ``,
     `What credits unlock:`,
     `  • 1 credit  — unlock an AI-matched school report tailored to your profile`,
     `  • 15 credits — full F-1 visa interview practice with a live AI consular officer`,
     ``,
-    `Your 5 free credits cover five match-report unlocks — enough to get a real feel for which U.S. schools are realistic for you before you spend anything.`,
+    `Your 2 free credits cover two match-report unlocks — enough to get a real feel for which U.S. schools are realistic for you before you spend anything.`,
     ``,
     `Dashboard: https://collegeready.io/app`,
     ``,

@@ -63,11 +63,11 @@ export default function DashboardPage() {
           setCredits(data.credits);
         }
       } else {
-        // Wallet not yet created — new users start with 5 free credits.
+        // Wallet not yet created — new users start with 2 free credits.
         // The wallet document is created by the Cloud Function on first
         // paid action (match unlock or visa interview). Keep this number
         // in sync with FREE_CREDITS_ON_SIGNUP in functions/src/index.ts.
-        setCredits(5);
+        setCredits(2);
       }
     });
 
