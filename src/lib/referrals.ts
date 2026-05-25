@@ -71,6 +71,24 @@ export function captureReferralCodeFromUrl(): void {
   }
 }
 
+/**
+ * Manually set a pending referral code (used by the "I have a referral
+ * code" entry on the signup page). Same shape as the URL-capture path
+ * — the post-auth applyReferralIfPresent flow reads whichever code
+ * landed last. Pass an empty string / null to clear.
+ */
+export function setPendingReferralCode(code: string | null): void {
+  if (typeof window === "undefined") return;
+  try {
+    const trimmed = (code ?? "").trim().toUpperCase();
+    if (!trimmed) {
+      localStorage.removeItem(REFERRAL_CODE_LS_KEY);
+    } else {
+      localStorage.setItem(REFERRAL_CODE_LS_KEY, trimmed);
+    }
+  } catch { /* ignore — private mode etc. */ }
+}
+
 export function readPendingReferralCode(): string | null {
   if (typeof window === "undefined") return null;
   try { return localStorage.getItem(REFERRAL_CODE_LS_KEY); } catch { return null; }

@@ -1,22 +1,41 @@
-import { useState, useEffect } from "react";
+// SignupPage — magic-link signup + Google. Replaces the older
+// email+password flow.
+//
+// Two paths in:
+//   1. Google sign-in (unchanged) — instant signup via OAuth popup.
+//   2. Email — visitor types their address, we send a one-time
+//      sign-in link via the sendUserSignInLink Cloud Function. They
+//      click the link in their inbox and land on /login signed-in
+//      (Firebase email-link auth creates the Auth user on first
+//      click). No password ever set; future logins go through the
+//      same magic-link flow on LoginPage.
+//
+// Two locally-stored bits travel across the magic-link round trip:
+//   - email (so signInWithEmailLink can verify on click-back)
+//   - optional referral code (typed manually or captured from ?ref=…)
+// Both live in localStorage and are read by LoginPage's verification
+// path right after the link is consumed.
+
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { createUserWithEmailAndPassword, signInWithPopup } from "firebase/auth";
+import { signInWithPopup } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { auth, googleProvider, db, functions } from "../lib/firebase";
-import { ArrowRight, Mail, Lock } from "lucide-react";
+import { ArrowRight, Mail, Check, Loader2, Tag, ChevronDown, ChevronUp } from "lucide-react";
 import BrandLogo from "../components/BrandLogo";
 import { motion } from "framer-motion";
 import {
   captureReferralCodeFromUrl,
   readPendingReferralCode,
   clearPendingReferralCode,
+  setPendingReferralCode,
 } from "../lib/referrals";
 
-// Only honour next-paths that are same-site (start with "/" but not "//").
-// Stops a crafted link like /signup?next=//evil.example from bouncing the
-// user off-site after sign-up. Returns null for anything that isn't a
-// plain relative path.
+// Same key the LoginPage reads. Pinned here so a rename in one place
+// doesn't silently break the round-trip.
+const EMAIL_LS_KEY = "userApp:emailForSignIn";
+
 function sanitizeNextPath(raw: string | null): string | null {
   if (!raw) return null;
   if (!raw.startsWith("/")) return null;
@@ -29,22 +48,30 @@ export default function SignupPage() {
   const [searchParams] = useSearchParams();
   const fromResults = searchParams.get("from") === "results";
   const nextPath    = sanitizeNextPath(searchParams.get("next"));
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  // Always clear stale guest data on mount — only redirect when explicitly coming from the wizard
+  const [email, setEmail] = useState("");
+  const [referralOpen, setReferralOpen] = useState(false);
+  const [referralCode,  setReferralCode] = useState("");
+  const [loading,  setLoading]  = useState(false);
+  const [sent,     setSent]     = useState(false);
+  const [error,    setError]    = useState<string | null>(null);
+
+  // Capture any ?ref=… on mount and pre-fill the manual entry so the
+  // user can confirm or correct it. Also clear stale guest data when
+  // they're not coming from the intake wizard.
   useEffect(() => {
     if (!fromResults) {
       localStorage.removeItem("unifinder_guest_profile");
       localStorage.removeItem("unifinder_preview_expires");
     }
-    // Stash any ?ref=CODE on the URL so we can apply it after signup completes,
-    // even if the user re-enters via Google OAuth (which round-trips off-domain).
     captureReferralCodeFromUrl();
+    const existing = readPendingReferralCode();
+    if (existing) {
+      setReferralCode(existing);
+      setReferralOpen(true);
+    }
   }, [fromResults]);
 
-  // Best-effort referral application — never blocks signup completion.
   const applyReferralIfPresent = async () => {
     const code = readPendingReferralCode();
     if (!code) return;
@@ -58,7 +85,6 @@ export default function SignupPage() {
     }
   };
 
-  // Helper: only valid if coming from wizard AND profile is unexpired
   const shouldGoToResults = () => {
     if (!fromResults) return false;
     const profile = localStorage.getItem("unifinder_guest_profile");
@@ -67,53 +93,59 @@ export default function SignupPage() {
     return Date.now() < parseInt(expires, 10);
   };
 
-  // Where do we send the user post-signup?
-  //   1. The explicit `next` query param (preserves protected-route intent)
-  //   2. The legacy /results round-trip
-  //   3. Otherwise the dashboard
   const computePostSignupPath = () => {
     if (nextPath) return nextPath;
     if (shouldGoToResults()) return "/results";
     return "/app";
   };
 
-  const handleSignup = async (e: React.FormEvent) => {
+  // Build the URL we want the magic link to bounce the user back to.
+  // We embed the post-signup destination as a `next` param so LoginPage
+  // (which catches the link return) knows where to ultimately land
+  // them. The protected-route round-trip ensures auth state is in
+  // place before we attempt to navigate.
+  const buildReturnUrl = (): string => {
+    const dest = computePostSignupPath();
+    const params = new URLSearchParams();
+    params.set("next", dest);
+    return `${window.location.origin}/login?${params.toString()}`;
+  };
+
+  // Stash the referral code (if the user typed one) before we hit the
+  // callable. The applyReferralIfPresent flow on LoginPage reads this
+  // right after sign-in completes. Empty string clears any stale code.
+  const persistReferralCode = () => {
+    setPendingReferralCode(referralCode.trim() || null);
+  };
+
+  const handleSendLink = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      
-      try {
-        const uid = userCredential.user.uid;
-        const userEmail = userCredential.user.email;
-        
-        await setDoc(doc(db, "users", uid), {
-          email: userEmail,
-          createdAt: serverTimestamp(),
-          role: "student"
-        }, { merge: true });
-
-        const guestProfile = localStorage.getItem("unifinder_guest_profile");
-        if (guestProfile) {
-          await setDoc(doc(db, "studentProfiles", uid), JSON.parse(guestProfile));
-        }
-      } catch (dbError) {
-        console.warn("Could not save backend foundation records:", dbError);
-      }
-
-      await applyReferralIfPresent();
-
-      navigate(computePostSignupPath());
-    } catch (err) {
-      console.error(err);
-      alert("Error signing up. Please try again.");
+      persistReferralCode();
+      const fn = httpsCallable(functions, "sendUserSignInLink");
+      await fn({
+        email:     email.trim().toLowerCase(),
+        returnUrl: buildReturnUrl(),
+      });
+      // Stash the email so signInWithEmailLink can verify it on
+      // click-back. Firebase requires the email at the verification
+      // step for replay protection.
+      localStorage.setItem(EMAIL_LS_KEY, email.trim().toLowerCase());
+      setSent(true);
+    } catch (err: any) {
+      setError(err?.message ?? "Could not send sign-in link. Try again.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogle = async () => {
+    setLoading(true);
+    setError(null);
     try {
+      persistReferralCode();
       const userCredential = await signInWithPopup(auth, googleProvider);
 
       try {
@@ -123,7 +155,7 @@ export default function SignupPage() {
         await setDoc(doc(db, "users", uid), {
           email: userEmail,
           createdAt: serverTimestamp(),
-          role: "student"
+          role: "student",
         }, { merge: true });
 
         const guestProfile = localStorage.getItem("unifinder_guest_profile");
@@ -135,15 +167,15 @@ export default function SignupPage() {
       }
 
       await applyReferralIfPresent();
-
       navigate(computePostSignupPath());
     } catch (err) {
       console.error(err);
+      setError("Google sign-up failed. Try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Build the cross-link to /login so the user doesn't lose their intended
-  // destination when they switch tabs.
   const loginHref = (() => {
     const params = new URLSearchParams();
     if (fromResults) params.set("from", "results");
@@ -152,15 +184,14 @@ export default function SignupPage() {
     return qs ? `/login?${qs}` : "/login";
   })();
 
-
   return (
     <div className="min-h-screen relative flex items-center justify-center p-4 sm:p-6 font-sans selection:bg-primary-500 selection:text-white">
-      {/* Background Image & Overlay */}
+      {/* Background image + overlay (unchanged from the password version) */}
       <div className="absolute inset-0 z-0">
-        <img 
+        <img
           src="https://images.unsplash.com/photo-1606761568499-6d2451b23c66?q=80&w=2000&auto=format&fit=crop"
-          className="w-full h-full object-cover" 
-          alt="Graduation" 
+          className="w-full h-full object-cover"
+          alt="Graduation"
         />
         <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"></div>
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent"></div>
@@ -170,79 +201,141 @@ export default function SignupPage() {
         <BrandLogo size="md" tone="light" />
       </div>
 
-      {/* Signup Card */}
-      <motion.div 
-        initial={{ opacity: 0, y: 20, scale: 0.95 }} 
-        animate={{ opacity: 1, y: 0, scale: 1 }} 
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.95 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.4 }}
         className="relative z-10 w-full max-w-[420px]"
       >
         <div className="bg-white/95 backdrop-blur-2xl rounded-[32px] p-8 sm:p-10 shadow-2xl shadow-slate-900/50 border border-white/50">
-          
           <div className="text-center mb-8">
             <h1 className="text-3xl font-black text-slate-900 mb-2">Create Account</h1>
             <p className="text-slate-500 font-medium text-sm">Join today and get 2 free credits.</p>
           </div>
 
-          <button onClick={handleGoogle} className="w-full bg-slate-50 border border-slate-200 text-slate-700 font-bold py-3.5 rounded-2xl mb-6 hover:bg-slate-100 transition-colors flex items-center justify-center gap-3">
-            <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5" alt="Google" />
-            Sign Up with Google
-          </button>
-
-          <div className="flex items-center gap-4 mb-6">
-            <div className="flex-1 h-px bg-slate-200"></div>
-            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Or email</span>
-            <div className="flex-1 h-px bg-slate-200"></div>
-          </div>
-
-          <form onSubmit={handleSignup} className="space-y-4">
-            <div>
-              <label className="block text-[10px] font-black tracking-widest text-slate-500 mb-2 uppercase ml-1">Email Address</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
-                  <Mail size={18} />
+          {sent ? (
+            // After we ship the magic link, swap to a "check your inbox"
+            // confirmation state so the user knows what to do next.
+            // They never see the password field or any of the
+            // pre-submit form again unless they click "Use a
+            // different email" to reset.
+            <div className="space-y-4">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 flex-shrink-0">
+                  <Check size={16} />
                 </div>
-                <input 
-                  type="email" 
-                  value={email} 
-                  onChange={e => setEmail(e.target.value)} 
-                  required 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-5 py-3.5 text-slate-900 font-bold focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all" 
-                  placeholder="you@example.com" 
-                />
-              </div>
-            </div>
-            
-            <div>
-              <label className="block text-[10px] font-black tracking-widest text-slate-500 mb-2 uppercase ml-1">Password</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
-                  <Lock size={18} />
+                <div className="flex-1 min-w-0">
+                  <p className="font-bold text-emerald-900 text-sm mb-0.5">Check your inbox</p>
+                  <p className="text-xs text-emerald-800 leading-relaxed break-words">
+                    A sign-in link is on its way to <span className="font-mono">{email}</span> from <span className="font-mono">noreply@collegeready.io</span>. Open the link on this device to finish.
+                  </p>
+                  {referralCode.trim() && (
+                    <p className="text-[11px] text-emerald-700 mt-1.5">
+                      Referral code <span className="font-mono font-bold">{referralCode.trim().toUpperCase()}</span> will be applied automatically when you land.
+                    </p>
+                  )}
                 </div>
-                <input 
-                  type="password" 
-                  value={password} 
-                  onChange={e => setPassword(e.target.value)} 
-                  required 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-5 py-3.5 text-slate-900 font-bold focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all" 
-                  placeholder="••••••••" 
-                />
               </div>
+              <button
+                onClick={() => { setSent(false); setError(null); }}
+                className="w-full text-xs text-slate-500 hover:text-slate-900 font-bold py-2"
+              >
+                Use a different email
+              </button>
             </div>
+          ) : (
+            <>
+              <button
+                onClick={handleGoogle}
+                disabled={loading}
+                className="w-full bg-slate-50 border border-slate-200 text-slate-700 font-bold py-3.5 rounded-2xl mb-6 hover:bg-slate-100 disabled:opacity-50 transition-colors flex items-center justify-center gap-3"
+              >
+                <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5" alt="Google" />
+                Sign Up with Google
+              </button>
 
-            <button
-              disabled={loading}
-              type="submit"
-              className="w-full bg-primary-600 text-white font-bold py-4 rounded-2xl mt-4 hover:bg-primary-700 transition-transform active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg shadow-primary-600/25 disabled:opacity-50"
-            >
-              {loading ? "Creating..." : "Sign Up Free"} <ArrowRight size={18} />
-            </button>
-          </form>
+              <div className="flex items-center gap-4 mb-6">
+                <div className="flex-1 h-px bg-slate-200"></div>
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Or email</span>
+                <div className="flex-1 h-px bg-slate-200"></div>
+              </div>
+
+              <form onSubmit={handleSendLink} className="space-y-4">
+                <div>
+                  <label className="block text-[10px] font-black tracking-widest text-slate-500 mb-2 uppercase ml-1">Email Address</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
+                      <Mail size={18} />
+                    </div>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-5 py-3.5 text-slate-900 font-bold focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
+                      placeholder="you@example.com"
+                    />
+                  </div>
+                </div>
+
+                {/* "I have a referral code" — collapsed by default so the
+                    primary signup flow is the lowest-friction path. Click
+                    to expand and reveal the input. Pre-fills if a ?ref=
+                    landed via URL so the user can confirm or correct. */}
+                <div className="bg-slate-50/60 border border-slate-200 rounded-2xl overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setReferralOpen((v) => !v)}
+                    className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-slate-100/60 transition-colors"
+                  >
+                    <span className="inline-flex items-center gap-2 text-xs font-bold text-slate-700">
+                      <Tag size={13} className="text-primary-600" />
+                      I have a referral code
+                    </span>
+                    {referralOpen ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
+                  </button>
+                  {referralOpen && (
+                    <div className="px-4 pb-3 pt-1">
+                      <input
+                        type="text"
+                        value={referralCode}
+                        onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                        maxLength={32}
+                        autoCapitalize="characters"
+                        spellCheck={false}
+                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-mono uppercase text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
+                        placeholder="JANE2025"
+                      />
+                      <p className="text-[10px] text-slate-500 mt-1.5 leading-relaxed">
+                        Got a code from a marketer or friend? Bonus credits land in your wallet right after you sign in.
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {error && (
+                  <p className="text-xs text-rose-600 leading-relaxed text-center">{error}</p>
+                )}
+
+                <button
+                  disabled={loading || !email.trim()}
+                  type="submit"
+                  className="w-full bg-primary-600 text-white font-bold py-4 rounded-2xl mt-4 hover:bg-primary-700 transition-transform active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg shadow-primary-600/25 disabled:opacity-50"
+                >
+                  {loading ? <Loader2 size={16} className="animate-spin" /> : null}
+                  {loading ? "Sending link…" : "Send sign-in link"} {!loading && <ArrowRight size={18} />}
+                </button>
+
+                <p className="text-[11px] text-slate-500 text-center leading-relaxed">
+                  No password needed. We'll email you a one-time sign-in link.
+                </p>
+              </form>
+            </>
+          )}
 
           <p className="text-sm font-medium text-slate-500 text-center mt-8">
             Already have an account? <Link to={loginHref} className="text-primary-600 font-black hover:underline">Log in</Link>
           </p>
-
         </div>
       </motion.div>
     </div>

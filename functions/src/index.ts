@@ -22,6 +22,7 @@ import {
 import { sendPurchaseReceipt } from "./paymentReceiptEmail.js";
 import { sendWelcomeEmail } from "./welcomeEmail.js";
 import { sendOpsSignInLinkEmail } from "./opsSignInEmail.js";
+import { sendUserSignInLinkEmail } from "./userSignInEmail.js";
 import { runCleanupTestPayments } from "./cleanupTestPayments.js";
 import { assertNotInMaintenance, setMaintenanceFlag } from "./maintenanceMode.js";
 import {
@@ -103,6 +104,18 @@ const waitlistRateLimit = createRateLimiter({
 // at any address an attacker might guess as an admin.
 const opsSignInRateLimit = createRateLimiter({
   maxPerWindow: 6,
+  windowMs:     60 * 60 * 1000,   // 1 hour
+});
+
+// sendUserSignInLink: public user-facing sign-up + sign-in. Open to
+// anyone — no admin claim required, no pre-existing account check
+// (this is literally the front door for new accounts). The same IP
+// requesting 8 links in an hour is either a typo-prone human, an
+// expired-link retry loop, or someone fishing through a leaked
+// address list — either way the cap is enough for one legit human
+// to recover from a few mistakes without enabling spam.
+const userSignInRateLimit = createRateLimiter({
+  maxPerWindow: 8,
   windowMs:     60 * 60 * 1000,   // 1 hour
 });
 
@@ -2392,6 +2405,82 @@ export const sendOpsSignInLink = onCall(
       void logError({
         category: "email_send",
         source:   "ops_signin.send_failed",
+        severity: "error",
+        message:  err?.message ?? String(err),
+        context:  { email },
+      });
+      throw new HttpsError("internal", "Could not send sign-in link. Try again.");
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// User-facing app — magic-link sign-in / sign-up
+//
+// Replaces email/password auth for the main user app. The same function
+// covers BOTH first-time signup and returning sign-in because Firebase
+// email-link auth has the same semantics for both:
+//   - generateSignInWithEmailLink creates the link.
+//   - signInWithEmailLink on the client side either creates a brand-new
+//     Auth user (first time) or signs in the existing one.
+//
+// No admin gate (this is literally the public front door). Per-IP rate
+// limit caps spam. Email shape validated server-side, returnUrl
+// allow-listed to the same set the ops sign-in uses.
+//
+// Anti-enumeration: we deliberately do NOT check whether the email
+// already exists before sending the link — that would let an attacker
+// probe which addresses have accounts. The Admin SDK is happy to mint
+// a link for an unknown address; when the user clicks it, the client
+// creates the account.
+// ─────────────────────────────────────────────────────────────────────────────
+export const sendUserSignInLink = onCall(
+  { ...LIGHT_OPTS, secrets: [RESEND_API_KEY] },
+  async (request) => {
+    const ip = extractClientIp(request.rawRequest);
+    const rl = userSignInRateLimit(ip);
+    if (!rl.allowed) {
+      throw new HttpsError("resource-exhausted", "Too many sign-in requests — try again in a few minutes.");
+    }
+
+    const email = String(request.data?.email ?? "").trim().toLowerCase();
+    const returnUrl = String(request.data?.returnUrl ?? "");
+
+    if (!/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(email)) {
+      throw new HttpsError("invalid-argument", "Enter a valid email address.");
+    }
+
+    let returnOrigin: string;
+    try {
+      returnOrigin = new URL(returnUrl).origin;
+    } catch {
+      throw new HttpsError("invalid-argument", "Invalid returnUrl.");
+    }
+    if (!isAllowedOpsPortalOrigin(returnOrigin)) {
+      // The user app shares the same origin allow-list as the ops portal
+      // (collegeready.io / vercel.app / localhost). Reusing the same
+      // predicate keeps one source of truth.
+      console.warn("[user-signin] rejected returnUrl origin:", returnOrigin);
+      throw new HttpsError("invalid-argument", "Unauthorized returnUrl origin.");
+    }
+
+    try {
+      const link = await admin.auth().generateSignInWithEmailLink(email, {
+        url:             returnUrl,
+        handleCodeInApp: true,
+      });
+      const { id } = await sendUserSignInLinkEmail({
+        apiKey: RESEND_API_KEY.value(),
+        to:     email,
+        link,
+      });
+      console.log("[user-signin] link sent", { email, messageId: id });
+      return { ok: true as const };
+    } catch (err: any) {
+      console.error("[user-signin] failed to send link:", err?.message ?? err);
+      void logError({
+        category: "email_send",
+        source:   "user_signin.send_failed",
         severity: "error",
         message:  err?.message ?? String(err),
         context:  { email },
