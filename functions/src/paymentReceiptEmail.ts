@@ -20,12 +20,26 @@ function subjectFor(credits: number): string {
   return `🎓 ${credits} credit${credits === 1 ? "" : "s"} added to your College Ready account`;
 }
 
+// Pick a currency glyph for the receipt copy. We only charge GHS today, but
+// the email template should stay correct if we ever flip currencies.
+function currencyGlyph(code: string): string {
+  switch (code.toUpperCase()) {
+    case "GHS": return "₵";
+    case "NGN": return "₦";
+    case "ZAR": return "R";
+    case "KES": return "KSh ";
+    case "USD": return "$";
+    default:    return "";
+  }
+}
+
 const htmlBody = (opts: {
-  packLabel: string;
-  credits: number;
-  priceUsd: number;
+  packLabel:  string;
+  credits:    number;
+  priceLocal: number;
+  currency:   string;
   newBalance: number;
-  paymentId: string;
+  paymentId:  string;
 }) => `
 <!DOCTYPE html>
 <html>
@@ -47,7 +61,7 @@ const htmlBody = (opts: {
                 <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#f8fafc;border-radius:14px;border:1px solid #e2e8f0;margin:0 0 18px 0;">
                   <tr>
                     <td style="padding:18px 22px;font-size:14px;color:#475569;">
-                      <p style="margin:0 0 6px 0;"><strong style="color:#0f172a;">${opts.packLabel} pack</strong> &nbsp;·&nbsp; $${opts.priceUsd.toFixed(2)} USD</p>
+                      <p style="margin:0 0 6px 0;"><strong style="color:#0f172a;">${opts.packLabel} pack</strong> &nbsp;·&nbsp; ${currencyGlyph(opts.currency)}${opts.priceLocal.toFixed(2)} ${opts.currency}</p>
                       <p style="margin:0 0 6px 0;">${opts.credits} credit${opts.credits === 1 ? "" : "s"} added</p>
                       <p style="margin:14px 0 0 0;padding-top:10px;border-top:1px solid #e2e8f0;color:#0f172a;font-size:13px;">
                         New balance: <strong style="font-size:18px;">${opts.newBalance}</strong> credit${opts.newBalance === 1 ? "" : "s"}
@@ -84,18 +98,19 @@ const htmlBody = (opts: {
 `.trim();
 
 const textBody = (opts: {
-  packLabel: string;
-  credits: number;
-  priceUsd: number;
+  packLabel:  string;
+  credits:    number;
+  priceLocal: number;
+  currency:   string;
   newBalance: number;
-  paymentId: string;
+  paymentId:  string;
 }) =>
   [
     `Credits added to your College Ready wallet`,
     ``,
     `Hey — your payment came through. Quick summary:`,
     ``,
-    `  ${opts.packLabel} pack · $${opts.priceUsd.toFixed(2)} USD`,
+    `  ${opts.packLabel} pack · ${currencyGlyph(opts.currency)}${opts.priceLocal.toFixed(2)} ${opts.currency}`,
     `  ${opts.credits} credit${opts.credits === 1 ? "" : "s"} added`,
     `  New balance: ${opts.newBalance} credit${opts.newBalance === 1 ? "" : "s"}`,
     ``,
@@ -119,13 +134,14 @@ const textBody = (opts: {
  * the wallet credit. Fire-and-forget from the caller's perspective.
  */
 export async function sendPurchaseReceipt(opts: {
-  apiKey:      string;
-  to:          string;
-  packLabel:   string;
-  credits:     number;
-  priceUsd:    number;
-  newBalance:  number;
-  paymentId:   string;
+  apiKey:     string;
+  to:         string;
+  packLabel:  string;
+  credits:    number;
+  priceLocal: number;
+  currency:   string;
+  newBalance: number;
+  paymentId:  string;
 }): Promise<{ id: string }> {
   const resend = new Resend(opts.apiKey);
   const result = await resend.emails.send({

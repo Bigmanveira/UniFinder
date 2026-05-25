@@ -17,10 +17,12 @@
 //   CREDIT_PACKS constant; Paystack just charges what we tell it.
 //
 // Currency:
-//   Charging in USD. Paystack-Ghana merchants need USD enabled explicitly
-//   on their account; the first `transaction/initialize` call will return
-//   a clear "currency not supported" error if it isn't. Switch the
-//   `currency` literal below to "GHS" if you swing back to local pricing.
+//   Charging in GHS (Ghanaian Cedi) — the default settlement currency on
+//   a Paystack-Ghana merchant account. Paystack `amount` is in pesewas
+//   (1 GHS = 100 pesewas), so we multiply our cedi prices by 100 before
+//   sending. If we ever need to charge in another currency (USD, NGN, ZAR…)
+//   the Paystack account must have that currency enabled first — otherwise
+//   `transaction/initialize` returns 403 "currency not supported".
 //
 // Idempotency: webhooks can fire multiple times. We dedupe on `reference`
 // (the unique transaction id Paystack returns) by storing every fulfilled
@@ -31,17 +33,17 @@
 import * as admin from "firebase-admin";
 import * as crypto from "crypto";
 
-/** Currency for all Paystack charges. USD requires the Paystack account to
- *  have USD enabled. For Ghana merchants this needs Paystack support's
- *  approval; without it `transaction/initialize` returns 400. */
-const PAYSTACK_CURRENCY = "USD" as const;
+/** Currency for all Paystack charges. GHS is the default on a Paystack-
+ *  Ghana merchant account; any other currency needs to be enabled with
+ *  Paystack support first or `transaction/initialize` returns 403. */
+const PAYSTACK_CURRENCY = "GHS" as const;
 
 export interface PaystackInitArgs {
-  secretKey:   string;
-  amountCents: number;   // smallest currency unit (cents for USD; pesewas for GHS, etc.)
-  email:       string;
-  callbackUrl: string;
-  metadata:    Record<string, unknown>;
+  secretKey:    string;
+  amountSubunit: number;   // smallest currency unit (pesewas for GHS, kobo for NGN, cents for USD)
+  email:        string;
+  callbackUrl:  string;
+  metadata:     Record<string, unknown>;
 }
 
 export interface PaystackInitResult {
@@ -64,7 +66,7 @@ export async function initPaystackTransaction(args: PaystackInitArgs): Promise<P
     },
     body: JSON.stringify({
       email:        args.email,
-      amount:       args.amountCents,
+      amount:       args.amountSubunit,
       currency:     PAYSTACK_CURRENCY,
       callback_url: args.callbackUrl,
       metadata:     args.metadata,
@@ -123,7 +125,7 @@ export interface PaystackWebhookEvent {
     id?:        number;
     reference?: string;
     status?:    string;
-    amount?:    number;     // smallest unit (cents for USD)
+    amount?:    number;     // smallest currency unit (pesewas for GHS)
     currency?:  string;
     customer?:  { email?: string };
     metadata?:  Record<string, any>;
@@ -147,7 +149,8 @@ export async function applyPaystackChargeSuccess(event: PaystackWebhookEvent): P
       customerEmail:  string | null;
       packId:         string;
       creditsGranted: number;
-      priceUsd:       number;
+      priceLocal:     number;
+      currency:       string;
       reference:      string;
     }
 > {
@@ -165,8 +168,8 @@ export async function applyPaystackChargeSuccess(event: PaystackWebhookEvent): P
   const userId         = md.userId         as string | undefined;
   const packId         = md.packId         as string | undefined;
   const creditsToGrant = parseInt(String(md.creditsToGrant ?? "0"), 10);
-  const expectedAmount = parseInt(String(md.amountCents ?? "0"), 10);
-  const priceUsd       = parseFloat(String(md.priceUsd ?? "0"));
+  const expectedAmount = parseInt(String(md.amountSubunit ?? "0"), 10);
+  const priceLocal     = parseFloat(String(md.priceLocal ?? "0"));
 
   if (!userId || !packId || !creditsToGrant || creditsToGrant < 0) {
     return { applied: false, reason: "missing or invalid metadata" };
@@ -207,7 +210,7 @@ export async function applyPaystackChargeSuccess(event: PaystackWebhookEvent): P
       userId,
       packId,
       creditsGranted:  creditsToGrant,
-      amountCents:     data.amount ?? expectedAmount,
+      amountSubunit:   data.amount ?? expectedAmount,
       currency:        data.currency ?? PAYSTACK_CURRENCY,
       providerStatus:  data.status ?? "success",
       provider:        "paystack",
@@ -219,7 +222,8 @@ export async function applyPaystackChargeSuccess(event: PaystackWebhookEvent): P
       type:      "purchase",
       reference,
       packId,
-      priceUsd,
+      priceLocal,
+      currency:  data.currency ?? PAYSTACK_CURRENCY,
       provider:  "paystack",
       createdAt: now,
     });
@@ -229,7 +233,8 @@ export async function applyPaystackChargeSuccess(event: PaystackWebhookEvent): P
       customerEmail:   data.customer?.email ?? null,
       packId,
       creditsGranted:  creditsToGrant,
-      priceUsd,
+      priceLocal,
+      currency:        data.currency ?? PAYSTACK_CURRENCY,
       reference,
     };
   });

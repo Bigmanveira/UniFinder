@@ -8,9 +8,21 @@ import { Loader2, Check, AlertTriangle } from "lucide-react";
 type CreditPack = {
   id: string;
   label: string;
-  priceUsd: number;
+  priceLocal: number;
+  currency: string;
   credits: number;
   recommended: boolean;
+};
+
+const currencyGlyph = (code: string): string => {
+  switch ((code ?? "").toUpperCase()) {
+    case "GHS": return "₵";
+    case "NGN": return "₦";
+    case "ZAR": return "R";
+    case "KES": return "KSh ";
+    case "USD": return "$";
+    default:    return "";
+  }
 };
 
 export default function PricingPage() {
@@ -153,7 +165,8 @@ export default function PricingPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {packs.map((pack) => {
               const isBuying = buying === pack.id;
-              const perCredit = (pack.priceUsd / pack.credits).toFixed(2);
+              const glyph = currencyGlyph(pack.currency);
+              const perCredit = (pack.priceLocal / pack.credits).toFixed(2);
               return (
                 <div
                   key={pack.id}
@@ -170,10 +183,10 @@ export default function PricingPage() {
                   )}
                   <h3 className={`text-lg font-black mb-1 ${pack.recommended ? "text-primary-900" : "text-slate-900"}`}>{pack.label}</h3>
                   <p className={`text-xs font-medium mb-5 ${pack.recommended ? "text-primary-700/80" : "text-slate-500"}`}>
-                    ${perCredit} per credit
+                    {glyph}{perCredit} per credit
                   </p>
                   <div className="mb-5">
-                    <span className={`text-4xl font-black ${pack.recommended ? "text-primary-900" : "text-slate-900"}`}>${pack.priceUsd}</span>
+                    <span className={`text-4xl font-black ${pack.recommended ? "text-primary-900" : "text-slate-900"}`}>{glyph}{pack.priceLocal}</span>
                     <span className={`font-bold ${pack.recommended ? "text-primary-700" : "text-slate-500"}`}> / {pack.credits} credits</span>
                   </div>
                   <button

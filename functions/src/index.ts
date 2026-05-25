@@ -141,17 +141,20 @@ const MAX_SUPPORTING_DOCS_PER_INTERVIEW = 3;
 // buys 6 match-unlocks. ~70% margin per unlock comfortably absorbs
 // Paystack's per-transaction fee (~3.9% + ~$0.10 for international USD)
 // at the $2 level.
+// Prices are GHS (Ghanaian Cedi) — the default settlement currency on our
+// Paystack-Ghana merchant account. Roughly tracks the previous USD prices
+// at ~₵12 / $1 (Try ~$2, Starter ~$5, Plus ~$15, Pro ~$40, Power ~$100).
 export const CREDIT_PACKS: Record<string, {
   label:        string;
-  priceUsd:     number;   // What we charge (USD)
+  priceLocal:   number;   // What we charge in GHS (cedi major units)
   credits:      number;   // What the user receives
   recommended?: boolean;
 }> = {
-  try:     { label: "Try",     priceUsd:   2, credits:   6 },
-  starter: { label: "Starter", priceUsd:   5, credits:  15 },
-  plus:    { label: "Plus",    priceUsd:  15, credits:  45, recommended: true },
-  pro:     { label: "Pro",     priceUsd:  40, credits: 120 },
-  power:   { label: "Power",   priceUsd: 100, credits: 300 },
+  try:     { label: "Try",     priceLocal:   24, credits:   6 },
+  starter: { label: "Starter", priceLocal:   60, credits:  15 },
+  plus:    { label: "Plus",    priceLocal:  180, credits:  45, recommended: true },
+  pro:     { label: "Pro",     priceLocal:  480, credits: 120 },
+  power:   { label: "Power",   priceLocal: 1200, credits: 300 },
 };
 // Greeting + DS-160 ask. The interview proper (real questions) doesn't begin
 // until BOTH the DS-160 confirmation page and the I-20 have been uploaded.
@@ -1712,7 +1715,8 @@ export const listCreditPacks = onCall({ ...LIGHT_OPTS }, async () => {
   return Object.entries(CREDIT_PACKS).map(([id, p]) => ({
     id,
     label:       p.label,
-    priceUsd:    p.priceUsd,
+    priceLocal:  p.priceLocal,
+    currency:    "GHS",
     credits:     p.credits,
     recommended: !!p.recommended,
   }));
@@ -1742,24 +1746,25 @@ export const createPaystackCheckout = onCall(
     if (!isAllowedUrl(returnUrl))
       throw new HttpsError("invalid-argument", "Invalid returnUrl");
 
-    // Paystack `amount` is in the smallest currency unit. For USD that's
-    // cents — $5 → 500. Compute here so the integer math stays explicit.
-    const amountCents = Math.round(pack.priceUsd * 100);
+    // Paystack `amount` is in the smallest currency unit. For GHS that's
+    // pesewas — ₵5 → 500. Compute here so the integer math stays explicit.
+    const amountSubunit = Math.round(pack.priceLocal * 100);
 
     try {
       const { checkoutUrl, reference } = await initPaystackTransaction({
-        secretKey:   PAYSTACK_SECRET_KEY.value(),
-        amountCents,
-        email:       userEmail,
-        callbackUrl: returnUrl,
+        secretKey:    PAYSTACK_SECRET_KEY.value(),
+        amountSubunit,
+        email:        userEmail,
+        callbackUrl:  returnUrl,
         // Everything the webhook needs to credit the right user. Paystack
         // echoes this back verbatim in the `data.metadata` field.
         metadata: {
           userId:         uid,
           packId,
           creditsToGrant: String(pack.credits),
-          amountCents:    String(amountCents),
-          priceUsd:       String(pack.priceUsd),
+          amountSubunit:  String(amountSubunit),
+          priceLocal:     String(pack.priceLocal),
+          currency:       "GHS",
         },
       });
       // Client side calls this `sessionId` historically — keep the alias
@@ -1865,7 +1870,8 @@ export const paystackWebhook = onRequest(
               to:         result.customerEmail,
               packLabel,
               credits:    result.creditsGranted,
-              priceUsd:   result.priceUsd,
+              priceLocal: result.priceLocal,
+              currency:   result.currency,
               newBalance: result.newCredits,
               paymentId:  result.reference,
             }).then(
