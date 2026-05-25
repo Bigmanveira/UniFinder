@@ -144,6 +144,19 @@ service cloud.firestore {
       allow write: if false;   // Written only by Cloud Functions via Admin SDK
     }
 
+    // Ops audit log — append-only record of admin actions taken in the
+    // ops portal (sign_in, user_viewed, future mutations like refunds
+    // and credit grants). Same access shape as errorLogs: admin reads
+    // for triage, no client writes — every entry is written by the
+    // `recordOpsAuditEvent` Cloud Function which verifies the admin
+    // custom claim before writing. This prevents a non-admin from
+    // ever creating a forged audit entry, even if they got hold of
+    // valid-shaped data.
+    match /auditLogs/{logId} {
+      allow read:  if isAdmin();
+      allow write: if false;
+    }
+
     // Referral codes: small reverse-lookup docs from code → userId.
     // - Any logged-in user can read (needed to verify a code on signup).
     // - A user can only CREATE a code that maps to their own uid, and only

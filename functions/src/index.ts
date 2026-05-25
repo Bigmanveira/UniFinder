@@ -2318,3 +2318,101 @@ export const sendOpsSignInLink = onCall(
     }
   },
 );
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ops portal — append-only audit log
+//
+// Every admin action taken through the ops portal flows through this
+// callable so we have a tamper-evident record of who did what, when. For
+// V1 the actions are read-only ("sign_in", "sign_out", "user_viewed");
+// when Tier-2 mutations land (refunds, manual credit grants), they'll
+// reuse this same write path with new `action` values so the log
+// continues to capture everything from one place.
+//
+// Security model:
+//   - Callers must be authenticated AND carry the `admin: true` custom
+//     claim. A non-admin can never write an entry, even with a forged
+//     payload, because we re-verify the claim from `request.auth.token`
+//     server-side (Firestore rules deny direct client writes too —
+//     belt-and-braces).
+//   - Actor identity (uid, email) comes from the auth token, NOT from
+//     the request body. Clients can't impersonate a different admin.
+//   - IP + user-agent are stamped server-side from the raw request so
+//     the entry survives a compromised client.
+//
+// Storage:
+//   - One doc per event in /auditLogs. Append-only (no updates, no
+//     deletes — even from the function side).
+//   - Same `logError` shape: small, flat, easy to filter on the ops
+//     portal side without a search index.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Action types we accept today. Adding a new action means adding it
+// here + handling it on the AuditPage UI; client-supplied actions
+// outside this set are rejected to keep the table column space
+// readable and prevent typos from creating "ghost" action types.
+const OPS_AUDIT_ACTIONS = new Set([
+  "sign_in",
+  "sign_out",
+  "user_viewed",
+] as const);
+
+export const recordOpsAuditEvent = onCall(
+  { ...LIGHT_OPTS },
+  async (request) => {
+    // Re-verify admin from the token server-side. Firestore rules also
+    // deny client writes to /auditLogs, but defense-in-depth.
+    const authToken = request.auth?.token;
+    if (!authToken || authToken.admin !== true) {
+      throw new HttpsError("permission-denied", "Admin only.");
+    }
+
+    const action = String(request.data?.action ?? "");
+    if (!(OPS_AUDIT_ACTIONS as Set<string>).has(action)) {
+      throw new HttpsError("invalid-argument", "Unknown audit action.");
+    }
+
+    const targetType = request.data?.targetType ? String(request.data.targetType).slice(0, 32) : null;
+    const targetId   = request.data?.targetId   ? String(request.data.targetId).slice(0, 128) : null;
+    // Metadata is free-form but capped. We JSON-stringify-roundtrip to
+    // strip functions/undefined and cap depth/size — same hygiene as
+    // errorLogger applies to its context field.
+    let metadata: Record<string, unknown> | null = null;
+    if (request.data?.metadata && typeof request.data.metadata === "object") {
+      try {
+        const json = JSON.stringify(request.data.metadata);
+        if (json.length <= 4_000) metadata = JSON.parse(json);
+      } catch {
+        metadata = null;
+      }
+    }
+
+    const ip = extractClientIp(request.rawRequest);
+    const ua = String(request.rawRequest?.headers?.["user-agent"] ?? "").slice(0, 240);
+
+    try {
+      await admin.firestore().collection("auditLogs").add({
+        actorUid:    request.auth!.uid,
+        actorEmail:  authToken.email ?? null,
+        action,
+        targetType,
+        targetId,
+        metadata,
+        ip,
+        userAgent:   ua,
+        createdAt:   admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return { ok: true as const };
+    } catch (err: any) {
+      // Audit write failure is not user-facing — the admin's action
+      // succeeded, we just couldn't record it. Log to Cloud Logging
+      // so we can spot a pattern.
+      console.warn("[ops-audit] write failed:", err?.message ?? err);
+      // Don't throw — the audit log is observational, not transactional.
+      // A throw here would block the calling action's UX for no real
+      // protection benefit (the action ran in the client; the log is
+      // separate).
+      return { ok: false as const };
+    }
+  },
+);
