@@ -92,16 +92,28 @@ const opsSignInRateLimit = createRateLimiter({
   windowMs:     60 * 60 * 1000,   // 1 hour
 });
 
-// Allow-listed origins the ops portal sign-in link can return the user to.
-// Locked down on purpose — if this list opens up, the email-link URL
-// becomes an open redirect vector. Add new origins explicitly when an
-// ops portal subdomain ships. The Firebase Auth "Authorized domains"
-// list must include each of these too.
-const OPS_PORTAL_ALLOWED_ORIGINS = new Set<string>([
-  "https://unifinder-ops.vercel.app",
-  "http://localhost:5174",         // ops portal dev server
-  "http://localhost:5173",         // generic Vite dev fallback
-]);
+// Decide whether a returnUrl origin is one the ops portal is allowed to
+// be served from. Layered with Firebase Auth's own "Authorized domains"
+// allow-list (set in Firebase Console > Authentication > Settings) —
+// that's the real gate, because `generateSignInWithEmailLink` rejects
+// any URL whose domain isn't authorized there. This local check is a
+// belt-and-braces shape filter so we fail fast with a clear error
+// before bothering the Admin SDK.
+//
+// Accepts:
+//   • any vercel.app subdomain (production + preview deployments)
+//   • collegeready.io and any collegeready.io subdomain (custom ops domain)
+//   • http://localhost (Vite dev server, any port)
+function isAllowedOpsPortalOrigin(origin: string): boolean {
+  let parsed: URL;
+  try { parsed = new URL(origin); } catch { return false; }
+  const { protocol, hostname } = parsed;
+  if (protocol === "http:" && hostname === "localhost") return true;
+  if (protocol !== "https:") return false;
+  if (hostname === "collegeready.io" || hostname.endsWith(".collegeready.io")) return true;
+  if (hostname.endsWith(".vercel.app")) return true;
+  return false;
+}
 
 // ─── Credit pricing ──────────────────────────────────────────────────────────
 // Single source of truth for every credit-deducting action. Keeping these as
@@ -2230,14 +2242,18 @@ export const sendOpsSignInLink = onCall(
       throw new HttpsError("invalid-argument", "Enter a valid email address.");
     }
 
-    // Return URL must originate from an allow-listed ops portal host.
+    // Return URL must come from a host shape we recognise as the ops
+    // portal (Vercel, custom collegeready.io subdomain, or localhost).
+    // Firebase Auth's authorized-domains list is the real gate; this is
+    // a fast-fail filter so we don't waste an Admin SDK call.
     let returnOrigin: string;
     try {
       returnOrigin = new URL(returnUrl).origin;
     } catch {
       throw new HttpsError("invalid-argument", "Invalid returnUrl.");
     }
-    if (!OPS_PORTAL_ALLOWED_ORIGINS.has(returnOrigin)) {
+    if (!isAllowedOpsPortalOrigin(returnOrigin)) {
+      console.warn("[ops-signin] rejected returnUrl origin:", returnOrigin);
       throw new HttpsError("invalid-argument", "Unauthorized returnUrl origin.");
     }
 
