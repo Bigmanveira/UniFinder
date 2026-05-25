@@ -120,27 +120,60 @@ export async function createMarketerCode(args: CreateMarketerCodeArgs): Promise<
 
 export async function listMarketerCodes(): Promise<MarketerCodeRow[]> {
   const db = admin.firestore();
-  const snap = await db.collection("referralCodes")
-    .where("type", "==", "marketer")
-    .orderBy("createdAt", "desc")
-    .limit(LIST_CAP)
-    .get();
 
-  return snap.docs.map((d) => {
-    const data: any = d.data();
-    return {
-      code:                   d.id,
-      marketerName:           typeof data.marketerName === "string" ? data.marketerName : "",
-      bonusCreditsForNewUser: typeof data.bonusCreditsForNewUser === "number" ? data.bonusCreditsForNewUser : 5,
-      enabled:                data.enabled !== false,
-      redemptionCount:        typeof data.redemptionCount === "number" ? data.redemptionCount : 0,
-      maxRedemptions:         typeof data.maxRedemptions === "number" ? data.maxRedemptions : null,
-      expiresAtMs:            tsToMs(data.expiresAt),
-      createdAtMs:            tsToMs(data.createdAt),
-      createdBy:              typeof data.createdBy === "string" ? data.createdBy : null,
-      lastRedeemedAtMs:       tsToMs(data.lastRedeemedAt),
-    };
-  });
+  // Fast path: composite (type, createdAt desc) index — declared in
+  // firestore.indexes.json and used when ready.
+  try {
+    const snap = await db.collection("referralCodes")
+      .where("type", "==", "marketer")
+      .orderBy("createdAt", "desc")
+      .limit(LIST_CAP)
+      .get();
+    return snap.docs.map(mapDocToRow);
+  } catch (err: any) {
+    // Firestore returns FAILED_PRECONDITION (gRPC code 9) when the
+    // composite index is missing OR still building post-deploy. We
+    // fall back to scanning the whole collection and filtering in
+    // memory so the ops portal stays functional during the few
+    // minutes Firestore needs to backfill an index. At this scale
+    // (admin-managed campaign codes) the collection is bounded — a
+    // few hundred docs max — so the fallback cost is negligible.
+    const code = err?.code ?? err?.status;
+    const message = String(err?.message ?? "");
+    const looksLikeIndexIssue =
+      code === 9 ||
+      code === "failed-precondition" ||
+      message.includes("requires an index") ||
+      message.includes("index is currently building");
+    if (!looksLikeIndexIssue) throw err;
+
+    console.warn("[marketerCodes] composite index unavailable, using in-memory fallback");
+    const allSnap = await db.collection("referralCodes").get();
+    const rows = allSnap.docs
+      .filter((d) => (d.data() as any)?.type === "marketer")
+      .map(mapDocToRow)
+      .sort((a, b) => (b.createdAtMs ?? 0) - (a.createdAtMs ?? 0))
+      .slice(0, LIST_CAP);
+    return rows;
+  }
+}
+
+// Shared row mapping so both the fast-path and fallback queries produce
+// the same shape. Defaults match the create-time defaults below.
+function mapDocToRow(d: FirebaseFirestore.QueryDocumentSnapshot): MarketerCodeRow {
+  const data: any = d.data();
+  return {
+    code:                   d.id,
+    marketerName:           typeof data.marketerName === "string" ? data.marketerName : "",
+    bonusCreditsForNewUser: typeof data.bonusCreditsForNewUser === "number" ? data.bonusCreditsForNewUser : 5,
+    enabled:                data.enabled !== false,
+    redemptionCount:        typeof data.redemptionCount === "number" ? data.redemptionCount : 0,
+    maxRedemptions:         typeof data.maxRedemptions === "number" ? data.maxRedemptions : null,
+    expiresAtMs:            tsToMs(data.expiresAt),
+    createdAtMs:            tsToMs(data.createdAt),
+    createdBy:              typeof data.createdBy === "string" ? data.createdBy : null,
+    lastRedeemedAtMs:       tsToMs(data.lastRedeemedAt),
+  };
 }
 
 // ─── Toggle enable/disable ─────────────────────────────────────────────
