@@ -57,10 +57,12 @@ const DEFAULT_MESSAGE = "We're making improvements behind the scenes.";
 // External social URLs. Set to "" / null to hide an icon; we keep
 // the slots reserved so the footer layout stays balanced if we add
 // or remove a platform later.
+// College Ready is built by 233Labs — the socials point at the studio's
+// channels rather than a product-specific handle.
 const SOCIALS = [
-  { label: "X (Twitter)", href: "https://x.com/collegeready_io",                          icon: <XIcon /> },
-  { label: "Instagram",   href: "https://www.instagram.com/collegeready.io",              icon: <InstagramIcon /> },
-  { label: "LinkedIn",    href: "https://www.linkedin.com/company/collegeready-io",       icon: <LinkedinIcon /> },
+  { label: "X (233Labs)",      href: "https://x.com/233labs",                       icon: <XIcon /> },
+  { label: "Instagram (233Labs)", href: "https://www.instagram.com/233labs",        icon: <InstagramIcon /> },
+  { label: "LinkedIn (233Labs)",  href: "https://www.linkedin.com/company/233labs", icon: <LinkedinIcon /> },
 ];
 
 function diffParts(ms: number): { days: number; hours: number; minutes: number; seconds: number } {
