@@ -21,6 +21,7 @@ import {
 } from "./paystackPayments.js";
 import { sendPurchaseReceipt } from "./paymentReceiptEmail.js";
 import { sendWelcomeEmail } from "./welcomeEmail.js";
+import { sendOpsSignInLinkEmail } from "./opsSignInEmail.js";
 import { logError } from "./errorLogger.js";
 import { createRateLimiter, extractClientIp } from "./rateLimiter.js";
 
@@ -81,6 +82,26 @@ const waitlistRateLimit = createRateLimiter({
   maxPerWindow: 5,
   windowMs:     60 * 60 * 1000,   // 1 hour
 });
+
+// sendOpsSignInLink: ops portal sign-in. The legit user is one analyst
+// requesting one link. 6 per hour leaves slack for "I closed the tab
+// before clicking" retries while still throttling email-bomb attempts
+// at any address an attacker might guess as an admin.
+const opsSignInRateLimit = createRateLimiter({
+  maxPerWindow: 6,
+  windowMs:     60 * 60 * 1000,   // 1 hour
+});
+
+// Allow-listed origins the ops portal sign-in link can return the user to.
+// Locked down on purpose — if this list opens up, the email-link URL
+// becomes an open redirect vector. Add new origins explicitly when an
+// ops portal subdomain ships. The Firebase Auth "Authorized domains"
+// list must include each of these too.
+const OPS_PORTAL_ALLOWED_ORIGINS = new Set<string>([
+  "https://unifinder-ops.vercel.app",
+  "http://localhost:5174",         // ops portal dev server
+  "http://localhost:5173",         // generic Vite dev fallback
+]);
 
 // ─── Credit pricing ──────────────────────────────────────────────────────────
 // Single source of truth for every credit-deducting action. Keeping these as
@@ -2168,6 +2189,116 @@ export const onUserCreated = onDocumentCreated(
         { welcomeEmailError: msg, welcomeEmailErrorAt: admin.firestore.FieldValue.serverTimestamp() },
         { merge: true },
       );
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ops portal — branded magic-link sign-in
+//
+// Replaces Firebase's built-in sendSignInLinkToEmail (which sent from
+// noreply@<project>.firebaseapp.com and routinely landed in spam) with a
+// Resend-sent email from `College Ready <noreply@collegeready.io>` — the
+// same SPF/DKIM-aligned sender we use for every other transactional email.
+//
+// Security:
+//   - Per-IP rate limit (6/hour) so the endpoint can't be turned into a
+//     spam cannon if leaked.
+//   - Per-email existence check: we only send to addresses that already
+//     have a Firebase Auth user (admins are pre-provisioned in the
+//     Firebase Console before being granted the admin claim). The
+//     response is intentionally identical whether the email exists or
+//     not — prevents enumeration of valid admin emails.
+//   - returnUrl must match a hardcoded allow-list of ops portal origins.
+//     Without this, an attacker could trigger a real email from us with
+//     a sign-in URL that redirects to their server post-auth.
+// ─────────────────────────────────────────────────────────────────────────────
+export const sendOpsSignInLink = onCall(
+  { ...LIGHT_OPTS, secrets: [RESEND_API_KEY] },
+  async (request) => {
+    const ip = extractClientIp(request.rawRequest);
+    const rl = opsSignInRateLimit(ip);
+    if (!rl.allowed) {
+      throw new HttpsError("resource-exhausted", "Too many sign-in requests — try again in a few minutes.");
+    }
+
+    const email = String(request.data?.email ?? "").trim().toLowerCase();
+    const returnUrl = String(request.data?.returnUrl ?? "");
+
+    // Format check — RFC-ish, defensive against header-injection chars.
+    if (!/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(email)) {
+      throw new HttpsError("invalid-argument", "Enter a valid email address.");
+    }
+
+    // Return URL must originate from an allow-listed ops portal host.
+    let returnOrigin: string;
+    try {
+      returnOrigin = new URL(returnUrl).origin;
+    } catch {
+      throw new HttpsError("invalid-argument", "Invalid returnUrl.");
+    }
+    if (!OPS_PORTAL_ALLOWED_ORIGINS.has(returnOrigin)) {
+      throw new HttpsError("invalid-argument", "Unauthorized returnUrl origin.");
+    }
+
+    // Existence check — only send to pre-provisioned auth users. We
+    // intentionally do NOT surface "no such user" to the caller; this
+    // prevents probing the admin email list.
+    let userExists = true;
+    try {
+      await admin.auth().getUserByEmail(email);
+    } catch (err: any) {
+      if (err?.code === "auth/user-not-found") {
+        userExists = false;
+      } else {
+        // Unknown auth-admin failure — log and swallow; we still want to
+        // return the generic success response to avoid enumeration.
+        console.warn("[ops-signin] getUserByEmail failed:", err?.message ?? err);
+        void logError({
+          category: "external_api",
+          source:   "ops_signin.user_lookup_failed",
+          severity: "warning",
+          message:  err?.message ?? String(err),
+          context:  { email },
+        });
+      }
+    }
+
+    if (!userExists) {
+      // Pretend everything is fine but actually do nothing. Constant-time
+      // matters less here than a consistent response shape; we don't
+      // measure timing in any way that would leak.
+      return { ok: true as const };
+    }
+
+    try {
+      // Generate the actual Firebase sign-in URL. The link itself is
+      // standard Firebase email-link auth — handleCodeInApp=true means
+      // when the user clicks it, they're returned to the SPA route which
+      // calls signInWithEmailLink() to complete the flow.
+      const link = await admin.auth().generateSignInWithEmailLink(email, {
+        url:             returnUrl,
+        handleCodeInApp: true,
+      });
+
+      // Send via Resend with our brand.
+      const { id } = await sendOpsSignInLinkEmail({
+        apiKey: RESEND_API_KEY.value(),
+        to:     email,
+        link,
+      });
+      console.log("[ops-signin] link sent", { email, messageId: id });
+      return { ok: true as const };
+    } catch (err: any) {
+      console.error("[ops-signin] failed to send link:", err?.message ?? err);
+      void logError({
+        category: "email_send",
+        source:   "ops_signin.send_failed",
+        severity: "error",
+        message:  err?.message ?? String(err),
+        context:  { email },
+      });
+      throw new HttpsError("internal", "Could not send sign-in link. Try again.");
     }
   },
 );

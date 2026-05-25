@@ -50,7 +50,7 @@
       ]
     },
     {
-      "collectionGroup": "dodoPayments",
+      "collectionGroup": "paystackPayments",
       "queryScope": "COLLECTION",
       "fields": [
         { "fieldPath": "userId",    "order": "ASCENDING"  },
