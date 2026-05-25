@@ -2,13 +2,13 @@
 // paymentReceiptEmail — Resend-powered receipt sent after a successful
 // payment lands credits in the user's wallet.
 //
-// Fired by the dodoWebhook handler AFTER `applyPaymentSucceeded` resolves —
+// Fired by the paystackWebhook handler AFTER `applyPaystackChargeSuccess` resolves —
 // outside the Firestore transaction (transactions can retry, and we don't
 // want to send the same email N times). Best-effort: if Resend errors, the
 // credit grant still stands; the customer can always see their balance in
 // the app even without the email.
 //
-// This is a brand confirmation, NOT a tax/compliance receipt — Dodo's own
+// This is a brand confirmation, NOT a tax/compliance receipt — Paystack's own
 // auto-receipt covers that side. Tone is warm and product-focused.
 // ─────────────────────────────────────────────────────────────────────────────
 

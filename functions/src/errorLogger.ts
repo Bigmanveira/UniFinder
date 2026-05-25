@@ -9,17 +9,17 @@
 //   try {
 //     ...
 //   } catch (err: any) {
-//     console.warn("[dodo] webhook signature invalid:", err?.message ?? err);
+//     console.warn("[paystack] webhook signature invalid");
 //     // ADD logError NEXT TO the existing log — do NOT replace.
 //     // Fire-and-forget: don't await inside a webhook handler.
 //     void logError({
 //       category: "payment_webhook",
-//       source:   "dodo.signature_invalid",
+//       source:   "paystack.signature_invalid",
 //       severity: "error",
 //       message:  err?.message ?? String(err),
-//       context:  { webhookId },
+//       context:  { signaturePrefix: signature.slice(0, 12) },
 //     });
-//     res.status(400).send("Invalid signature");
+//     res.status(401).send("Invalid signature");
 //     return;
 //   }
 //
@@ -60,7 +60,7 @@ export type ErrorSeverity = "error" | "warning";
 export interface LogErrorArgs {
   /** Coarse bucket for filtering in the ops portal */
   category: ErrorCategory;
-  /** Narrow label, e.g. "dodo.signature_invalid", "heygen.token_network" */
+  /** Narrow label, e.g. "paystack.signature_invalid", "heygen.token_network" */
   source: string;
   /** Defaults to "error". Use "warning" for non-fatal (e.g. receipt email failed but credits granted). */
   severity?: ErrorSeverity;

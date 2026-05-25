@@ -14,11 +14,11 @@ import { synthesizeOfficerAudio } from "./avatarTts.js";
 import { extractVisaDocument, type VisaDocumentType, type ExtractedDocument } from "./visaDocExtractor.js";
 import { aiMatchSchools, type AiCandidate } from "./aiMatch.js";
 import {
-  createDodoCheckoutSession,
-  verifyDodoWebhook,
-  applyPaymentSucceeded,
-  applyPaymentRefunded,
-} from "./dodoPayments.js";
+  initPaystackTransaction,
+  verifyPaystackWebhook,
+  applyPaystackChargeSuccess,
+  applyPaystackRefund,
+} from "./paystackPayments.js";
 import { sendPurchaseReceipt } from "./paymentReceiptEmail.js";
 import { sendWelcomeEmail } from "./welcomeEmail.js";
 import { logError } from "./errorLogger.js";
@@ -28,8 +28,7 @@ admin.initializeApp();
 
 const ANTHROPIC_API_KEY        = defineSecret("ANTHROPIC_API_KEY");
 const HEYGEN_API_KEY           = defineSecret("HEYGEN_API_KEY");
-const DODO_PAYMENTS_API_KEY    = defineSecret("DODO_PAYMENTS_API_KEY");
-const DODO_PAYMENTS_WEBHOOK_KEY = defineSecret("DODO_PAYMENTS_WEBHOOK_KEY");
+const PAYSTACK_SECRET_KEY      = defineSecret("PAYSTACK_SECRET_KEY");
 const RESEND_API_KEY           = defineSecret("RESEND_API_KEY");
 
 // ─── Instance caps ───────────────────────────────────────────────────────────
@@ -107,9 +106,9 @@ const FREE_CREDITS_ON_SIGNUP   = 5;
 // realistic ask (bank statement, sponsor letter, employment letter).
 const MAX_SUPPORTING_DOCS_PER_INTERVIEW = 3;
 
-// Dodo Payments — one-time credit-pack products. The product_id values must
-// match what's configured in the Dodo dashboard. Pricing lives in Dodo (we
-// don't trust the client) but we mirror it here for the in-app billing UI.
+// Credit packs — pricing lives here on the server (the client supplies only
+// the packId to checkout, never a price). Paystack accepts arbitrary amount
+// per call so we don't need pre-created products on their side.
 //
 // Edit this list when launching new packs; the credit amount and price are
 // also referenced by the client UI via the listCreditPacks callable.
@@ -140,19 +139,19 @@ const MAX_SUPPORTING_DOCS_PER_INTERVIEW = 3;
 // "Try" pack ($2/6cr) exists to lower the absolute entry price for
 // students who balk at $5. It's not enough for a visa interview but
 // buys 6 match-unlocks. ~70% margin per unlock comfortably absorbs
-// Dodo's per-transaction fee (~$0.30 + 3%) at the $2 level.
+// Paystack's per-transaction fee (~3.9% + ~$0.10 for international USD)
+// at the $2 level.
 export const CREDIT_PACKS: Record<string, {
-  productId: string;     // Dodo product id — set after creating products in dashboard
-  label: string;
-  priceUsd: number;      // What we charge
-  credits: number;       // What the user receives
+  label:        string;
+  priceUsd:     number;   // What we charge (USD)
+  credits:      number;   // What the user receives
   recommended?: boolean;
 }> = {
-  try:     { productId: "pdt_0Nf7vOA8zsn1zSnsMRfp4", label: "Try",     priceUsd:   2, credits:   6 },
-  starter: { productId: "pdt_0Nf7vZAZA3tbthN3LljwO", label: "Starter", priceUsd:   5, credits:  15 },
-  plus:    { productId: "pdt_0Nf7w8zJF1lc9NCTR86bg", label: "Plus",    priceUsd:  15, credits:  45, recommended: true },
-  pro:     { productId: "pdt_0Nf7wK2sInrt7WEyXNItP", label: "Pro",     priceUsd:  40, credits: 120 },
-  power:   { productId: "pdt_0Nf7wUVLfwQ3WxRJ2vyKD", label: "Power",   priceUsd: 100, credits: 300 },
+  try:     { label: "Try",     priceUsd:   2, credits:   6 },
+  starter: { label: "Starter", priceUsd:   5, credits:  15 },
+  plus:    { label: "Plus",    priceUsd:  15, credits:  45, recommended: true },
+  pro:     { label: "Pro",     priceUsd:  40, credits: 120 },
+  power:   { label: "Power",   priceUsd: 100, credits: 300 },
 };
 // Greeting + DS-160 ask. The interview proper (real questions) doesn't begin
 // until BOTH the DS-160 confirmation page and the I-20 have been uploaded.
@@ -1696,27 +1695,17 @@ export const markAvatarStatus = onCall({ ...LIGHT_OPTS }, async (request) => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Dodo Payments — credit-pack checkout + webhook
+// Paystack — credit-pack checkout + webhook
+//
+// Replaced Dodo Payments on 2026-05-24. Paystack is a better fit for the
+// African market (Ghana/Nigeria/Kenya), supports local cards + mobile money
+// when the merchant account is configured for it, and verifies merchants
+// faster than Dodo did.
+//
+// Test mode vs live mode is determined by which secret key is set in
+// PAYSTACK_SECRET_KEY (`sk_test_...` vs `sk_live_...`). No environment
+// constant needed in code — Paystack picks the mode from the key itself.
 // ─────────────────────────────────────────────────────────────────────────────
-
-// Dodo environment. Hardcoded to "test_mode" while the merchant account is
-// still pending Dodo's verification (verification of business KYC, bank
-// settlement, etc.). With a test-mode API key set as the secret, this MUST
-// be "test_mode" or Dodo rejects every checkout creation with 401.
-//
-// Switch to "live_mode" when:
-//   1. Dodo dashboard shows the account as verified, AND
-//   2. DODO_PAYMENTS_API_KEY Firebase Secret has been rotated to a live key
-//      (`printf '%s' 'sk_live_...' | firebase functions:secrets:set DODO_PAYMENTS_API_KEY ...`), AND
-//   3. DODO_PAYMENTS_WEBHOOK_KEY has been rotated to the live-mode webhook
-//      signing secret.
-// Then redeploy createDodoCheckout + dodoWebhook.
-//
-// (Earlier this was a process.env lookup with a .env.unifinder-dev-d61aa
-// file. Firebase v2 didn't reliably pick up the project-specific file in
-// our deploys, so the function silently kept defaulting to live_mode and
-// every checkout 401'd. Hardcoding the constant removed the moving part.)
-const DODO_ENV: "live_mode" | "test_mode" = "test_mode";
 
 /** Public catalogue — client reads this to render the billing tab. */
 export const listCreditPacks = onCall({ ...LIGHT_OPTS }, async () => {
@@ -1730,13 +1719,14 @@ export const listCreditPacks = onCall({ ...LIGHT_OPTS }, async () => {
 });
 
 /**
- * Create a Dodo checkout session for the requested credit pack and return
- * the URL the browser should redirect to. The client supplies only the
- * packId — pricing and credit amount come from CREDIT_PACKS server-side so
- * a tampered client can't pay $5 for the Power pack.
+ * Create a Paystack hosted-checkout session for the requested credit pack
+ * and return the authorization_url the browser should redirect to. The
+ * client supplies only the packId — pricing and credit amount come from
+ * CREDIT_PACKS server-side so a tampered client can't pay $2 for the
+ * Power pack.
  */
-export const createDodoCheckout = onCall(
-  { ...LIGHT_OPTS, secrets: [DODO_PAYMENTS_API_KEY] },
+export const createPaystackCheckout = onCall(
+  { ...LIGHT_OPTS, secrets: [PAYSTACK_SECRET_KEY] },
   async (request) => {
     const uid = request.auth?.uid;
     if (!uid)                throw new HttpsError("unauthenticated", "Sign in to buy credits");
@@ -1745,118 +1735,127 @@ export const createDodoCheckout = onCall(
 
     const packId    = String(request.data?.packId ?? "");
     const returnUrl = String(request.data?.returnUrl ?? "");
-    const cancelUrl = request.data?.cancelUrl ? String(request.data.cancelUrl) : "";
     const pack = CREDIT_PACKS[packId];
     if (!pack)               throw new HttpsError("invalid-argument", "Unknown credit pack");
     const isAllowedUrl = (url: string) =>
       url.startsWith("https://") || url.startsWith("http://localhost") || url.startsWith("http://127.0.0.1");
     if (!isAllowedUrl(returnUrl))
       throw new HttpsError("invalid-argument", "Invalid returnUrl");
-    if (cancelUrl && !isAllowedUrl(cancelUrl))
-      throw new HttpsError("invalid-argument", "Invalid cancelUrl");
-    if (pack.productId.startsWith("REPLACE_WITH"))
-      throw new HttpsError("failed-precondition", "Credit pack not configured — admin must set Dodo product IDs.");
+
+    // Paystack `amount` is in the smallest currency unit. For USD that's
+    // cents — $5 → 500. Compute here so the integer math stays explicit.
+    const amountCents = Math.round(pack.priceUsd * 100);
 
     try {
-      const { checkoutUrl, sessionId } = await createDodoCheckoutSession({
-        apiKey:      DODO_PAYMENTS_API_KEY.value(),
-        environment: DODO_ENV,
-        pack,
-        packId,
-        userId:      uid,
-        userEmail,
-        returnUrl,
-        cancelUrl:   cancelUrl || undefined,
+      const { checkoutUrl, reference } = await initPaystackTransaction({
+        secretKey:   PAYSTACK_SECRET_KEY.value(),
+        amountCents,
+        email:       userEmail,
+        callbackUrl: returnUrl,
+        // Everything the webhook needs to credit the right user. Paystack
+        // echoes this back verbatim in the `data.metadata` field.
+        metadata: {
+          userId:         uid,
+          packId,
+          creditsToGrant: String(pack.credits),
+          amountCents:    String(amountCents),
+          priceUsd:       String(pack.priceUsd),
+        },
       });
-      return { checkoutUrl, sessionId };
+      // Client side calls this `sessionId` historically — keep the alias
+      // so DashboardPage doesn't need a rename in the same deploy.
+      return { checkoutUrl, sessionId: reference };
     } catch (err: any) {
-      console.error("[dodo] checkout creation failed:", err?.message ?? err);
+      console.error("[paystack] checkout creation failed:", err?.message ?? err);
+      void logError({
+        category:  "payment_webhook",   // not strictly a webhook, but same bucket in ops
+        source:    "paystack.init_failed",
+        severity:  "error",
+        message:   err?.message ?? String(err),
+        userId:    uid,
+        context:   { packId, userEmail },
+      });
       throw new HttpsError("internal", "Could not start checkout. Please try again.");
     }
   },
 );
 
 /**
- * Dodo webhook receiver. Raw HTTP endpoint (not callable) because Dodo posts
- * from the outside world. We verify the signature with the webhook secret,
- * then atomically credit the user's wallet on payment.succeeded.
+ * Paystack webhook receiver. Raw HTTP endpoint. We verify the HMAC-SHA512
+ * signature with the secret key (Paystack uses the same key for API auth
+ * AND webhook signing — no separate webhook secret), then dispatch by
+ * event type.
  *
  * Returns:
  *   200 + { ok: true }           on successful credit
- *   200 + { duplicated: true }   on already-processed (Dodo retries)
+ *   200 + { duplicated: true }   on already-processed (Paystack retries)
  *   200 + { ignored: true }      for event types we don't handle (still 200
- *                                so Dodo doesn't retry forever)
- *   400 on signature failure (causes Dodo to retry — correct behavior)
- *
- * IMPORTANT: returning anything other than 200 will cause Dodo to retry,
- * so 200 is the right answer for "we got it, even if it was a duplicate
- * or an event we don't care about."
+ *                                so Paystack stops retrying)
+ *   401 on signature failure (Paystack stops retrying — if it really is
+ *       Paystack and our key is wrong, the dashboard surfaces the delivery
+ *       failure and we investigate from there)
  */
-export const dodoWebhook = onRequest(
-  { ...LIGHT_OPTS, secrets: [DODO_PAYMENTS_WEBHOOK_KEY, RESEND_API_KEY], cors: false },
+export const paystackWebhook = onRequest(
+  { ...LIGHT_OPTS, secrets: [PAYSTACK_SECRET_KEY, RESEND_API_KEY], cors: false },
   async (req, res) => {
     if (req.method !== "POST") {
       res.status(405).send("Method not allowed");
       return;
     }
 
-    // We need the raw body for signature verification. Firebase v2 onRequest
-    // gives us req.rawBody as a Buffer when content-type is application/json.
-    const rawBody = (req.rawBody ?? Buffer.from("")).toString("utf8");
-    const webhookId        = String(req.header("webhook-id") ?? "");
-    const webhookSignature = String(req.header("webhook-signature") ?? "");
-    const webhookTimestamp = String(req.header("webhook-timestamp") ?? "");
-
-    if (!webhookId || !webhookSignature || !webhookTimestamp) {
-      res.status(400).send("Missing webhook headers");
+    const rawBody   = (req.rawBody ?? Buffer.from("")).toString("utf8");
+    const signature = String(req.header("x-paystack-signature") ?? "");
+    if (!signature) {
+      res.status(400).send("Missing signature");
       return;
     }
 
-    let event;
-    try {
-      event = verifyDodoWebhook({
-        rawBody,
-        webhookKey:       DODO_PAYMENTS_WEBHOOK_KEY.value(),
-        webhookId,
-        webhookSignature,
-        webhookTimestamp,
-      });
-    } catch (err: any) {
-      console.warn("[dodo] webhook signature invalid:", err?.message ?? err);
+    const valid = verifyPaystackWebhook({
+      rawBody,
+      signature,
+      secretKey: PAYSTACK_SECRET_KEY.value(),
+    });
+    if (!valid) {
+      console.warn("[paystack] webhook signature invalid");
       void logError({
         category: "payment_webhook",
-        source:   "dodo.signature_invalid",
+        source:   "paystack.signature_invalid",
         severity: "error",
-        message:  err?.message ?? String(err),
-        context:  { webhookId, webhookTimestamp },
+        message:  "HMAC-SHA512 of body did not match x-paystack-signature header",
+        context:  { signaturePrefix: signature.slice(0, 12), bodyLength: rawBody.length },
       });
-      // 400 so Dodo retries — could be a transient timestamp drift.
-      res.status(400).send("Invalid signature");
+      res.status(401).send("Invalid signature");
+      return;
+    }
+
+    let event: any;
+    try {
+      event = JSON.parse(rawBody);
+    } catch {
+      res.status(400).send("Invalid JSON");
       return;
     }
 
     try {
-      if (event.type === "payment.succeeded") {
-        const result = await applyPaymentSucceeded(event);
+      if (event.event === "charge.success") {
+        const result = await applyPaystackChargeSuccess(event);
         if (!result.applied && !result.duplicated) {
-          console.warn("[dodo] payment.succeeded not applied:", result.reason);
-          // Pull correlation IDs from the event itself, not `result` —
-          // the not-applied result shape doesn't expose them.
-          const evData: any = (event as any).data ?? {};
+          console.warn("[paystack] charge.success not applied:", result.reason);
+          const evData: any = event.data ?? {};
           const evMd: any   = evData.metadata ?? {};
           void logError({
             category: "payment_webhook",
-            source:   "dodo.payment_succeeded_not_applied",
+            source:   "paystack.charge_success_not_applied",
             severity: "error",
-            message:  result.reason ?? "payment.succeeded not applied",
-            paymentId: typeof evData.payment_id === "string" ? evData.payment_id : null,
+            message:  result.reason ?? "charge.success not applied",
+            paymentId: typeof evData.reference === "string" ? evData.reference : null,
             userId:    typeof evMd.userId === "string" ? evMd.userId : null,
-            context:   { eventType: event.type, webhookId, packId: evMd.packId },
+            context:   { eventType: event.event, packId: evMd.packId },
           });
         }
-        // Receipt email — fire-and-forget. We've already credited the
-        // wallet; if Resend fails the customer still has their credits and
-        // Dodo's auto-receipt covers the legal/compliance side. Log only.
+        // Receipt email — fire-and-forget. Credits already landed; if Resend
+        // fails the customer keeps their credits and Paystack's own receipt
+        // email covers the compliance side.
         if (result.applied) {
           const pack = CREDIT_PACKS[result.packId];
           const packLabel = pack?.label ?? result.packId;
@@ -1868,87 +1867,67 @@ export const dodoWebhook = onRequest(
               credits:    result.creditsGranted,
               priceUsd:   result.priceUsd,
               newBalance: result.newCredits,
-              paymentId:  result.paymentId,
+              paymentId:  result.reference,
             }).then(
-              ({ id }) => console.log("[dodo] receipt email sent", { paymentId: result.paymentId, messageId: id }),
+              ({ id }) => console.log("[paystack] receipt email sent", { reference: result.reference, messageId: id }),
               (err) => {
-                console.warn("[dodo] receipt email failed (credits already granted)", err?.message ?? err);
+                console.warn("[paystack] receipt email failed (credits already granted)", err?.message ?? err);
                 void logError({
                   category: "email_send",
-                  source:   "dodo.receipt_email_failed",
-                  severity: "warning",   // non-fatal: credits already granted
+                  source:   "paystack.receipt_email_failed",
+                  severity: "warning",
                   message:  err?.message ?? String(err),
-                  paymentId: result.paymentId,
-                  // applied:true shape doesn't expose userId; pull from
-                  // the webhook event metadata to keep ops correlation.
-                  userId:   typeof ((event as any).data?.metadata?.userId) === "string"
-                            ? (event as any).data.metadata.userId : null,
+                  paymentId: result.reference,
+                  userId:   typeof (event.data?.metadata?.userId) === "string"
+                            ? event.data.metadata.userId : null,
                   context:  { packId: result.packId, customerEmail: result.customerEmail },
                 });
               },
             );
           } else {
-            console.warn("[dodo] no customer email on payment.succeeded — skipping receipt", { paymentId: result.paymentId });
-            void logError({
-              category: "payment_webhook",
-              source:   "dodo.no_customer_email",
-              severity: "warning",
-              message:  "payment.succeeded with no customer email — receipt skipped",
-              paymentId: result.paymentId,
-              userId:   typeof ((event as any).data?.metadata?.userId) === "string"
-                        ? (event as any).data.metadata.userId : null,
-              context:  { packId: result.packId },
-            });
+            console.warn("[paystack] no customer email on charge.success — skipping receipt", { reference: result.reference });
           }
         }
-        // `duplicated` only exists on the applied:false branch — narrow the
-        // discriminated union so TypeScript doesn't complain.
         res.status(200).json({
           ok:         result.applied,
           duplicated: result.applied ? false : !!result.duplicated,
         });
         return;
       }
-      // Audit 2026-05-15: handle refunds/chargebacks by reversing the credit
-      // grant. Dodo's actual event names (confirmed against dashboard
-      // 2026-05-18) are `refund.succeeded` for admin refunds and
-      // `dispute.opened` for chargebacks. Both reverse the credit grant.
-      if (event.type === "refund.succeeded" || event.type === "dispute.opened") {
-        const result = await applyPaymentRefunded(event);
+      // Refunds + chargebacks reverse the credit grant.
+      if (event.event === "refund.processed" || event.event === "charge.dispute.create") {
+        const result = await applyPaystackRefund(event);
         if (!result.applied && !result.duplicated) {
-          console.warn(`[dodo] ${event.type} not applied:`, result.reason);
-          const evData: any = (event as any).data ?? {};
-          const evMd: any   = evData.metadata ?? {};
+          console.warn(`[paystack] ${event.event} not applied:`, result.reason);
+          const evData: any = event.data ?? {};
           void logError({
             category: "payment_webhook",
-            source:   `dodo.${event.type}_not_applied`,
+            source:   `paystack.${event.event.replace(/[^a-z0-9_]/gi, "_")}_not_applied`,
             severity: "error",
-            message:  result.reason ?? `${event.type} not applied`,
-            paymentId: typeof evData.payment_id === "string" ? evData.payment_id : null,
-            userId:    typeof evMd.userId === "string" ? evMd.userId : null,
-            context:   { eventType: event.type, webhookId },
+            message:  result.reason ?? `${event.event} not applied`,
+            paymentId: typeof evData.reference === "string" ? evData.reference : null,
+            context:   { eventType: event.event },
           });
         }
         res.status(200).json({ ok: result.applied, duplicated: !!result.duplicated });
         return;
       }
-      // payment.failed and any other events: log and 200 so Dodo stops retrying.
-      console.log("[dodo] received event:", event.type);
+      // Other events (charge.failed, transfer.success, etc.): log + 200.
+      console.log("[paystack] received event:", event.event);
       res.status(200).json({ ignored: true });
     } catch (err: any) {
-      console.error("[dodo] webhook processing error:", err?.message ?? err);
+      console.error("[paystack] webhook processing error:", err?.message ?? err);
       void logError({
         category: "payment_webhook",
-        source:   "dodo.webhook_processing_error",
+        source:   "paystack.webhook_processing_error",
         severity: "error",
         message:  err?.message ?? String(err),
         context:  {
-          eventType: (event as any)?.type,
-          webhookId,
+          eventType: event?.event,
           stack: typeof err?.stack === "string" ? err.stack.slice(0, 1000) : undefined,
         },
       });
-      // 500 so Dodo retries — transient Firestore issue, etc.
+      // 500 so Paystack retries — transient Firestore issue, etc.
       res.status(500).send("Webhook processing failed");
     }
   },

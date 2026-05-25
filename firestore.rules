@@ -123,10 +123,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Dodo Payments — one record per fulfilled purchase, written by the
-    // dodoWebhook Cloud Function via Admin SDK (so the write side is
+    // Paystack — one record per fulfilled purchase, written by the
+    // paystackWebhook Cloud Function via Admin SDK (so the write side is
     // already protected). Users can read their own purchase history.
-    match /dodoPayments/{paymentId} {
+    // The old `dodoPayments` collection rule was removed 2026-05-24 when
+    // we cut over to Paystack; historical Dodo data is orphaned and the
+    // ops portal can ignore it.
+    match /paystackPayments/{reference} {
       allow read: if (request.auth != null && request.auth.uid == resource.data.userId) || isAdmin();
       allow write: if false;
     }

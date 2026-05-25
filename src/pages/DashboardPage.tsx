@@ -903,9 +903,9 @@ function ProfileTab({ user, username, onSignOut }: { user: any, username: string
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Billing tab — pulls credit packs from the backend, kicks off Dodo Payments
+// Billing tab — pulls credit packs from the backend, kicks off Paystack
 // hosted checkout, and surfaces a success/cancel banner when the user is
-// bounced back from Dodo via return_url.
+// bounced back from Paystack via callback_url.
 // ─────────────────────────────────────────────────────────────────────────────
 type CreditPack = {
   id:          string;
@@ -922,7 +922,7 @@ function BillingTab({ credits, userId }: { credits: number; userId: string | und
   const [error, setError]   = useState("");
   const [returnStatus, setReturnStatus] = useState<"paid" | "cancelled" | null>(null);
 
-  // Read return_url query param Dodo bounces back with. We strip it from
+  // Read query param Paystack bounces back with. We strip it from
   // the URL so refreshing the page doesn't keep showing the banner.
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -962,17 +962,12 @@ function BillingTab({ credits, userId }: { credits: number; userId: string | und
     setError("");
     try {
       const base = window.location.origin;
-      // Dodo bounces back here with the same URL on success or failure; we
-      // use query params to know which happened. (Dodo doesn't currently
-      // differentiate success/cancel return URLs in their public docs, so
-      // we surface both as ?paid=1 and rely on the webhook for ground truth.)
       const returnUrl = `${base}/app?tab=billing&paid=1`;
-      const fn  = httpsCallable(functions, "createDodoCheckout");
-      const res = await fn({ packId, returnUrl });
+      const cancelUrl = `${base}/app?tab=billing&cancelled=1`;
+      const fn  = httpsCallable(functions, "createPaystackCheckout");
+      const res = await fn({ packId, returnUrl, cancelUrl });
       const data = res.data as { checkoutUrl?: string };
       if (!data?.checkoutUrl) throw new Error("No checkout URL returned");
-      // Hard navigate — leaving SPA so on return the page boots fresh and
-      // wallet snapshot reflects the new balance.
       window.location.href = data.checkoutUrl;
     } catch (err: any) {
       console.error("Checkout failed:", err);
@@ -984,7 +979,7 @@ function BillingTab({ credits, userId }: { credits: number; userId: string | und
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl">
 
-      {/* Return-from-Dodo banner */}
+      {/* Return-from-Paystack banner */}
       {returnStatus === "paid" && (
         <div className="mb-6 bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-start gap-3">
           <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 flex-shrink-0">
@@ -1030,7 +1025,7 @@ function BillingTab({ credits, userId }: { credits: number; userId: string | und
       <ReferralCard userId={userId} />
 
       <h3 className="text-xl font-black text-slate-900 mb-2">Top Up Credits</h3>
-      <p className="text-sm text-slate-500 mb-6">Secure checkout by Dodo Payments. Credits post automatically once payment confirms.</p>
+      <p className="text-sm text-slate-500 mb-6">Secure checkout by Paystack. Credits post automatically once payment confirms.</p>
 
       {error && (
         <div className="mb-4 bg-rose-50 border border-rose-200 rounded-2xl p-3 text-sm text-rose-700 flex items-start gap-2">
@@ -1094,7 +1089,7 @@ function BillingTab({ credits, userId }: { credits: number; userId: string | und
       )}
 
       <p className="text-[11px] text-slate-400 mt-6 leading-relaxed">
-        Payments are processed by Dodo Payments. We don't see or store your card details.
+        Payments are processed by Paystack. We don't see or store your card details.
         Refunds and disputes: contact <a className="underline" href="mailto:support@collegeready.io">support@collegeready.io</a>.
       </p>
     </motion.div>
