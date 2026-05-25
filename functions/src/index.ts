@@ -22,6 +22,7 @@ import {
 import { sendPurchaseReceipt } from "./paymentReceiptEmail.js";
 import { sendWelcomeEmail } from "./welcomeEmail.js";
 import { sendOpsSignInLinkEmail } from "./opsSignInEmail.js";
+import { runCleanupTestPayments } from "./cleanupTestPayments.js";
 import { logError } from "./errorLogger.js";
 import { createRateLimiter, extractClientIp } from "./rateLimiter.js";
 
@@ -2414,5 +2415,75 @@ export const recordOpsAuditEvent = onCall(
       // separate).
       return { ok: false as const };
     }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ops portal — one-shot cleanup of test-mode payment data
+//
+// Triggered manually after going live. Wipes every paystackPayments doc
+// EXCEPT the one matching `liveReference`, every creditTransactions doc
+// not tied to that reference, and zeros every creditWallets balance
+// (planting the live payer's wallet with the credits the live pack
+// granted).
+//
+// Safety:
+//   - Admin custom claim re-verified server-side.
+//   - `confirm: "CONFIRM"` string required exactly — refuses booleans,
+//     numbers, lower-case variants, etc.
+//   - Writes an audit log entry (action: "test_payments_cleanup") so
+//     the action is traceable in the AuditPage even after the function
+//     is hot.
+// ─────────────────────────────────────────────────────────────────────────────
+export const cleanupTestPayments = onCall(
+  // 540s = the v2 max — large /users tables would otherwise blow the
+  // default 60s budget. We don't expect to hit it, but the safety
+  // headroom is free.
+  { ...LIGHT_OPTS, timeoutSeconds: 540 },
+  async (request) => {
+    const token = request.auth?.token;
+    if (!token || token.admin !== true) {
+      throw new HttpsError("permission-denied", "Admin only.");
+    }
+    const liveReference = String(request.data?.liveReference ?? "").trim();
+    const confirm       = String(request.data?.confirm ?? "");
+    if (!liveReference) {
+      throw new HttpsError("invalid-argument", "liveReference is required.");
+    }
+    if (confirm !== "CONFIRM") {
+      throw new HttpsError("invalid-argument", 'Pass confirm: "CONFIRM" exactly to authorize the deletion.');
+    }
+
+    let result;
+    try {
+      result = await runCleanupTestPayments({ liveReference });
+    } catch (err: any) {
+      console.error("[cleanup-test-payments] failed:", err?.message ?? err);
+      throw new HttpsError("internal", err?.message ?? "Cleanup failed.");
+    }
+
+    // Audit entry — bypass the OPS_AUDIT_ACTIONS allow-list because
+    // we're writing as the privileged Cloud Function, not a client. The
+    // AuditPage's badge map falls back to a neutral pill for unknown
+    // actions, so the entry still renders correctly.
+    try {
+      await admin.firestore().collection("auditLogs").add({
+        actorUid:    request.auth!.uid,
+        actorEmail:  token.email ?? null,
+        action:      "test_payments_cleanup",
+        targetType:  "paystackPayments",
+        targetId:    liveReference,
+        metadata:    result,
+        ip:          extractClientIp(request.rawRequest),
+        userAgent:   String(request.rawRequest?.headers?.["user-agent"] ?? "").slice(0, 240),
+        createdAt:   admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (err) {
+      // Audit failure here is purely observational — the cleanup
+      // already landed. Log + continue.
+      console.warn("[cleanup-test-payments] audit write failed:", err);
+    }
+
+    return result;
   },
 );
