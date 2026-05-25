@@ -178,6 +178,35 @@ function mapDocToRow(d: FirebaseFirestore.QueryDocumentSnapshot): MarketerCodeRo
 
 // ─── Toggle enable/disable ─────────────────────────────────────────────
 
+/**
+ * Hard-delete a marketer code from /referralCodes. The doc disappears
+ * entirely — there's no soft-delete tombstone.
+ *
+ * Existing users who redeemed the code retain `referredByMarketerCode:
+ * <code>` on their /users doc; that's a plain string, not a foreign
+ * key, so referential integrity isn't broken — the value just won't
+ * resolve to a live row anymore.
+ */
+export async function deleteMarketerCode(code: string): Promise<void> {
+  const normalisedCode = code.trim().toUpperCase();
+  if (!CODE_REGEX.test(normalisedCode)) {
+    throw new HttpsError("invalid-argument", "Invalid code format.");
+  }
+  const db  = admin.firestore();
+  const ref = db.collection("referralCodes").doc(normalisedCode);
+  const snap = await ref.get();
+  if (!snap.exists) {
+    throw new HttpsError("not-found", `Code "${normalisedCode}" does not exist.`);
+  }
+  if (snap.data()?.type !== "marketer") {
+    // Same defensive guard as setMarketerCodeEnabled — auto-generated
+    // user codes have their own lifecycle and shouldn't be deletable
+    // from the marketing surface.
+    throw new HttpsError("permission-denied", "This code is a user-generated code and can't be deleted from the marketing surface.");
+  }
+  await ref.delete();
+}
+
 export async function setMarketerCodeEnabled(code: string, enabled: boolean): Promise<void> {
   const normalisedCode = code.trim().toUpperCase();
   if (!CODE_REGEX.test(normalisedCode)) {

@@ -28,6 +28,7 @@ import {
   createMarketerCode,
   listMarketerCodes,
   setMarketerCodeEnabled,
+  deleteMarketerCode,
   applyMarketerCode,
 } from "./marketerCodes.js";
 import { logError } from "./errorLogger.js";
@@ -2599,7 +2600,7 @@ export const setMaintenanceMode = onCall(
 
 async function writeMarketerCodeAudit(
   request: any,
-  action: "marketer_code_created" | "marketer_code_toggled",
+  action: "marketer_code_created" | "marketer_code_toggled" | "marketer_code_deleted",
   targetCode: string,
   metadata: Record<string, unknown>,
 ): Promise<void> {
@@ -2671,5 +2672,32 @@ export const setMarketerReferralCodeEnabled = onCall(
     await setMarketerCodeEnabled(code, enabled);
     await writeMarketerCodeAudit(request, "marketer_code_toggled", code.toUpperCase(), { enabled });
     return { ok: true as const, code: code.toUpperCase(), enabled };
+  },
+);
+
+export const deleteMarketerReferralCode = onCall(
+  { ...LIGHT_OPTS },
+  async (request) => {
+    const token = request.auth?.token;
+    if (!token || token.admin !== true) {
+      throw new HttpsError("permission-denied", "Admin only.");
+    }
+    const code = String(request.data?.code ?? "").trim().toUpperCase();
+
+    // Snapshot the doc BEFORE deleting so the audit log carries the
+    // marketer name + redemption count at the moment of deletion.
+    // Otherwise the audit entry would just have the code string, with
+    // no context for forensic review.
+    const snap = await admin.firestore().collection("referralCodes").doc(code).get();
+    const before = snap.exists ? snap.data() ?? {} : null;
+
+    await deleteMarketerCode(code);
+
+    await writeMarketerCodeAudit(request, "marketer_code_deleted", code, {
+      marketerName:           before?.marketerName ?? null,
+      bonusCreditsForNewUser: before?.bonusCreditsForNewUser ?? null,
+      redemptionCount:        before?.redemptionCount ?? 0,
+    });
+    return { ok: true as const, code };
   },
 );
