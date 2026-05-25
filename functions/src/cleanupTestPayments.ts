@@ -11,6 +11,11 @@
 //      spends, etc.) so the ledger reads as "fresh launch".
 //   4. Sets every `creditWallets` balance to 0, then plants the live
 //      payer's wallet with the credits the live pack actually granted.
+//   5. Wipes every product-activity collection — matchReports, aiRuns,
+//      visaInterviewSessions / Messages / Reports / Documents, errorLogs.
+//      User accounts + their state (/users, /studentProfiles,
+//      /savedSchools, /roadmapProgress) deliberately stay put so
+//      dormant test accounts keep their profile.
 //
 // Why a Cloud Function and not a local script:
 //   - Admin SDK runs server-side with privileged Firestore access; no
@@ -27,11 +32,10 @@
 //   - If the liveReference isn't found, we throw before deleting anything.
 //
 // NOT-touched collections (intentional):
-//   - /users, /studentProfiles, /savedSchools, /roadmapProgress — user
-//     state survives. We're cleaning revenue + credit accounting only.
-//   - /matchReports, /aiRuns, /visaInterview* — product activity from
-//     test mode lingers but is read-only history; doesn't pollute the
-//     Payments dashboard or the audit picture.
+//   - /users, /studentProfiles, /savedSchools, /roadmapProgress,
+//     /referralCodes — user identity + state survives.
+//   - /auditLogs — the cleanup itself writes an entry here, and
+//     prior entries are the historical record of admin actions.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import * as admin from "firebase-admin";
@@ -46,7 +50,24 @@ export interface CleanupTestPaymentsResult {
   walletsReset:              number;
   liveUserId:                string;
   liveCreditsGranted:        number;
+  /** Per-collection delete counts for the activity wipe. Keys are
+   *  the Firestore collection names; values are doc counts deleted. */
+  activityDeleted:           Record<string, number>;
 }
+
+// Collections that hold pure test-usage data — every doc gets purged.
+// User identity + state (/users, /studentProfiles, /savedSchools,
+// /roadmapProgress) deliberately stays put so dormant test accounts
+// keep their profile rather than losing it by surprise.
+const ACTIVITY_COLLECTIONS = [
+  "matchReports",
+  "aiRuns",
+  "visaInterviewSessions",
+  "visaInterviewMessages",
+  "visaInterviewReports",
+  "visaInterviewDocuments",
+  "errorLogs",
+] as const;
 
 // Firestore caps a single WriteBatch at 500 ops. 400 leaves headroom
 // in case we ever combine writes from multiple collections in one
@@ -131,11 +152,23 @@ export async function runCleanupTestPayments(
     batch.set(doc.ref, { credits: balance, updatedAt: now }, { merge: true });
   });
 
+  // 6. Wipe product-activity collections. These are pure test usage —
+  //    every doc goes. Post-cleanup the Business Report's funnel,
+  //    product-usage, COGS, and Health page all read as "zero
+  //    activity" until real users start interacting.
+  const activityDeleted: Record<string, number> = {};
+  for (const collName of ACTIVITY_COLLECTIONS) {
+    const snap = await db.collection(collName).get();
+    await batchedWrite(snap.docs.map((d) => d.ref), (batch, ref) => batch.delete(ref));
+    activityDeleted[collName] = snap.size;
+  }
+
   return {
     paystackPaymentsDeleted:   paymentRefsToDelete.length,
     creditTransactionsDeleted: txRefsToDelete.length,
     walletsReset:              allWallets.size,
     liveUserId,
     liveCreditsGranted,
+    activityDeleted,
   };
 }
