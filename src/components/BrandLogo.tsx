@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import webLogo from "../assets/weblogo.png";
+import { useAuth } from "../hooks/useAuth";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // BrandLogo — the College Ready wordmark.
@@ -48,6 +49,11 @@ export default function BrandLogo({
 }: Props) {
   const s = SIZES[size];
   const textColor = tone === "dark" ? "text-slate-900" : "text-white";
+  // Logo click goes to the dashboard for signed-in users (otherwise bouncing
+  // them to the marketing landing — with a "Log In" CTA they're already past —
+  // looks broken). Guests still go to the marketing root.
+  const { user } = useAuth();
+  const linkTarget = user ? "/app" : "/";
 
   const inner = (
     <div className={`flex items-center ${s.gap} ${className}`}>
@@ -77,7 +83,7 @@ export default function BrandLogo({
   );
 
   if (asLink) {
-    return <Link to="/" aria-label="College Ready home" className="inline-block">{inner}</Link>;
+    return <Link to={linkTarget} aria-label="College Ready home" className="inline-block">{inner}</Link>;
   }
   return inner;
 }

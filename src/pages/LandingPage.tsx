@@ -30,9 +30,7 @@ export default function LandingPage() {
   // the dashboard. Signed-out users sign up first; the same destination is
   // preserved via ProtectedRoute's `next` param so they land on Billing
   // after auth instead of the default Home tab.
-  const billingHref = user
-    ? "/app?tab=billing"
-    : `/signup?next=${encodeURIComponent("/app?tab=billing")}`;
+  const billingHref = "/pricing";
 
   // When the user clicks an in-page anchor (Pricing / How It Works) the URL
   // gets a hash like #pricing. If they then scroll all the way back to the
@@ -74,18 +72,29 @@ export default function LandingPage() {
           <BrandLogo size="lg" />
           <nav className="hidden md:flex items-center gap-8">
             <a href="#how-it-works" className="text-sm font-bold text-slate-500 hover:text-primary-600 transition-colors">How it Works</a>
-            <a href="#pricing" className="text-sm font-bold text-slate-500 hover:text-primary-600 transition-colors">Pricing</a>
+            <Link to="/pricing" className="text-sm font-bold text-slate-500 hover:text-primary-600 transition-colors">Pricing</Link>
             <Link to="/faq" className="text-sm font-bold text-slate-500 hover:text-primary-600 transition-colors">FAQ</Link>
           </nav>
           <div className="flex items-center gap-3 md:gap-4">
-            {/* Log In hides on phones — the badge + wordmark + Start Free
-                already fill the pill. Returning users tap Start Free,
-                which routes them to /intake; they can switch to /login
-                from there. On sm+ the link returns. */}
-            <Link to="/login" className="hidden sm:inline text-sm font-bold text-slate-900 hover:text-primary-600 transition-colors">Log In</Link>
-            <Link to="/intake" className="bg-slate-900 text-white px-4 md:px-5 py-2 md:py-2.5 rounded-full text-sm font-bold hover:bg-slate-800 transition-transform active:scale-95 shadow-md">
-              Start Free
-            </Link>
+            {user ? (
+              // Signed-in viewers shouldn't see "Log In" / "Start Free" — they're
+              // already in. Drop them straight at the dashboard. Single CTA keeps
+              // the pill's visual rhythm intact.
+              <Link to="/app" className="bg-slate-900 text-white px-4 md:px-5 py-2 md:py-2.5 rounded-full text-sm font-bold hover:bg-slate-800 transition-transform active:scale-95 shadow-md">
+                Dashboard
+              </Link>
+            ) : (
+              <>
+                {/* Log In hides on phones — the badge + wordmark + Start Free
+                    already fill the pill. Returning users tap Start Free,
+                    which routes them to /intake; they can switch to /login
+                    from there. On sm+ the link returns. */}
+                <Link to="/login" className="hidden sm:inline text-sm font-bold text-slate-900 hover:text-primary-600 transition-colors">Log In</Link>
+                <Link to="/intake" className="bg-slate-900 text-white px-4 md:px-5 py-2 md:py-2.5 rounded-full text-sm font-bold hover:bg-slate-800 transition-transform active:scale-95 shadow-md">
+                  Start Free
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </header>
