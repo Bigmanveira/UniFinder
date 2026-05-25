@@ -31,6 +31,11 @@ import {
   deleteMarketerCode,
   applyMarketerCode,
 } from "./marketerCodes.js";
+import {
+  listOpsAdmins,
+  inviteOpsAdmin,
+  revokeOpsAdmin,
+} from "./opsAdmins.js";
 import { logError } from "./errorLogger.js";
 import { createRateLimiter, extractClientIp } from "./rateLimiter.js";
 
@@ -2737,5 +2742,119 @@ export const deleteMarketerReferralCode = onCall(
       redemptionCount:        before?.redemptionCount ?? 0,
     });
     return { ok: true as const, code };
+  },
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Ops portal — admin allowlist management
+//
+// inviteOpsAdmin / listOpsAdmins / revokeOpsAdmin are the three
+// callables behind the ops-portal /admins page. They wrap the
+// helpers in opsAdmins.ts with the same admin-gate-and-audit
+// pattern every other privileged callable uses.
+//
+// Invite specifically reuses the same returnUrl shape check as
+// sendOpsSignInLink so a malicious admin can't trick us into
+// emailing a sign-in link to a crafted phishing URL — Firebase's
+// own authorized-domains list is still the deep gate, but
+// rejecting unknown origins at the function layer is the
+// fail-fast.
+// ─────────────────────────────────────────────────────────────────────────────
+
+async function writeOpsAdminAudit(
+  request: any,
+  action: "admin_invited" | "admin_revoked",
+  targetUid: string,
+  metadata: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await admin.firestore().collection("auditLogs").add({
+      actorUid:    request.auth!.uid,
+      actorEmail:  request.auth?.token?.email ?? null,
+      action,
+      targetType:  "opsAdmin",
+      targetId:    targetUid,
+      metadata,
+      ip:          extractClientIp(request.rawRequest),
+      userAgent:   String(request.rawRequest?.headers?.["user-agent"] ?? "").slice(0, 240),
+      createdAt:   admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    console.warn("[ops-admin] audit write failed:", err);
+  }
+}
+
+export const listOpsAdminsFn = onCall(
+  { ...LIGHT_OPTS },
+  async (request) => {
+    const token = request.auth?.token;
+    if (!token || token.admin !== true) {
+      throw new HttpsError("permission-denied", "Admin only.");
+    }
+    const rows = await listOpsAdmins();
+    return { rows };
+  },
+);
+
+export const inviteOpsAdminFn = onCall(
+  { ...LIGHT_OPTS, secrets: [RESEND_API_KEY] },
+  async (request) => {
+    const token = request.auth?.token;
+    if (!token || token.admin !== true) {
+      throw new HttpsError("permission-denied", "Admin only.");
+    }
+    const email = String(request.data?.email ?? "");
+    const returnUrl = String(request.data?.returnUrl ?? "");
+
+    // Same returnUrl allow-list as sendOpsSignInLink. Reuses the same
+    // predicate so any future ops-portal origin we add only has to be
+    // registered in one place.
+    let returnOrigin: string;
+    try {
+      returnOrigin = new URL(returnUrl).origin;
+    } catch {
+      throw new HttpsError("invalid-argument", "Invalid returnUrl.");
+    }
+    if (!isAllowedOpsPortalOrigin(returnOrigin)) {
+      console.warn("[ops-admin-invite] rejected returnUrl origin:", returnOrigin);
+      throw new HttpsError("invalid-argument", "Unauthorized returnUrl origin.");
+    }
+
+    const result = await inviteOpsAdmin({
+      email,
+      returnUrl,
+      resendKey: RESEND_API_KEY.value(),
+    });
+
+    await writeOpsAdminAudit(request, "admin_invited", result.uid, {
+      email:       result.email,
+      granted:     result.granted,
+      userCreated: result.userCreated,
+      emailSent:   result.emailSent,
+    });
+
+    return result;
+  },
+);
+
+export const revokeOpsAdminFn = onCall(
+  { ...LIGHT_OPTS },
+  async (request) => {
+    const token = request.auth?.token;
+    if (!token || token.admin !== true) {
+      throw new HttpsError("permission-denied", "Admin only.");
+    }
+    const targetUid = String(request.data?.uid ?? "");
+    if (!targetUid) {
+      throw new HttpsError("invalid-argument", "Missing target uid.");
+    }
+    const result = await revokeOpsAdmin({
+      targetUid,
+      actorUid: request.auth!.uid,
+    });
+    if (result.revoked) {
+      await writeOpsAdminAudit(request, "admin_revoked", targetUid, { actor: request.auth!.uid });
+    }
+    return result;
   },
 );
