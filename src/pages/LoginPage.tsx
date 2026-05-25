@@ -54,11 +54,19 @@ export default function LoginPage() {
   const fromResults = searchParams.get("from") === "results";
   const nextPath    = sanitizeNextPath(searchParams.get("next"));
 
-  const [email, setEmail]       = useState("");
+  // Pre-fill email from ?email=… so the "no account, sign up instead"
+  // banner on SignupPage can bounce a confused user back here without
+  // making them retype their address. (And vice-versa — see SignupPage.)
+  const prefillEmail = searchParams.get("email") ?? "";
+  const [email, setEmail]       = useState(prefillEmail);
   const [loading, setLoading]   = useState(false);
   const [sent, setSent]         = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [error, setError]       = useState<string | null>(null);
+  // When the server says "no account with this email" we render a
+  // dedicated switch-to-signup banner. Distinct from generic `error`
+  // so the banner only shows for this specific case.
+  const [noAccount, setNoAccount] = useState(false);
 
   const shouldGoToResults = () => {
     if (!fromResults) return false;
@@ -170,17 +178,33 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setNoAccount(false);
     try {
       const dest = computePostLoginPath();
       const params = new URLSearchParams();
       params.set("next", dest);
       const returnUrl = `${window.location.origin}/login?${params.toString()}`;
 
-      const fn = httpsCallable(functions, "sendUserSignInLink");
-      await fn({
+      const fn = httpsCallable<
+        { email: string; returnUrl: string; intent: "signup" | "signin" },
+        { ok: boolean; reason?: "already_registered" | "no_account" }
+      >(functions, "sendUserSignInLink");
+      const res = await fn({
         email:     email.trim().toLowerCase(),
         returnUrl,
+        intent:    "signin",
       });
+      if (res.data.ok === false) {
+        // Server says no account exists for this email. Don't write
+        // the email-link localStorage entry (no link is coming) — show
+        // the switch-to-signup banner instead.
+        if (res.data.reason === "no_account") {
+          setNoAccount(true);
+        } else {
+          setError("Something went wrong. Try again.");
+        }
+        return;
+      }
       localStorage.setItem(EMAIL_LS_KEY, email.trim().toLowerCase());
       setSent(true);
     } catch (err: any) {
@@ -189,6 +213,17 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  // /signup URL the "Sign up instead" banner navigates to. Pre-fills
+  // email + carries any `next`/`from` params so the user keeps their
+  // intended destination across the bounce.
+  const signupSwitchHref = (() => {
+    const params = new URLSearchParams();
+    params.set("email", email.trim().toLowerCase());
+    if (fromResults) params.set("from", "results");
+    if (nextPath)    params.set("next", nextPath);
+    return `/signup?${params.toString()}`;
+  })();
 
   const handleGoogle = async () => {
     setLoading(true);
@@ -311,6 +346,26 @@ export default function LoginPage() {
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Or email</span>
                 <div className="flex-1 h-px bg-slate-200"></div>
               </div>
+
+              {noAccount && (
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4 flex items-start gap-3">
+                  <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 flex-shrink-0">
+                    <Mail size={16} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-bold text-amber-900 text-sm mb-0.5">No account with this email</p>
+                    <p className="text-xs text-amber-800 leading-relaxed mb-2 break-words">
+                      We couldn't find an account for <span className="font-mono">{email}</span>. Want to create one?
+                    </p>
+                    <Link
+                      to={signupSwitchHref}
+                      className="inline-flex items-center gap-1.5 bg-amber-700 hover:bg-amber-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      Sign up instead <ArrowRight size={12} />
+                    </Link>
+                  </div>
+                </div>
+              )}
 
               <form onSubmit={handleSendLink} className="space-y-4">
                 <div>

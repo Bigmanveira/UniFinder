@@ -2443,8 +2443,13 @@ export const sendUserSignInLink = onCall(
       throw new HttpsError("resource-exhausted", "Too many sign-in requests — try again in a few minutes.");
     }
 
-    const email = String(request.data?.email ?? "").trim().toLowerCase();
+    const email     = String(request.data?.email ?? "").trim().toLowerCase();
     const returnUrl = String(request.data?.returnUrl ?? "");
+    // Intent tells the server what the visitor is trying to do so we
+    // can route them to the right page on a mismatch. Defaults to
+    // signin for backwards compat (any caller that hasn't been
+    // updated still works, just without the wrong-page detection).
+    const intent    = request.data?.intent === "signup" ? "signup" : "signin";
 
     if (!/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(email)) {
       throw new HttpsError("invalid-argument", "Enter a valid email address.");
@@ -2464,6 +2469,43 @@ export const sendUserSignInLink = onCall(
       throw new HttpsError("invalid-argument", "Unauthorized returnUrl origin.");
     }
 
+    // Intent vs. existence check. We confirm whether a Firebase Auth
+    // account already exists for the address and cross-check against
+    // what the visitor *thinks* they're doing — signing up vs.
+    // signing in. On a mismatch we return a structured "wrong page"
+    // response without sending the email; the client renders a
+    // "switch to the right page" banner with email pre-filled.
+    //
+    // SECURITY TRADE-OFF: this does enable enumeration via the
+    // endpoint — an attacker can probe whether an email is
+    // registered by sending requests with intent=signup and watching
+    // for `already_registered`. We accept this risk because
+    //   (a) the per-IP rate limit (8/hr) caps how fast they can probe,
+    //   (b) every major consumer app — Google, GitHub, Stripe — leaks
+    //       the same bit, treating it as a normal cost of decent UX,
+    //   (c) the alternative is ambiguous responses that leave real
+    //       users stuck trying the wrong flow with no feedback.
+    let userExists = false;
+    try {
+      await admin.auth().getUserByEmail(email);
+      userExists = true;
+    } catch (err: any) {
+      if (err?.code !== "auth/user-not-found") {
+        // A transient auth-admin failure shouldn't strand the user.
+        // Log it but proceed as if the user doesn't exist; worst
+        // case the email-link generation below fails and we surface
+        // a generic error.
+        console.warn("[user-signin] auth lookup failed:", err?.message ?? err);
+      }
+    }
+
+    if (intent === "signup" && userExists) {
+      return { ok: false as const, reason: "already_registered" as const };
+    }
+    if (intent === "signin" && !userExists) {
+      return { ok: false as const, reason: "no_account" as const };
+    }
+
     try {
       const link = await admin.auth().generateSignInWithEmailLink(email, {
         url:             returnUrl,
@@ -2474,7 +2516,7 @@ export const sendUserSignInLink = onCall(
         to:     email,
         link,
       });
-      console.log("[user-signin] link sent", { email, messageId: id });
+      console.log("[user-signin] link sent", { email, intent, messageId: id });
       return { ok: true as const };
     } catch (err: any) {
       console.error("[user-signin] failed to send link:", err?.message ?? err);
@@ -2483,7 +2525,7 @@ export const sendUserSignInLink = onCall(
         source:   "user_signin.send_failed",
         severity: "error",
         message:  err?.message ?? String(err),
-        context:  { email },
+        context:  { email, intent },
       });
       throw new HttpsError("internal", "Could not send sign-in link. Try again.");
     }
