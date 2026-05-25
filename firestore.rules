@@ -157,6 +157,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // App runtime config — single doc /appConfig/runtime holds the
+    // maintenance-mode kill switch + custom maintenance message.
+    // Public read because the user-facing app needs to detect
+    // maintenance state without being authenticated; no client
+    // writes — only the admin-gated `setMaintenanceMode` Cloud
+    // Function can flip the flag.
+    match /appConfig/{configId} {
+      allow read:  if true;
+      allow write: if false;
+    }
+
     // Referral codes: small reverse-lookup docs from code → userId.
     // - Any logged-in user can read (needed to verify a code on signup).
     // - A user can only CREATE a code that maps to their own uid, and only

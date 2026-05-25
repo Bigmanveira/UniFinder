@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { MaintenanceGate } from "./components/MaintenanceGate";
 
 // Landing is eager so the very first paint doesn't wait on an extra
 // round-trip — it's by far the most common entry point and we don't want
@@ -92,10 +93,11 @@ function App() {
         <ScrollToTopOnNavigation />
         <Suspense fallback={<PageLoader />}>
           <Routes>
-            {/* Public Routes */}
+            {/* Public Routes that ALWAYS stay live — marketing + legal
+                + auth surfaces never go into maintenance mode so the
+                waitlist keeps growing and admins can still sign in
+                during a downtime window. */}
             <Route path="/" element={<HomeGate />} />
-            <Route path="/intake" element={<GuestMatchWizard />} />
-            <Route path="/results" element={<LockedPreviewPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/faq" element={<FAQPage />} />
@@ -112,13 +114,23 @@ function App() {
             <Route path="/waitlist/support" element={<WaitlistSupportPage />} />
             <Route path="/waitlist/faq"     element={<WaitlistFAQPage />} />
 
-            {/* Protected Routes */}
-            <Route element={<ProtectedRoute />}>
-              <Route path="/app" element={<DashboardPage />} />
-              <Route path="/app/reports/:reportId" element={<FullReportPage />} />
-              <Route path="/app/roadmap" element={<RoadmapPage />} />
-              <Route path="/app/visa-interview" element={<VisaInterviewPage />} />
-              <Route path="/app/interview-reports/:reportId" element={<InterviewReportDetailPage />} />
+            {/* Gated routes — show MaintenancePage when the kill
+                switch is on (unless the user carries the admin
+                claim). The guest matching flow + every authenticated
+                /app route lives behind this gate because each one
+                depends on Cloud Functions that themselves enforce
+                the same flag server-side. */}
+            <Route element={<MaintenanceGate />}>
+              <Route path="/intake" element={<GuestMatchWizard />} />
+              <Route path="/results" element={<LockedPreviewPage />} />
+
+              <Route element={<ProtectedRoute />}>
+                <Route path="/app" element={<DashboardPage />} />
+                <Route path="/app/reports/:reportId" element={<FullReportPage />} />
+                <Route path="/app/roadmap" element={<RoadmapPage />} />
+                <Route path="/app/visa-interview" element={<VisaInterviewPage />} />
+                <Route path="/app/interview-reports/:reportId" element={<InterviewReportDetailPage />} />
+              </Route>
             </Route>
           </Routes>
         </Suspense>

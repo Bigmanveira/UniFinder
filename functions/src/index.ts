@@ -23,6 +23,7 @@ import { sendPurchaseReceipt } from "./paymentReceiptEmail.js";
 import { sendWelcomeEmail } from "./welcomeEmail.js";
 import { sendOpsSignInLinkEmail } from "./opsSignInEmail.js";
 import { runCleanupTestPayments } from "./cleanupTestPayments.js";
+import { assertNotInMaintenance, setMaintenanceFlag } from "./maintenanceMode.js";
 import { logError } from "./errorLogger.js";
 import { createRateLimiter, extractClientIp } from "./rateLimiter.js";
 
@@ -347,6 +348,7 @@ export const testFunction = onCall({ ...LIGHT_OPTS }, async () => {
 const REFERRAL_REWARD = 5;
 
 export const applyReferralCode = onCall({ ...LIGHT_OPTS }, async (request) => {
+  await assertNotInMaintenance(request);
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Must be logged in");
 
@@ -423,6 +425,7 @@ export const aiMatchSchoolsCallable = onCall(
     memory:         "512MiB",
   },
   async (request) => {
+    await assertNotInMaintenance(request);
     const uid = request.auth?.uid;
     void uid; // anonymous matching is allowed (used during /results preview)
 
@@ -526,6 +529,7 @@ export const unlockMatchReport = onCall(
     memory:         "512MiB",
   },
   async (request) => {
+    await assertNotInMaintenance(request);
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "User must be logged in");
 
@@ -957,6 +961,7 @@ async function logAiRun(args: {
 export const startVisaInterviewSession = onCall(
   { ...LIGHT_OPTS, secrets: [ANTHROPIC_API_KEY] },
   async (request) => {
+    await assertNotInMaintenance(request);
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in to start a practice interview");
 
@@ -1076,6 +1081,7 @@ export const startVisaInterviewSession = onCall(
 export const sendVisaInterviewAnswer = onCall(
   { ...HOT_OPTS, secrets: [ANTHROPIC_API_KEY] },
   async (request) => {
+    await assertNotInMaintenance(request);
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in to continue the interview");
 
@@ -1164,6 +1170,7 @@ export const sendVisaInterviewAnswer = onCall(
 // Returns the metadata the client needs to upload a document directly to
 // Storage. Storage rules already restrict the path to the user's own folder.
 export const requestVisaDocumentUpload = onCall({ ...LIGHT_OPTS }, async (request) => {
+  await assertNotInMaintenance(request);
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in first");
 
@@ -1202,6 +1209,7 @@ export const requestVisaDocumentUpload = onCall({ ...LIGHT_OPTS }, async (reques
 export const recordVisaInterviewDocument = onCall(
   { ...HEAVY_OPTS, secrets: [ANTHROPIC_API_KEY], timeoutSeconds: 90 },
   async (request) => {
+    await assertNotInMaintenance(request);
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in first");
 
@@ -1424,6 +1432,7 @@ export const recordVisaInterviewDocument = onCall(
 export const finishVisaInterviewSession = onCall(
   { ...HEAVY_OPTS, secrets: [ANTHROPIC_API_KEY] },
   async (request) => {
+    await assertNotInMaintenance(request);
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in first");
 
@@ -1533,6 +1542,7 @@ export const finishVisaInterviewSession = onCall(
 export const createLiveAvatarSession = onCall(
   { ...HEAVY_OPTS, secrets: [HEYGEN_API_KEY] },
   async (request) => {
+    await assertNotInMaintenance(request);
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in first");
 
@@ -1647,6 +1657,7 @@ const MAX_TTS_CALLS_PER_SESSION = 60;
 export const generateAvatarSpeech = onCall(
   { ...HOT_OPTS, timeoutSeconds: 60 },
   async (request) => {
+    await assertNotInMaintenance(request);
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in first");
 
@@ -1766,6 +1777,7 @@ export const listCreditPacks = onCall({ ...LIGHT_OPTS }, async () => {
 export const createPaystackCheckout = onCall(
   { ...LIGHT_OPTS, secrets: [PAYSTACK_SECRET_KEY] },
   async (request) => {
+    await assertNotInMaintenance(request);
     const uid = request.auth?.uid;
     if (!uid)                throw new HttpsError("unauthenticated", "Sign in to buy credits");
     const userEmail = request.auth?.token?.email;
@@ -2482,6 +2494,62 @@ export const cleanupTestPayments = onCall(
       // Audit failure here is purely observational — the cleanup
       // already landed. Log + continue.
       console.warn("[cleanup-test-payments] audit write failed:", err);
+    }
+
+    return result;
+  },
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Maintenance mode kill switch
+//
+// Toggles the /appConfig/runtime flag that gates every user-facing
+// callable + the main app's React tree. Admin-only. Each toggle
+// writes an auditLogs entry so the state change is traceable in the
+// ops portal.
+// ─────────────────────────────────────────────────────────────────────────────
+export const setMaintenanceMode = onCall(
+  { ...LIGHT_OPTS },
+  async (request) => {
+    const token = request.auth?.token;
+    if (!token || token.admin !== true) {
+      throw new HttpsError("permission-denied", "Admin only.");
+    }
+    const enabled = request.data?.enabled === true;
+    const message = typeof request.data?.message === "string"
+      ? request.data.message.slice(0, 500)
+      : "";
+    const rawEta = request.data?.etaMs;
+    const etaMs = typeof rawEta === "number" && isFinite(rawEta) && rawEta > Date.now()
+      ? rawEta
+      : null;
+
+    const result = await setMaintenanceFlag({
+      enabled,
+      message,
+      etaMs,
+      actorUid:   request.auth!.uid,
+      actorEmail: token.email ?? null,
+    });
+
+    // Audit log — bypass the OPS_AUDIT_ACTIONS allow-list because
+    // we write directly via the Admin SDK. The AuditPage falls back
+    // to a neutral pill for unknown actions, but we add an explicit
+    // entry for the operator to see in their feed.
+    try {
+      await admin.firestore().collection("auditLogs").add({
+        actorUid:    request.auth!.uid,
+        actorEmail:  token.email ?? null,
+        action:      "maintenance_mode_set",
+        targetType:  "appConfig",
+        targetId:    "runtime",
+        metadata:    { enabled, message, etaMs },
+        ip:          extractClientIp(request.rawRequest),
+        userAgent:   String(request.rawRequest?.headers?.["user-agent"] ?? "").slice(0, 240),
+        createdAt:   admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (err) {
+      console.warn("[maintenance] audit write failed:", err);
     }
 
     return result;
