@@ -13,11 +13,18 @@ import { motion, AnimatePresence } from "framer-motion";
 import { collection, query, where } from "firebase/firestore";
 import { FadeIn, FadeInItem } from "../components/FadeIn";
 import { getOrCreateReferralCode, buildReferralUrl } from "../lib/referrals";
+import { isFounderEmail } from "../lib/founders";
 
 const VALID_DASHBOARD_TABS = new Set(["matches", "saved", "billing", "profile", "interviews"]);
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  // Founders run the app with unlimited credits for product testing.
+  // The wallet UI shows "∞" instead of the literal balance for these
+  // accounts; the backend bypasses credit deduction for the same
+  // emails. See src/lib/founders.ts for the allowlist (mirrored
+  // server-side in functions/src/index.ts).
+  const isFounder = isFounderEmail(user?.email);
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   // Honour deep-links like /app?tab=billing (used by the landing page's
@@ -183,7 +190,7 @@ export default function DashboardPage() {
                 {activeTab === "profile" && "Your Profile"}
                 {activeTab === "interviews" && "Interview history"}
               </h1>
-              <p className="text-slate-500 font-medium text-sm mt-1">Welcome back! You have {credits} credits available.</p>
+              <p className="text-slate-500 font-medium text-sm mt-1">Welcome back! You have {isFounder ? "unlimited" : credits} credits available.</p>
             </motion.div>
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex items-center gap-3">
               <button onClick={() => navigate("/intake")} className="bg-primary-600 hover:bg-primary-700 text-white font-bold text-sm px-6 py-3 rounded-full transition-colors flex items-center gap-2 shadow-xl shadow-primary-600/20 active:scale-95">
@@ -204,6 +211,7 @@ export default function DashboardPage() {
                 reportsCount={matchReports.length}
                 savedCount={savedSchools.length}
                 onStart={() => navigate("/intake")}
+                isFounder={isFounder}
               />
             </FadeIn>
 
@@ -212,11 +220,11 @@ export default function DashboardPage() {
               <FadeInItem index={0}>
                 <StatTile
                   label="Available credits"
-                  value={credits}
+                  value={isFounder ? "∞" : credits}
                   accent="bg-blue-500"
                   icon={<Wallet size={15} />}
-                  action="Buy more"
-                  onAction={() => setActiveTab("billing")}
+                  action={isFounder ? undefined : "Buy more"}
+                  onAction={isFounder ? undefined : () => setActiveTab("billing")}
                 />
               </FadeInItem>
               <FadeInItem index={1}>
@@ -443,7 +451,7 @@ export default function DashboardPage() {
         )}
 
         {activeTab === "billing" && (
-          <BillingTab credits={credits} userId={user?.uid} />
+          <BillingTab credits={credits} userId={user?.uid} isFounder={isFounder} />
         )}
 
         {activeTab === "saved" && (
@@ -927,7 +935,7 @@ const currencyGlyph = (code: string): string => {
   }
 };
 
-function BillingTab({ credits, userId }: { credits: number; userId: string | undefined }) {
+function BillingTab({ credits, userId, isFounder }: { credits: number; userId: string | undefined; isFounder: boolean }) {
   const [packs, setPacks]   = useState<CreditPack[]>([]);
   const [loading, setLoading] = useState(true);
   const [buying, setBuying] = useState<string | null>(null);
@@ -1035,9 +1043,12 @@ function BillingTab({ credits, userId }: { credits: number; userId: string | und
           <div>
             <h2 className="text-sm font-black tracking-widest text-slate-400 uppercase mb-2">Available Balance</h2>
             <div className="flex items-end gap-3">
-              <span className="text-7xl font-black leading-none">{credits}</span>
+              <span className="text-7xl font-black leading-none">{isFounder ? "∞" : credits}</span>
               <span className="text-xl font-bold text-slate-400 mb-2">Credits</span>
             </div>
+            {isFounder && (
+              <p className="text-xs text-primary-300 font-bold mt-2">Founder account — unlimited credits for product testing.</p>
+            )}
           </div>
           <div className="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/10 max-w-xs">
             <p className="text-sm font-bold mb-1">How credits work:</p>
@@ -1171,7 +1182,7 @@ const HERO_IMAGES = [
 ];
 
 function DashboardHero({
-  displayName, photoURL, credits, reportsCount, savedCount, onStart,
+  displayName, photoURL, credits, reportsCount, savedCount, onStart, isFounder,
 }: {
   displayName: string;
   photoURL?: string | null;
@@ -1179,6 +1190,7 @@ function DashboardHero({
   reportsCount: number;
   savedCount: number;
   onStart: () => void;
+  isFounder: boolean;
 }) {
   const heroImg = HERO_IMAGES[new Date().getDate() % HERO_IMAGES.length];
   const greetingHour = new Date().getHours();
@@ -1226,7 +1238,7 @@ function DashboardHero({
 
         {/* Inline stat chips — quick at-a-glance */}
         <div className="flex flex-wrap gap-2 sm:flex-col sm:items-end">
-          <HeroChip label="Credits" value={credits} />
+          <HeroChip label="Credits" value={isFounder ? "∞" : credits} />
           <HeroChip label="Reports" value={reportsCount} />
           <HeroChip label="Saved" value={savedCount} />
         </div>
@@ -1235,7 +1247,7 @@ function DashboardHero({
   );
 }
 
-function HeroChip({ label, value }: { label: string; value: number }) {
+function HeroChip({ label, value }: { label: string; value: number | string }) {
   return (
     <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/15 backdrop-blur-md border border-white/15 text-white text-[12px]">
       <span className="text-white/65">{label}</span>
@@ -1248,7 +1260,7 @@ function StatTile({
   label, value, accent, icon, action, onAction,
 }: {
   label: string;
-  value: number;
+  value: number | string;
   accent: string;
   icon: React.ReactNode;
   action?: string;

@@ -145,6 +145,22 @@ const MATCH_REPORT_CREDIT_COST = 1;
 const VISA_INTERVIEW_CREDIT_COST = 15;
 const FREE_CREDITS_ON_SIGNUP   = 2;
 
+// ─── Founders / unlimited-credit allowlist ────────────────────────────────
+// Both accounts can run every credit-spending callable without their
+// wallet getting touched. Strictly for product testing — the founders
+// need to feel the live app at every price point without burning real
+// money. Edit this set if the founding team changes (and update the
+// matching client-side list in src/lib/founders.ts so the dashboard
+// shows ∞ for these accounts).
+const FOUNDER_EMAILS = new Set<string>([
+  "frederick.da-silveira@233labs.com",
+  "franklyn.oppong@233labs.com",
+]);
+function isFounderEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return FOUNDER_EMAILS.has(email.trim().toLowerCase());
+}
+
 // Supporting-doc cap per interview. Each upload runs a Sonnet vision
 // extraction (~$0.012). Without a cap, one bad actor uploading 20 PDFs
 // burns ~$0.25 of margin on a single 15-credit session. Three covers the
@@ -569,7 +585,11 @@ export const unlockMatchReport = onCall(
     // tokens before the transaction throws. The atomic re-check inside the
     // transaction below still guarantees correctness — this is just the
     // free-fast-path that stops paying-out-of-pocket for failed attempts.
-    {
+    //
+    // Founder bypass: skip the balance check entirely so the founders'
+    // wallets aren't a gating factor on internal product testing.
+    const founder = isFounderEmail(request.auth?.token?.email as string | undefined);
+    if (!founder) {
       const walletSnap = await db.collection("creditWallets").doc(uid).get();
       const balance = walletSnap.exists ? (walletSnap.data()?.credits ?? FREE_CREDITS_ON_SIGNUP) : FREE_CREDITS_ON_SIGNUP;
       if (balance < MATCH_REPORT_CREDIT_COST) {
@@ -770,11 +790,16 @@ export const unlockMatchReport = onCall(
         currentCredits = walletDoc.data()?.credits ?? 0;
       }
 
-      if (currentCredits < MATCH_REPORT_CREDIT_COST) {
-        throw new HttpsError("resource-exhausted", "Insufficient credits");
+      // Founder bypass — they can run unlimited reports. We still
+      // create the report doc + (for new wallets) seed the wallet
+      // record so future-them looks like any other user; we just
+      // don't gate on balance and don't deduct.
+      if (!founder) {
+        if (currentCredits < MATCH_REPORT_CREDIT_COST) {
+          throw new HttpsError("resource-exhausted", "Insufficient credits");
+        }
+        transaction.update(walletRef, { credits: currentCredits - MATCH_REPORT_CREDIT_COST, updatedAt: now });
       }
-
-      transaction.update(walletRef, { credits: currentCredits - MATCH_REPORT_CREDIT_COST, updatedAt: now });
 
       // Only store what the report actually renders. Storing the full matches
       // array (or programEligibleMatches) blows past Firestore's 1 MiB
@@ -802,10 +827,15 @@ export const unlockMatchReport = onCall(
         updatedAt:            now,
       });
 
+      // Ledger entry. For founders, write a zero-amount entry tagged
+      // `founder_unlock` so the audit trail still shows the action
+      // happened — analytics can filter these out of "real" credit
+      // usage by type. For everyone else, the entry carries the
+      // negative deduction.
       transaction.set(txRef, {
         userId:    uid,
-        amount:    -MATCH_REPORT_CREDIT_COST,
-        type:      "unlock_report",
+        amount:    founder ? 0 : -MATCH_REPORT_CREDIT_COST,
+        type:      founder ? "founder_unlock" : "unlock_report",
         reportId:  reportRef.id,
         createdAt: now,
         ...(typeof clientRequestId === "string" && clientRequestId.length > 0
@@ -1034,6 +1064,7 @@ export const startVisaInterviewSession = onCall(
     const now = admin.firestore.FieldValue.serverTimestamp();
 
     // Atomic: deduct credit + create session + create first officer message + log usage
+    const founder = isFounderEmail(request.auth?.token?.email as string | undefined);
     await db.runTransaction(async (tx) => {
       const wallet = await tx.get(walletRef);
       let credits: number;
@@ -1043,10 +1074,17 @@ export const startVisaInterviewSession = onCall(
       } else {
         credits = wallet.data()?.credits ?? 0;
       }
-      if (credits < VISA_INTERVIEW_CREDIT_COST) {
-        throw new HttpsError("resource-exhausted", "Insufficient credits");
+      // Founder bypass — internal product testing can run unlimited
+      // visa interviews. Wallet stays untouched; the ledger entry
+      // below still records the action with a zero amount + a
+      // founder-specific type so the audit shows what happened
+      // without it polluting paid-usage analytics.
+      if (!founder) {
+        if (credits < VISA_INTERVIEW_CREDIT_COST) {
+          throw new HttpsError("resource-exhausted", "Insufficient credits");
+        }
+        tx.update(walletRef, { credits: credits - VISA_INTERVIEW_CREDIT_COST, updatedAt: now });
       }
-      tx.update(walletRef, { credits: credits - VISA_INTERVIEW_CREDIT_COST, updatedAt: now });
 
       tx.set(sessionRef, {
         userId:               uid,
@@ -1076,8 +1114,8 @@ export const startVisaInterviewSession = onCall(
 
       tx.set(txRef, {
         userId:    uid,
-        amount:    -VISA_INTERVIEW_CREDIT_COST,
-        type:      "visa_interview_start",
+        amount:    founder ? 0 : -VISA_INTERVIEW_CREDIT_COST,
+        type:      founder ? "founder_visa_interview" : "visa_interview_start",
         sessionId: sessionRef.id,
         createdAt: now,
         ...(typeof clientRequestId === "string" && clientRequestId.length > 0
