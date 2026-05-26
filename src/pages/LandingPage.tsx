@@ -200,28 +200,32 @@ export default function LandingPage() {
       <section id="how-it-works" className="scroll-mt-24 py-20 md:py-24 bg-white relative z-20">
         <div className="max-w-6xl mx-auto px-6">
           <Reveal className="text-center mb-12 md:mb-16">
+            <p className="text-xs font-black tracking-[0.2em] uppercase text-primary-600 mb-4">How it works</p>
             <h2 className="text-3xl md:text-5xl font-black text-slate-900 tracking-tight mb-4">Your acceptance <br/><span className="text-primary-600">starts here.</span></h2>
             <p className="text-lg text-slate-500 font-medium max-w-2xl mx-auto">Skip the guesswork. Get a personalised college shortlist built around your strengths, your budget, and your future — backed by verified data, not vibes.</p>
           </Reveal>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6">
             <Reveal delay={0}>
               <FeatureCard
-                icon={<Target className="text-accent-500" size={28} />}
+                index={1}
+                icon={<Target className="text-accent-600" size={24} />}
                 title="Matched to who you really are"
                 desc="Your GPA, scores, budget, and goals shape every recommendation — so the colleges you see are ones where you can actually get in, afford to attend, and thrive."
               />
             </Reveal>
             <Reveal delay={80}>
               <FeatureCard
-                icon={<ShieldCheck className="text-emerald-500" size={28} />}
+                index={2}
+                icon={<ShieldCheck className="text-emerald-600" size={24} />}
                 title="Real schools. Real programs."
                 desc="Every match is cross-checked against accredited program data. No invented schools, no dead listings, no application fees wasted chasing programs that don't exist."
               />
             </Reveal>
             <Reveal delay={160}>
               <FeatureCard
-                icon={<BrainCircuit className="text-primary-500" size={28} />}
+                index={3}
+                icon={<BrainCircuit className="text-primary-600" size={24} />}
                 title="Clear reasons, real strategy"
                 desc="Each match comes with a written explanation of why it fits, the funding paths worth chasing, and exactly what to strengthen — turning your shortlist into a plan."
               />
@@ -368,14 +372,38 @@ export default function LandingPage() {
   );
 }
 
-function FeatureCard({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) {
+function FeatureCard({
+  index, icon, title, desc,
+}: {
+  index?: number;
+  icon: React.ReactNode;
+  title: string;
+  desc: string;
+}) {
   return (
-    <div className="bg-slate-50 rounded-[32px] p-8 border border-slate-100 hover:shadow-xl hover:shadow-slate-200/50 transition-all hover:-translate-y-1">
-      <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center shadow-sm border border-slate-100 mb-6">
-        {icon}
+    <div className="group relative bg-white rounded-2xl p-7 md:p-8 border border-slate-200 hover:border-slate-300 hover:shadow-xl hover:shadow-slate-900/[0.04] hover:-translate-y-0.5 transition-all duration-300 h-full">
+      {/* Index + icon row — the number reads as a chapter marker, classic
+          enterprise pattern (Stripe / Linear). Icon tile sits in a soft
+          slate well that inverts to white on hover so the card feels
+          interactive without being noisy. */}
+      <div className="flex items-start justify-between mb-6">
+        <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 group-hover:bg-white group-hover:border-slate-200 group-hover:shadow-sm transition-all duration-300">
+          {icon}
+        </div>
+        {index !== undefined && (
+          <span className="text-[10px] font-black tracking-[0.22em] uppercase text-slate-400 tabular-nums">
+            {String(index).padStart(2, "0")}
+          </span>
+        )}
       </div>
-      <h3 className="text-xl font-black text-slate-900 mb-3">{title}</h3>
-      <p className="text-slate-500 font-medium leading-relaxed">{desc}</p>
+
+      {/* Short accent rule sits between the icon row and the heading.
+          Anchors the eye and adds a touch of brand colour without leaning
+          on a full gradient wash. */}
+      <div className="w-8 h-px bg-slate-200 mb-5" />
+
+      <h3 className="text-lg md:text-xl font-black text-slate-900 mb-3 tracking-tight leading-snug">{title}</h3>
+      <p className="text-sm md:text-[15px] text-slate-500 font-medium leading-relaxed">{desc}</p>
     </div>
   );
 }
