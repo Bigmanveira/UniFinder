@@ -4,6 +4,7 @@ import { defineSecret } from "firebase-functions/params";
 import * as admin from "firebase-admin";
 import { generateClaudeMatchExplanation } from "./claudeExplainMatches.js";
 import { sendWaitlistWelcome } from "./waitlistEmail.js";
+import { sendLaunchAnnouncement } from "./launchAnnouncementEmail.js";
 import {
   generateOfficerTurn, scoreVisaInterview, VISA_DISCLAIMER,
   pickIntroQuestion,
@@ -2238,6 +2239,145 @@ export const onWaitlistEntry = onDocumentCreated(
         { merge: true },
       );
     }
+  },
+);
+
+// ============================================================
+// Launch announcement — one-off bulk email to waitlist signups
+// ============================================================
+/**
+ * Admin-only callable that walks every doc in /waitlist and sends a
+ * "We're live" Resend email to addresses we haven't notified yet.
+ * Stamps `launchEmailSentAt` (success) or `launchEmailError` (failure)
+ * on each doc so a retry is idempotent — already-sent addresses are
+ * skipped, failures are reattempted.
+ *
+ * Two safety knobs the operator should use:
+ *   • `dryRun: true` (default) — no emails actually leave; returns the
+ *     count of who WOULD have been mailed. Run this first.
+ *   • `maxToSend: number` — caps how many sends happen in this
+ *     invocation. Use a small number (5–10) for a final live smoke
+ *     test, then call again uncapped to mail the rest.
+ *
+ * Timeout is bumped to 540s so a couple thousand emails can flow in
+ * one call; we slot a 100ms pause between sends to stay polite to
+ * Resend and avoid burst rate-limit. Anything bigger than that should
+ * call this in multiple passes — each pass picks up where the last
+ * left off.
+ */
+export const announceLaunch = onCall(
+  { ...LIGHT_OPTS, timeoutSeconds: 540, secrets: [RESEND_API_KEY] },
+  async (request) => {
+    const authToken = request.auth?.token;
+    if (!authToken || authToken.admin !== true) {
+      throw new HttpsError("permission-denied", "Admin only.");
+    }
+
+    const dryRun    = request.data?.dryRun !== false;  // default TRUE — explicit opt-out required
+    const maxToSend = Math.max(0, Math.min(5000, Number(request.data?.maxToSend ?? 5000)));
+
+    const db = admin.firestore();
+    // Read every waitlist doc. Collection is small (pre-launch list);
+    // no cursoring needed. If it ever balloons past a few thousand we
+    // can switch to a streaming query, but for now the simpler shape
+    // is easier to reason about.
+    const all = await db.collection("waitlist").get();
+
+    // Sort by createdAt so we mail the earliest signups first. They've
+    // waited the longest; if we hit a partial-send scenario they should
+    // be the ones who definitely heard from us.
+    const docs = all.docs
+      .map((d) => ({ id: d.id, ref: d.ref, data: d.data() ?? {} }))
+      .filter((d) => typeof d.data.email === "string" && d.data.email.length > 0)
+      .sort((a, b) => {
+        const ta = a.data.createdAt?.toMillis?.() ?? 0;
+        const tb = b.data.createdAt?.toMillis?.() ?? 0;
+        return ta - tb;
+      });
+
+    let totalCandidates = 0;
+    let alreadySent     = 0;
+    let toSendQueue: typeof docs = [];
+
+    for (const d of docs) {
+      totalCandidates++;
+      if (d.data.launchEmailSentAt) {
+        alreadySent++;
+        continue;
+      }
+      toSendQueue.push(d);
+    }
+
+    if (toSendQueue.length > maxToSend) {
+      toSendQueue = toSendQueue.slice(0, maxToSend);
+    }
+
+    if (dryRun) {
+      return {
+        dryRun:          true,
+        totalCandidates,
+        alreadySent,
+        wouldSend:       toSendQueue.length,
+        sampleEmails:    toSendQueue.slice(0, 5).map((d) => d.data.email),
+      };
+    }
+
+    let sent   = 0;
+    let failed = 0;
+    const failures: Array<{ email: string; error: string }> = [];
+
+    for (const d of toSendQueue) {
+      const email = String(d.data.email);
+      try {
+        const { id } = await sendLaunchAnnouncement({
+          apiKey: RESEND_API_KEY.value(),
+          to:     email,
+        });
+        await d.ref.set(
+          {
+            launchEmailSentAt:    admin.firestore.FieldValue.serverTimestamp(),
+            launchEmailMessageId: id,
+            launchEmailError:     admin.firestore.FieldValue.delete(),
+            launchEmailErrorAt:   admin.firestore.FieldValue.delete(),
+          },
+          { merge: true },
+        );
+        sent++;
+      } catch (err: any) {
+        const msg = err?.message ?? String(err);
+        failed++;
+        failures.push({ email, error: msg });
+        await d.ref.set(
+          {
+            launchEmailError:   msg,
+            launchEmailErrorAt: admin.firestore.FieldValue.serverTimestamp(),
+          },
+          { merge: true },
+        );
+        void logError({
+          category: "email_send",
+          source:   "resend.launch_announcement_failed",
+          severity: "warning",
+          message:  msg,
+          context:  { entryId: d.id, email },
+        });
+      }
+      // Polite gap between sends so Resend's burst limiter doesn't trip.
+      await new Promise((r) => setTimeout(r, 100));
+    }
+
+    return {
+      dryRun:          false,
+      totalCandidates,
+      alreadySent,
+      attempted:       toSendQueue.length,
+      sent,
+      failed,
+      // Truncate failure detail so a giant blob doesn't blow up the
+      // callable response. Operator can inspect /waitlist docs directly
+      // for the full error per-row.
+      sampleFailures:  failures.slice(0, 5),
+    };
   },
 );
 

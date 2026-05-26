@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from "react";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -29,13 +29,6 @@ const PrivacyPage        = lazy(() => import("./pages/PrivacyPage"));
 const TermsPage          = lazy(() => import("./pages/TermsPage"));
 const ContactPage        = lazy(() => import("./pages/ContactPage"));
 const WaitlistPage       = lazy(() => import("./pages/WaitlistPage"));
-
-// Waitlist-specific info pages — pre-launch tone, distinct from the main
-// app's /privacy /terms /contact /faq routes which serve production users.
-const WaitlistPrivacyPage = lazy(() => import("./pages/waitlist/PrivacyPage"));
-const WaitlistTermsPage   = lazy(() => import("./pages/waitlist/TermsPage"));
-const WaitlistSupportPage = lazy(() => import("./pages/waitlist/SupportPage"));
-const WaitlistFAQPage     = lazy(() => import("./pages/waitlist/FAQPage"));
 
 // Set VITE_WAITLIST_MODE=true in Vercel to gate the public site behind the
 // waitlist. Anyone hitting "/" while signed out sees WaitlistPage instead of
@@ -106,13 +99,14 @@ function App() {
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/contact" element={<ContactPage />} />
 
-            {/* Waitlist-specific info pages — reachable only from the
-                waitlist footer; distinct namespace so they never collide
-                with the main app's policy/help routes above. */}
-            <Route path="/waitlist/privacy" element={<WaitlistPrivacyPage />} />
-            <Route path="/waitlist/terms"   element={<WaitlistTermsPage />} />
-            <Route path="/waitlist/support" element={<WaitlistSupportPage />} />
-            <Route path="/waitlist/faq"     element={<WaitlistFAQPage />} />
+            {/* Legacy waitlist paths — redirect to their live-mode
+                equivalents so any bookmarked or emailed link still
+                lands somewhere sensible. /support has no main-app
+                twin, so it folds into /contact. */}
+            <Route path="/waitlist/privacy" element={<Navigate to="/privacy" replace />} />
+            <Route path="/waitlist/terms"   element={<Navigate to="/terms"   replace />} />
+            <Route path="/waitlist/support" element={<Navigate to="/contact" replace />} />
+            <Route path="/waitlist/faq"     element={<Navigate to="/faq"     replace />} />
 
             {/* Gated routes — show MaintenancePage when the kill
                 switch is on (unless the user carries the admin
