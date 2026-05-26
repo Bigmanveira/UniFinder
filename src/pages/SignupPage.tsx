@@ -49,9 +49,9 @@ export default function SignupPage() {
   const fromResults = searchParams.get("from") === "results";
   const nextPath    = sanitizeNextPath(searchParams.get("next"));
 
-  // Pre-fill email from ?email=… so the "this account exists, log in instead"
-  // banner on LoginPage can bounce a confused user back here without making
-  // them retype their address. (And vice-versa — see LoginPage.)
+  // Pre-fill email from ?email=… so visitors who arrive via a
+  // marketing link, a forwarded URL, or a previous tab don't have
+  // to retype their address.
   const prefillEmail = searchParams.get("email") ?? "";
   const [email, setEmail] = useState(prefillEmail);
   const [referralOpen, setReferralOpen] = useState(false);
@@ -59,11 +59,6 @@ export default function SignupPage() {
   const [loading,  setLoading]  = useState(false);
   const [sent,     setSent]     = useState(false);
   const [error,    setError]    = useState<string | null>(null);
-  // When the server says "this email is already registered" we render
-  // an inline banner offering a one-click switch to /login with the
-  // email pre-filled. Distinct from the generic `error` state so the
-  // banner only shows for this specific case.
-  const [alreadyRegistered, setAlreadyRegistered] = useState(false);
 
   // Capture any ?ref=… on mount and pre-fill the manual entry so the
   // user can confirm or correct it. Also clear stale guest data when
@@ -131,29 +126,17 @@ export default function SignupPage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setAlreadyRegistered(false);
     try {
       persistReferralCode();
       const fn = httpsCallable<
         { email: string; returnUrl: string; intent: "signup" | "signin" },
-        { ok: boolean; reason?: "already_registered" | "no_account" }
+        { ok: boolean }
       >(functions, "sendUserSignInLink");
-      const res = await fn({
+      await fn({
         email:     email.trim().toLowerCase(),
         returnUrl: buildReturnUrl(),
         intent:    "signup",
       });
-      if (res.data.ok === false) {
-        // Server says this email is already registered. Don't write
-        // the email-link localStorage entry (no link is coming), surface
-        // the dedicated switch-to-login banner instead.
-        if (res.data.reason === "already_registered") {
-          setAlreadyRegistered(true);
-        } else {
-          setError("Something went wrong. Try again.");
-        }
-        return;
-      }
       // Stash the email so signInWithEmailLink can verify it on
       // click-back. Firebase requires the email at the verification
       // step for replay protection.
@@ -165,18 +148,6 @@ export default function SignupPage() {
       setLoading(false);
     }
   };
-
-  // Build the /login URL that the "Log in instead" banner navigates
-  // to. Pre-fills email + carries any `next`/`from` params so the
-  // user lands in the same intended state they would have had if
-  // they'd come straight to /login.
-  const loginSwitchHref = (() => {
-    const params = new URLSearchParams();
-    params.set("email", email.trim().toLowerCase());
-    if (fromResults) params.set("from", "results");
-    if (nextPath)    params.set("next", nextPath);
-    return `/login?${params.toString()}`;
-  })();
 
   const handleGoogle = async () => {
     setLoading(true);
@@ -264,10 +235,13 @@ export default function SignupPage() {
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-emerald-900 text-sm mb-0.5">Check your inbox</p>
                   <p className="text-xs text-emerald-800 leading-relaxed break-words">
-                    A sign-in link is on its way to <span className="font-mono">{email}</span> from <span className="font-mono">noreply@collegeready.io</span>. Open the link on this device to finish.
+                    A sign-in link is on its way to <span className="font-mono">{email}</span> from <span className="font-mono">noreply@collegeready.io</span>. Open it on this device to finish.
+                  </p>
+                  <p className="text-[11px] text-emerald-700 mt-1.5 leading-relaxed">
+                    If this email is already registered, you'll be signed into that account.
                   </p>
                   {referralCode.trim() && (
-                    <p className="text-[11px] text-emerald-700 mt-1.5">
+                    <p className="text-[11px] text-emerald-700 mt-1 leading-relaxed">
                       Referral code <span className="font-mono font-bold">{referralCode.trim().toUpperCase()}</span> will be applied automatically when you land.
                     </p>
                   )}
@@ -296,26 +270,6 @@ export default function SignupPage() {
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Or email</span>
                 <div className="flex-1 h-px bg-slate-200"></div>
               </div>
-
-              {alreadyRegistered && (
-                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4 flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-700 flex-shrink-0">
-                    <Mail size={16} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-bold text-amber-900 text-sm mb-0.5">This email is already registered</p>
-                    <p className="text-xs text-amber-800 leading-relaxed mb-2 break-words">
-                      <span className="font-mono">{email}</span> already has an account. Log in instead to pick up where you left off.
-                    </p>
-                    <Link
-                      to={loginSwitchHref}
-                      className="inline-flex items-center gap-1.5 bg-amber-700 hover:bg-amber-800 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition-colors"
-                    >
-                      Log in instead <ArrowRight size={12} />
-                    </Link>
-                  </div>
-                </div>
-              )}
 
               <form onSubmit={handleSendLink} className="space-y-4">
                 <div>

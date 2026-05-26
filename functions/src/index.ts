@@ -2445,10 +2445,10 @@ export const sendUserSignInLink = onCall(
 
     const email     = String(request.data?.email ?? "").trim().toLowerCase();
     const returnUrl = String(request.data?.returnUrl ?? "");
-    // Intent tells the server what the visitor is trying to do so we
-    // can route them to the right page on a mismatch. Defaults to
-    // signin for backwards compat (any caller that hasn't been
-    // updated still works, just without the wrong-page detection).
+    // `intent` is only retained for log telemetry — the server NEVER
+    // branches behaviour based on it. Branching would leak account
+    // existence (the previous "is this email already registered"
+    // response opened that hole). See the security note below.
     const intent    = request.data?.intent === "signup" ? "signup" : "signin";
 
     if (!/^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/.test(email)) {
@@ -2469,43 +2469,17 @@ export const sendUserSignInLink = onCall(
       throw new HttpsError("invalid-argument", "Unauthorized returnUrl origin.");
     }
 
-    // Intent vs. existence check. We confirm whether a Firebase Auth
-    // account already exists for the address and cross-check against
-    // what the visitor *thinks* they're doing — signing up vs.
-    // signing in. On a mismatch we return a structured "wrong page"
-    // response without sending the email; the client renders a
-    // "switch to the right page" banner with email pre-filled.
-    //
-    // SECURITY TRADE-OFF: this does enable enumeration via the
-    // endpoint — an attacker can probe whether an email is
-    // registered by sending requests with intent=signup and watching
-    // for `already_registered`. We accept this risk because
-    //   (a) the per-IP rate limit (8/hr) caps how fast they can probe,
-    //   (b) every major consumer app — Google, GitHub, Stripe — leaks
-    //       the same bit, treating it as a normal cost of decent UX,
-    //   (c) the alternative is ambiguous responses that leave real
-    //       users stuck trying the wrong flow with no feedback.
-    let userExists = false;
-    try {
-      await admin.auth().getUserByEmail(email);
-      userExists = true;
-    } catch (err: any) {
-      if (err?.code !== "auth/user-not-found") {
-        // A transient auth-admin failure shouldn't strand the user.
-        // Log it but proceed as if the user doesn't exist; worst
-        // case the email-link generation below fails and we surface
-        // a generic error.
-        console.warn("[user-signin] auth lookup failed:", err?.message ?? err);
-      }
-    }
-
-    if (intent === "signup" && userExists) {
-      return { ok: false as const, reason: "already_registered" as const };
-    }
-    if (intent === "signin" && !userExists) {
-      return { ok: false as const, reason: "no_account" as const };
-    }
-
+    // ANTI-ENUMERATION: we deliberately do NOT check whether an account
+    // exists before sending. The endpoint returns the same `{ ok: true }`
+    // for every valid request, so an attacker can't probe a leaked
+    // email list to discover which addresses are registered. Firebase's
+    // email-link auth handles both first-time signup AND returning
+    // sign-in transparently — clicking the link creates the user if
+    // they're new, or signs them in if they already exist. The /signup
+    // and /login pages display different success copy that honestly
+    // names both outcomes ("we'll create your account when you click"
+    // / "you'll be signed into your existing account"), so users get
+    // expectation-setting without us leaking a single bit.
     try {
       const link = await admin.auth().generateSignInWithEmailLink(email, {
         url:             returnUrl,
