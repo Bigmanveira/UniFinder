@@ -157,6 +157,23 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // User audit log — same shape as /auditLogs but for the main
+    // user-facing app. Captures user_sign_in / user_sign_out events
+    // from regular authenticated users so the ops portal can show
+    // who signed in when. Kept in a SEPARATE collection from the
+    // admin audit log because:
+    //   - At scale, user events massively outnumber admin events;
+    //     mixing them buries the security-relevant admin trail in
+    //     a sea of routine sign-ins.
+    //   - The two have different read profiles (admin: security
+    //     audit / forensics; user: engagement analytics).
+    // Reads admin-only; client writes blocked — entries flow only
+    // through the `recordUserAuditEvent` Cloud Function.
+    match /userAuditLogs/{logId} {
+      allow read:  if isAdmin();
+      allow write: if false;
+    }
+
     // App runtime config — single doc /appConfig/runtime holds the
     // maintenance-mode kill switch + custom maintenance message.
     // Public read because the user-facing app needs to detect

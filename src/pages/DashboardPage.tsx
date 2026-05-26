@@ -2,7 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { auth, db, storage } from "../lib/firebase";
-import { signOut, sendPasswordResetEmail } from "firebase/auth";
+import { sendPasswordResetEmail } from "firebase/auth";
+import { signOutWithAudit } from "../lib/userAudit";
 import { doc, getDoc, onSnapshot, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { httpsCallable } from "firebase/functions";
@@ -132,7 +133,11 @@ export default function DashboardPage() {
   }, [user]);
 
   const handleSignOut = async () => {
-    await signOut(auth);
+    // signOutWithAudit writes a user_sign_out event to /userAuditLogs
+    // first, then resolves the actual Firebase signOut. Audit failure
+    // is swallowed inside the helper so a Firestore hiccup can never
+    // block the sign-out path.
+    await signOutWithAudit();
     navigate("/");
   };
 

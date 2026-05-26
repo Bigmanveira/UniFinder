@@ -2618,6 +2618,75 @@ export const recordOpsAuditEvent = onCall(
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
+// User-facing app — append-only user audit log
+//
+// Mirror of recordOpsAuditEvent for the main user-facing app. Captures
+// user_sign_in and user_sign_out events into /userAuditLogs (kept in a
+// SEPARATE collection from the ops /auditLogs so security-relevant
+// admin actions aren't buried under thousands of routine user
+// sign-ins at scale).
+//
+// Auth model differs from the ops version:
+//   - Caller must be authenticated, but no admin claim required.
+//   - Actor identity (uid, email) comes from the auth token,
+//     never the request body — so even a tampered client can't
+//     forge entries on behalf of a different user.
+//   - Action allow-list is small (sign_in / sign_out only); new
+//     event types require an explicit code change here.
+//
+// Same fire-and-forget semantics: a failed write does not throw
+// back to the caller (the sign-in / sign-out action already
+// happened in the client).
+// ─────────────────────────────────────────────────────────────────────────────
+const USER_AUDIT_ACTIONS = new Set([
+  "user_sign_in",
+  "user_sign_out",
+] as const);
+
+export const recordUserAuditEvent = onCall(
+  { ...LIGHT_OPTS },
+  async (request) => {
+    if (!request.auth?.uid) {
+      throw new HttpsError("unauthenticated", "Sign in to record an audit event.");
+    }
+    const action = String(request.data?.action ?? "");
+    if (!(USER_AUDIT_ACTIONS as Set<string>).has(action)) {
+      throw new HttpsError("invalid-argument", "Unknown audit action.");
+    }
+    const targetType = request.data?.targetType ? String(request.data.targetType).slice(0, 32) : null;
+    const targetId   = request.data?.targetId   ? String(request.data.targetId).slice(0, 128) : null;
+    let metadata: Record<string, unknown> | null = null;
+    if (request.data?.metadata && typeof request.data.metadata === "object") {
+      try {
+        const json = JSON.stringify(request.data.metadata);
+        if (json.length <= 4_000) metadata = JSON.parse(json);
+      } catch { metadata = null; }
+    }
+
+    const ip = extractClientIp(request.rawRequest);
+    const ua = String(request.rawRequest?.headers?.["user-agent"] ?? "").slice(0, 240);
+
+    try {
+      await admin.firestore().collection("userAuditLogs").add({
+        actorUid:    request.auth.uid,
+        actorEmail:  request.auth.token?.email ?? null,
+        action,
+        targetType,
+        targetId,
+        metadata,
+        ip,
+        userAgent:   ua,
+        createdAt:   admin.firestore.FieldValue.serverTimestamp(),
+      });
+      return { ok: true as const };
+    } catch (err: any) {
+      console.warn("[user-audit] failed to persist log:", err?.message ?? err);
+      return { ok: false as const };
+    }
+  },
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Ops portal — one-shot cleanup of test-mode payment data
 //
 // Triggered manually after going live. Wipes every paystackPayments doc

@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { User } from "firebase/auth";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../lib/firebase";
+import { logUserSignInIfNewAuth, signOutWithAudit } from "../lib/userAudit";
 
 interface AuthContextType {
   user: User | null;
@@ -30,11 +31,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Subscribe to Firebase auth state once.
+  // Subscribe to Firebase auth state once. Also fires the user-side
+  // audit log when authTime indicates a fresh sign-in event — same
+  // pattern the ops portal uses. Fire-and-forget; the audit write is
+  // best-effort and never blocks app state updates.
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       setLoading(false);
+      if (currentUser) {
+        try {
+          const tokenResult = await currentUser.getIdTokenResult();
+          void logUserSignInIfNewAuth(currentUser.uid, tokenResult.authTime);
+        } catch (err) {
+          // Token-read failure shouldn't break auth state. Just log.
+          // eslint-disable-next-line no-console
+          console.warn("[auth] could not read token for audit log:", err);
+        }
+      }
     });
     return () => unsubscribe();
   }, []);
@@ -49,7 +63,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       idleTimerRef.current = setTimeout(() => {
         console.log("[auth] 15min idle — signing out");
-        signOut(auth).catch(() => { /* best-effort; onAuthStateChanged will catch the result */ });
+        // signOutWithAudit awaits the audit write before signing out
+        // so the user_sign_out entry lands while the auth token is
+        // still valid. Failure modes are swallowed inside the helper.
+        signOutWithAudit().catch(() => { /* best-effort */ });
       }, IDLE_TIMEOUT_MS);
     };
 
