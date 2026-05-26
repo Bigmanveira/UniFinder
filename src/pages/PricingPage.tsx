@@ -329,7 +329,7 @@ export default function PricingPage() {
       {/* Footer */}
       <footer className="bg-white py-12 border-t border-slate-100">
         <div className="max-w-6xl mx-auto px-6 flex flex-col gap-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div className="flex flex-col items-center md:flex-row md:justify-between gap-6">
             <BrandLogo size="sm" />
             <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm font-bold text-slate-400">
               <Link to="/pricing" className="hover:text-primary-600 transition-colors">Pricing</Link>
