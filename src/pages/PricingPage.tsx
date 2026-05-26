@@ -244,9 +244,10 @@ export default function PricingPage() {
       </main>
 
       <footer className="bg-white py-10 border-t border-slate-100 mt-10">
-        <div className="max-w-6xl mx-auto px-6 flex items-center justify-between text-sm text-slate-500">
+        <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4 text-sm text-slate-500">
           <p>© 2026 College Ready</p>
-          <div className="flex gap-6">
+          <div className="flex flex-wrap justify-center gap-x-6 gap-y-2">
+            <Link to="/faq" className="hover:text-primary-600 transition-colors">FAQ</Link>
             <Link to="/privacy" className="hover:text-primary-600 transition-colors">Privacy</Link>
             <Link to="/terms" className="hover:text-primary-600 transition-colors">Terms</Link>
             <Link to="/contact" className="hover:text-primary-600 transition-colors">Contact</Link>

@@ -343,15 +343,22 @@ export default function LandingPage() {
 
       {/* Footer */}
       <footer className="bg-white py-12 border-t border-slate-100 relative z-20">
-        <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
-          <BrandLogo size="sm" />
-          <div className="flex gap-6 text-sm font-bold text-slate-400">
-            <Link to="/faq" className="hover:text-primary-600 transition-colors">FAQ</Link>
-            <Link to="/privacy" className="hover:text-primary-600 transition-colors">Privacy Policy</Link>
-            <Link to="/terms" className="hover:text-primary-600 transition-colors">Terms of Service</Link>
-            <Link to="/contact" className="hover:text-primary-600 transition-colors">Contact</Link>
+        <div className="max-w-6xl mx-auto px-6 flex flex-col gap-8">
+          {/* Top row: brand on the left, link group on the right. Stacks
+              vertically on mobile so neither side has to squeeze. */}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <BrandLogo size="sm" />
+            <nav className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm font-bold text-slate-400">
+              <Link to="/pricing" className="hover:text-primary-600 transition-colors">Pricing</Link>
+              <Link to="/faq" className="hover:text-primary-600 transition-colors">FAQ</Link>
+              <Link to="/privacy" className="hover:text-primary-600 transition-colors">Privacy</Link>
+              <Link to="/terms" className="hover:text-primary-600 transition-colors">Terms</Link>
+              <Link to="/contact" className="hover:text-primary-600 transition-colors">Contact</Link>
+            </nav>
           </div>
-          <p className="text-xs font-medium text-slate-400">
+          {/* Bottom row: copyright + disclaimer on its own line so the
+              long string never collides with the link group above. */}
+          <p className="text-xs font-medium text-slate-400 text-center md:text-left border-t border-slate-100 pt-6">
             © 2026 College Ready. Practice tools only. Not affiliated with any government, embassy, or consular service.
           </p>
         </div>

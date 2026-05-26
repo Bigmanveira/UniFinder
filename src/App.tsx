@@ -28,6 +28,7 @@ const InterviewReportDetailPage = lazy(() => import("./pages/InterviewReportDeta
 const PrivacyPage        = lazy(() => import("./pages/PrivacyPage"));
 const TermsPage          = lazy(() => import("./pages/TermsPage"));
 const ContactPage        = lazy(() => import("./pages/ContactPage"));
+const PricingPage        = lazy(() => import("./pages/PricingPage"));
 const WaitlistPage       = lazy(() => import("./pages/WaitlistPage"));
 
 // Set VITE_WAITLIST_MODE=true in Vercel to gate the public site behind the
@@ -98,6 +99,7 @@ function App() {
             <Route path="/privacy" element={<PrivacyPage />} />
             <Route path="/terms" element={<TermsPage />} />
             <Route path="/contact" element={<ContactPage />} />
+            <Route path="/pricing" element={<PricingPage />} />
 
             {/* Legacy waitlist paths — redirect to their live-mode
                 equivalents so any bookmarked or emailed link still
