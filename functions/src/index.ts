@@ -62,16 +62,29 @@ const RESEND_API_KEY           = defineSecret("RESEND_API_KEY");
 // on 2026-05-18 after the original setting forced a new cold start for each
 // concurrent user during a visa interview — interview turns went from
 // ~2s to ~10s when traffic was bursty.
-const HEAVY_OPTS = { maxInstances: 50, concurrency: 40 } as const;
-// LIGHT_OPTS — for cheap CRUD-ish callables. Default concurrency (80) is fine.
-const LIGHT_OPTS = { maxInstances: 50 } as const;
-// HOT_OPTS — for functions in the interview loop that fire repeatedly during
-// a single user session. minInstances: 1 keeps one instance always-warm so
-// the first request after a quiet period doesn't pay a 3-8s Node + Anthropic
-// SDK cold-start tax. Cost: one always-warm 512MiB instance is ~$3-5/month
-// per function — fine for the latency win on the most-impactful UX path.
-// At higher scale (>10k DAU) raise minInstances proportionally.
-const HOT_OPTS  = { maxInstances: 50, concurrency: 40, minInstances: 1 } as const;
+// Bumped from 50 → 150 to support sustained 1000-concurrent on AI-heavy
+// callables (unlockMatchReport, aiMatchSchoolsCallable, etc.). 150 × 40
+// concurrency = 6000 in-flight slots, with plenty of headroom over the
+// 1000-concurrent target. Cost ceiling at full saturation is bounded
+// by Anthropic + HeyGen rate limits more than by our instance count.
+const HEAVY_OPTS = { maxInstances: 150, concurrency: 40 } as const;
+// LIGHT_OPTS — for cheap CRUD-ish callables. Default concurrency (80)
+// is fine. Bumped to 200 because these are the user-facing high-volume
+// endpoints (listCreditPacks, createPaystackCheckout, wallet reads).
+const LIGHT_OPTS = { maxInstances: 200 } as const;
+// HOT_OPTS — for functions in the interview loop that fire repeatedly
+// during a single user session. minInstances: 1 keeps one instance
+// always-warm so the first request after a quiet period doesn't pay a
+// 3-8s Node + Anthropic SDK cold-start tax. Bumped maxInstances to 100
+// for headroom on concurrent interviews.
+const HOT_OPTS  = { maxInstances: 100, concurrency: 40, minInstances: 1 } as const;
+// HEAVY_HOT_OPTS — for HEAVY callables that should stay always-warm to
+// avoid cold-start tax on a user's first action. Same scaling shape as
+// HEAVY_OPTS, but with minInstances: 2 paying ~$60/month per function
+// for the latency win. Applied to unlockMatchReport,
+// aiMatchSchoolsCallable, and createLiveAvatarSession — the three
+// "first impression" endpoints where a cold-start ruins UX.
+const HEAVY_HOT_OPTS = { maxInstances: 150, concurrency: 40, minInstances: 2 } as const;
 
 // ─── Rate limiters (replace the App Check we removed 2026-05-23) ─────────
 // Per-IP, in-memory, persist on each warm Cloud Run instance. Module-scope
@@ -478,7 +491,7 @@ export const applyReferralCode = onCall({ ...LIGHT_OPTS }, async (request) => {
 
 export const aiMatchSchoolsCallable = onCall(
   {
-    ...HEAVY_OPTS,
+    ...HEAVY_HOT_OPTS,
     secrets: [ANTHROPIC_API_KEY],
     // Claude can take 10–30s to rank a full candidate list. Be generous.
     timeoutSeconds: 90,
@@ -579,7 +592,7 @@ export const aiMatchSchoolsCallable = onCall(
 
 export const unlockMatchReport = onCall(
   {
-    ...HEAVY_OPTS,
+    ...HEAVY_HOT_OPTS,
     secrets: [ANTHROPIC_API_KEY],
     // Claude takes 30–90s to explain 10 schools with detailed tips. Default
     // 60s timeout was too tight — the function would time out mid-Claude
@@ -1622,7 +1635,7 @@ export const finishVisaInterviewSession = onCall(
 // avatar lifecycle metadata on the visa session doc so we can audit usage
 // and surface the avatar status in the UI.
 export const createLiveAvatarSession = onCall(
-  { ...HEAVY_OPTS, secrets: [HEYGEN_API_KEY] },
+  { ...HEAVY_HOT_OPTS, secrets: [HEYGEN_API_KEY] },
   async (request) => {
     await assertNotInMaintenance(request);
     const uid = request.auth?.uid;
