@@ -202,7 +202,7 @@ export default function LandingPage() {
           <Reveal className="text-center mb-12 md:mb-16">
             <p className="text-xs font-black tracking-[0.2em] uppercase text-primary-600 mb-4">How it works</p>
             <h2 className="text-3xl md:text-5xl font-black text-slate-900 tracking-tight mb-4">Your acceptance <br/><span className="text-primary-600">starts here.</span></h2>
-            <p className="text-lg text-slate-500 font-medium max-w-2xl mx-auto">Skip the guesswork. Get a personalised college shortlist built around your strengths, your budget, and your future — backed by verified data, not vibes.</p>
+            <p className="text-lg text-slate-500 font-medium max-w-2xl mx-auto">Skip the guesswork. Get a personalised college shortlist built around your strengths, your budget, and your future — grounded in verified program data.</p>
           </Reveal>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6">
