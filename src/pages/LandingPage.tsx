@@ -327,8 +327,8 @@ export default function LandingPage() {
               <h3 className="text-2xl font-black mb-2">Plus Pack</h3>
               <p className="text-slate-400 font-medium text-sm mb-6">Perfect for building your shortlist.</p>
               <div className="mb-6">
-                <span className="text-5xl font-black">$20</span>
-                <span className="text-slate-400 font-bold"> / 30 Credits</span>
+                <span className="text-5xl font-black">$15</span>
+                <span className="text-slate-400 font-bold"> / 45 Credits</span>
               </div>
               <Link
                 to={billingHref}

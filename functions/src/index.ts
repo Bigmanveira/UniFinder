@@ -233,20 +233,32 @@ const MAX_SUPPORTING_DOCS_PER_INTERVIEW = 3;
 // buys 6 match-unlocks. ~70% margin per unlock comfortably absorbs
 // Paystack's per-transaction fee (~3.9% + ~$0.10 for international USD)
 // at the $2 level.
-// Prices are GHS (Ghanaian Cedi) — the default settlement currency on our
-// Paystack-Ghana merchant account. Roughly tracks the previous USD prices
-// at ~₵12 / $1 (Try ~$2, Starter ~$5, Plus ~$15, Pro ~$40, Power ~$100).
+// Prices live in BOTH GHS and USD on each pack.
+//   priceLocal: the actual amount Paystack charges (always GHS for our
+//               Paystack-Ghana merchant account — initPaystackTransaction
+//               sends amount=priceLocal*100, currency="GHS").
+//   priceUsd:   what the user-facing UI shows as the primary number.
+//               Pinned manually here at the ~₵12 / $1 reference rate
+//               we set when launching. Treat as a "menu price" — not
+//               recomputed at runtime to avoid FX drift surprising
+//               users between page-load and checkout.
+//
+// Update both fields together when prices change. The UI shows USD
+// prominently with "Charged as ₵X GHS" underneath so international
+// users see a familiar number and Ghanaian users see exactly what
+// hits their card.
 export const CREDIT_PACKS: Record<string, {
   label:        string;
-  priceLocal:   number;   // What we charge in GHS (cedi major units)
-  credits:      number;   // What the user receives
+  priceLocal:   number;   // GHS (cedi major units) — what Paystack actually charges
+  priceUsd:     number;   // USD (display only) — never sent to Paystack
+  credits:      number;
   recommended?: boolean;
 }> = {
-  try:     { label: "Try",     priceLocal:   24, credits:   6 },
-  starter: { label: "Starter", priceLocal:   60, credits:  15 },
-  plus:    { label: "Plus",    priceLocal:  180, credits:  45, recommended: true },
-  pro:     { label: "Pro",     priceLocal:  480, credits: 120 },
-  power:   { label: "Power",   priceLocal: 1200, credits: 300 },
+  try:     { label: "Try",     priceLocal:   24, priceUsd:   2, credits:   6 },
+  starter: { label: "Starter", priceLocal:   60, priceUsd:   5, credits:  15 },
+  plus:    { label: "Plus",    priceLocal:  180, priceUsd:  15, credits:  45, recommended: true },
+  pro:     { label: "Pro",     priceLocal:  480, priceUsd:  40, credits: 120 },
+  power:   { label: "Power",   priceLocal: 1200, priceUsd: 100, credits: 300 },
 };
 // Greeting + DS-160 ask. The interview proper (real questions) doesn't begin
 // until BOTH the DS-160 confirmation page and the I-20 have been uploaded.
@@ -1856,6 +1868,7 @@ export const listCreditPacks = onCall({ ...LIGHT_OPTS }, async () => {
     id,
     label:       p.label,
     priceLocal:  p.priceLocal,
+    priceUsd:    p.priceUsd,
     currency:    "GHS",
     credits:     p.credits,
     recommended: !!p.recommended,

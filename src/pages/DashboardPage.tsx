@@ -923,6 +923,11 @@ function ProfileTab({ user, username, onSignOut }: { user: any, username: string
 type CreditPack = {
   id:          string;
   label:       string;
+  // Primary display — what an international audience expects to see.
+  priceUsd:    number;
+  // Actual charge currency (GHS for our Paystack-Ghana merchant).
+  // Shown as a "Charged as ₵X GHS" sub-label so the user knows
+  // exactly what hits their card before clicking Buy.
   priceLocal:  number;
   currency:    string;
   credits:     number;
@@ -1094,8 +1099,8 @@ function BillingTab({ credits, userId, isFounder }: { credits: number; userId: s
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
           {packs.map((pack) => {
             const isBuying = buying === pack.id;
-            const glyph = currencyGlyph(pack.currency);
-            const perCredit = (pack.priceLocal / pack.credits).toFixed(2);
+            const localGlyph = currencyGlyph(pack.currency);
+            const perCreditUsd = (pack.priceUsd / pack.credits).toFixed(2);
             return (
               <div
                 key={pack.id}
@@ -1112,11 +1117,16 @@ function BillingTab({ credits, userId, isFounder }: { credits: number; userId: s
                 )}
                 <h4 className={`text-lg font-black mb-1 ${pack.recommended ? "text-primary-900" : "text-slate-900"}`}>{pack.label}</h4>
                 <p className={`text-xs font-medium mb-5 ${pack.recommended ? "text-primary-700/80" : "text-slate-500"}`}>
-                  {glyph}{perCredit} per credit
+                  ${perCreditUsd} per credit
                 </p>
                 <div className="mb-5">
-                  <span className={`text-4xl font-black ${pack.recommended ? "text-primary-900" : "text-slate-900"}`}>{glyph}{pack.priceLocal}</span>
-                  <span className={`font-bold ${pack.recommended ? "text-primary-700" : "text-slate-500"}`}> / {pack.credits} credits</span>
+                  <div>
+                    <span className={`text-4xl font-black ${pack.recommended ? "text-primary-900" : "text-slate-900"}`}>${pack.priceUsd}</span>
+                    <span className={`font-bold ${pack.recommended ? "text-primary-700" : "text-slate-500"}`}> / {pack.credits} credits</span>
+                  </div>
+                  <p className={`text-[11px] font-medium mt-1 ${pack.recommended ? "text-primary-700/80" : "text-slate-500"}`}>
+                    Charged as {localGlyph}{pack.priceLocal} {pack.currency}
+                  </p>
                 </div>
                 <button
                   onClick={() => handleBuy(pack.id)}
@@ -1137,7 +1147,7 @@ function BillingTab({ credits, userId, isFounder }: { credits: number; userId: s
       )}
 
       <p className="text-[11px] text-slate-400 mt-6 leading-relaxed">
-        Payments are processed by Paystack. We don't see or store your card details.
+        Prices shown in USD. Payments are processed in Ghanaian Cedi (₵) by Paystack at the equivalent rate above — your bank may convert to your local currency. We don't see or store your card details.
         Refunds and disputes: contact <a className="underline" href="mailto:support@collegeready.io">support@collegeready.io</a>.
       </p>
     </motion.div>
