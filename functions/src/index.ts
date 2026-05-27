@@ -2667,6 +2667,88 @@ export const backfillCreditWallets = onCall(
 );
 
 // ============================================================
+// restoreSignupCredits — admin-only restorative one-shot
+// ============================================================
+/**
+ * Bumps every wallet that's currently below FREE_CREDITS_ON_SIGNUP back
+ * up to the signup grant. Wallets at or above the grant are left alone.
+ *
+ * Built in response to a cleanupTestPayments run that zeroed live users
+ * whose wallets had been eagerly materialized to credits:2 by
+ * onUserCreated — the cleanup ran AFTER signup, so users who'd never
+ * spent a credit ended up with 0. cleanupTestPayments has been fixed to
+ * preserve the grant going forward; this callable is the one-shot
+ * recovery for users who got caught by the bug.
+ *
+ * Safe to re-run any time: users above the grant are skipped, users
+ * already at the grant are no-ops, only sub-grant wallets get touched.
+ * Dry-run by default.
+ */
+export const restoreSignupCredits = onCall(
+  { ...LIGHT_OPTS, timeoutSeconds: 540 },
+  async (request) => {
+    const authToken = request.auth?.token;
+    if (!authToken || authToken.admin !== true) {
+      throw new HttpsError("permission-denied", "Admin only.");
+    }
+
+    const dryRun = request.data?.dryRun !== false;  // default TRUE
+
+    const db = admin.firestore();
+    const walletsSnap = await db.collection("creditWallets").get();
+
+    let totalWallets   = 0;
+    let alreadyAtOrAbove = 0;
+    let toRestore      = 0;
+    let restored       = 0;
+    let failed         = 0;
+    const failures: Array<{ uid: string; error: string }> = [];
+    const wouldRestore: Array<{ uid: string; was: number }> = [];
+
+    for (const walletDoc of walletsSnap.docs) {
+      totalWallets++;
+      const uid     = walletDoc.id;
+      const current = typeof walletDoc.data()?.credits === "number"
+        ? walletDoc.data()!.credits as number
+        : 0;
+
+      if (current >= FREE_CREDITS_ON_SIGNUP) {
+        alreadyAtOrAbove++;
+        continue;
+      }
+
+      toRestore++;
+      if (dryRun) {
+        wouldRestore.push({ uid, was: current });
+        continue;
+      }
+
+      try {
+        await walletDoc.ref.set({
+          credits:   FREE_CREDITS_ON_SIGNUP,
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          source:    "restore_signup_grant",
+        }, { merge: true });
+        restored++;
+      } catch (err: any) {
+        failed++;
+        failures.push({ uid, error: err?.message ?? String(err) });
+      }
+    }
+
+    return {
+      dryRun,
+      totalWallets,
+      alreadyAtOrAbove,
+      ...(dryRun
+        ? { wouldRestore: toRestore, sample: wouldRestore.slice(0, 10) }
+        : { restored, failed, sampleFailures: failures.slice(0, 5) }
+      ),
+    };
+  },
+);
+
+// ============================================================
 // Bulk email — templates, audience resolution, dry-run + live send
 // ============================================================
 /**
@@ -3568,7 +3650,10 @@ export const cleanupTestPayments = onCall(
 
     let result;
     try {
-      result = await runCleanupTestPayments({ liveReference });
+      result = await runCleanupTestPayments({
+        liveReference,
+        freeSignupCredits: FREE_CREDITS_ON_SIGNUP,
+      });
     } catch (err: any) {
       console.error("[cleanup-test-payments] failed:", err?.message ?? err);
       throw new HttpsError("internal", err?.message ?? "Cleanup failed.");

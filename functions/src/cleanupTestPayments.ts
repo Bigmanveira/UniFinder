@@ -9,8 +9,13 @@
 //      the live one — wipes test-mode purchase ledger entries as well as
 //      every non-purchase movement (free signup credits, match-unlock
 //      spends, etc.) so the ledger reads as "fresh launch".
-//   4. Sets every `creditWallets` balance to 0, then plants the live
-//      payer's wallet with the credits the live pack actually granted.
+//   4. Resets every `creditWallets` balance to the FREE_CREDITS_ON_SIGNUP
+//      grant (so signed-up users keep the welcome credits they're
+//      entitled to), then plants the live payer's wallet with the
+//      credits the live pack actually granted. Prior to 2026-05-27
+//      this step wrote 0 — which silently wiped freshly-signed-up
+//      accounts whose wallets had been eagerly materialized by
+//      onUserCreated to credits:2. The signup grant is now preserved.
 //   5. Wipes every product-activity collection — matchReports, aiRuns,
 //      visaInterviewSessions / Messages / Reports / Documents, errorLogs.
 //      User accounts + their state (/users, /studentProfiles,
@@ -42,6 +47,10 @@ import * as admin from "firebase-admin";
 
 export interface CleanupTestPaymentsArgs {
   liveReference: string;
+  /** Base balance every non-live wallet is reset to after the wipe.
+   *  Passed in from the caller so this module doesn't have to import
+   *  FREE_CREDITS_ON_SIGNUP from index.ts (avoids a circular dep). */
+  freeSignupCredits: number;
 }
 
 export interface CleanupTestPaymentsResult {
@@ -148,7 +157,14 @@ export async function runCleanupTestPayments(
 
   const now = admin.firestore.FieldValue.serverTimestamp();
   await batchedWrite(allWallets.docs, (batch, doc) => {
-    const balance = doc.id === liveUserId ? liveCreditsGranted : 0;
+    // Non-live wallets get the signup grant back, NOT 0. Anyone who's
+    // signed up is entitled to FREE_CREDITS_ON_SIGNUP; cleaning up
+    // test transactions shouldn't strip that. Live payer keeps the
+    // credits their real pack granted (typically far above the grant,
+    // so the comparison ?? floor isn't needed — but kept defensive).
+    const balance = doc.id === liveUserId
+      ? Math.max(liveCreditsGranted, args.freeSignupCredits)
+      : args.freeSignupCredits;
     batch.set(doc.ref, { credits: balance, updatedAt: now }, { merge: true });
   });
 
