@@ -123,6 +123,18 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Pending referrals — server-managed ledger for the deferred referral
+    // payout flow (referrer's 5 credits only post after the referee's
+    // first paid purchase, defeats self-referral fraud). Doc id is the
+    // referee's uid. Written exclusively by the applyReferralCode +
+    // applyPaystackChargeSuccess Cloud Functions via Admin SDK, which
+    // bypasses these rules. Direct client writes blocked; admin reads
+    // only.
+    match /pendingReferrals/{referredUserId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // Paystack — one record per fulfilled purchase, written by the
     // paystackWebhook Cloud Function via Admin SDK (so the write side is
     // already protected). Users can read their own purchase history.

@@ -410,9 +410,17 @@ export const testFunction = onCall({ ...LIGHT_OPTS }, async () => {
 });
 
 // ============================================================
-// applyReferralCode — credits the referrer with 5 credits when a
-// new user signs up via their referral link. Idempotent per-user:
-// a user can only be referred once, never themselves.
+// applyReferralCode — records a pending referral that pays out the
+// referrer's 5 credits ONLY when the new user makes their first paid
+// purchase. This kills the self-referral fraud vector (create N fake
+// accounts, refer them all to yourself, drain free credits into one
+// wallet) — the referee has to actually spend real money for the
+// referrer to see anything land. Honest sharing is unaffected.
+//
+// Idempotent per-user: a user can only be referred once, never
+// themselves. Edge case handled: if the referee already has a successful
+// paystackPayments doc on file (rare — they bought first, applied the
+// code later), the payout fires immediately inside the same transaction.
 // ============================================================
 
 const REFERRAL_REWARD = 5;
@@ -452,6 +460,21 @@ export const applyReferralCode = onCall({ ...LIGHT_OPTS }, async (request) => {
   if (!referrerUid)               return { ok: false, reason: "invalid_code" };
   if (referrerUid === uid)        return { ok: false, reason: "self_referral" };
 
+  // Pre-tx read: has the referee already made a successful purchase? Used
+  // below to decide whether the payout fires immediately (existing paying
+  // customer) or sits pending. Limit 1 — we only care that ONE exists.
+  // Outside the transaction is fine: we recheck inside if needed, but the
+  // failure mode of a false negative here is "payout stays pending until
+  // their NEXT purchase fires applyPaystackChargeSuccess" which is the
+  // correct behaviour anyway. False positives are impossible (we only see
+  // committed paystackPayments docs, which are write-once on charge.success).
+  const priorPurchaseSnap = await db
+    .collection("paystackPayments")
+    .where("userId", "==", uid)
+    .limit(1)
+    .get();
+  const refereeAlreadyPaying = !priorPurchaseSnap.empty;
+
   // SECURITY (audit 2026-05-15): the `referredBy` guard MUST live inside the
   // transaction. Reading it outside was racy: two parallel calls both saw an
   // empty `referredBy` and both credited the referrer, yielding 2× the
@@ -459,8 +482,8 @@ export const applyReferralCode = onCall({ ...LIGHT_OPTS }, async (request) => {
   // call now sees the first call's write and bails with already_referred.
   const result = await db.runTransaction(async (tx) => {
     const userRef           = db.collection("users").doc(uid);
+    const pendingRef        = db.collection("pendingReferrals").doc(uid);
     const referrerWalletRef = db.collection("creditWallets").doc(referrerUid);
-    const txRef             = db.collection("creditTransactions").doc();
     const now               = admin.firestore.FieldValue.serverTimestamp();
 
     const userSnap = await tx.get(userRef);
@@ -468,21 +491,60 @@ export const applyReferralCode = onCall({ ...LIGHT_OPTS }, async (request) => {
       return { ok: false as const, reason: "already_referred" as const };
     }
 
-    const walletSnap = await tx.get(referrerWalletRef);
-    const currentCredits = walletSnap.exists
-      ? (walletSnap.data()?.credits ?? FREE_CREDITS_ON_SIGNUP)
-      : FREE_CREDITS_ON_SIGNUP;
+    // If we're going to pay out immediately, we also need the referrer's
+    // current wallet balance. Read it inside the tx so it can't drift.
+    let referrerCurrentCredits = 0;
+    if (refereeAlreadyPaying) {
+      const walletSnap = await tx.get(referrerWalletRef);
+      referrerCurrentCredits = walletSnap.exists
+        ? (walletSnap.data()?.credits ?? 0)
+        : 0;
+    }
 
-    tx.set(referrerWalletRef, { credits: currentCredits + REFERRAL_REWARD, updatedAt: now }, { merge: true });
-    tx.set(userRef,           { referredBy: referrerUid, referredAt: now }, { merge: true });
-    tx.set(txRef, {
-      userId:          referrerUid,
-      amount:          REFERRAL_REWARD,
-      type:            "referral_reward",
-      referredUserId:  uid,
-      createdAt:       now,
+    if (refereeAlreadyPaying) {
+      // Immediate payout — referee already has a successful charge on file.
+      const txRef = db.collection("creditTransactions").doc();
+      tx.set(referrerWalletRef, { credits: referrerCurrentCredits + REFERRAL_REWARD, updatedAt: now }, { merge: true });
+      tx.set(pendingRef, {
+        referredUserId:        uid,
+        referrerUid,
+        code,
+        rewardAmount:          REFERRAL_REWARD,
+        status:                "paid_out",
+        createdAt:             now,
+        paidOutAt:             now,
+        // Stamped at apply-time (referee was already a paying user); no
+        // single triggering payment in this branch.
+        triggeringPaymentRef:  null,
+        paidOutTxRef:          txRef.id,
+        paidOutReason:         "referee_already_paying",
+      });
+      tx.set(userRef, { referredBy: referrerUid, referredAt: now }, { merge: true });
+      tx.set(txRef, {
+        userId:         referrerUid,
+        amount:         REFERRAL_REWARD,
+        type:           "referral_reward",
+        referredUserId: uid,
+        createdAt:      now,
+      });
+      return { ok: true as const, status: "paid_out" as const, creditsAwarded: REFERRAL_REWARD };
+    }
+
+    // Standard path — payout stays pending until the referee's first
+    // successful paystackPayments lands. applyPaystackChargeSuccess
+    // releases it.
+    tx.set(pendingRef, {
+      referredUserId:        uid,
+      referrerUid,
+      code,
+      rewardAmount:          REFERRAL_REWARD,
+      status:                "pending",
+      createdAt:             now,
+      paidOutAt:             null,
+      triggeringPaymentRef:  null,
     });
-    return { ok: true as const, creditsAwarded: REFERRAL_REWARD };
+    tx.set(userRef, { referredBy: referrerUid, referredAt: now }, { merge: true });
+    return { ok: true as const, status: "pending" as const };
   });
 
   return result;

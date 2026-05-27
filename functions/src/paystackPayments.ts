@@ -192,7 +192,21 @@ export async function applyPaystackChargeSuccess(event: PaystackWebhookEvent): P
   const paymentRef = db.collection("paystackPayments").doc(reference);
   const walletRef  = db.collection("creditWallets").doc(userId);
   const txRef      = db.collection("creditTransactions").doc();
+  const pendingRef = db.collection("pendingReferrals").doc(userId);
   const now        = admin.firestore.FieldValue.serverTimestamp();
+
+  // Pre-tx peek at the pending referral so we can set up the referrer's
+  // wallet ref before entering the transaction (Firestore txs require all
+  // reads before writes, and we don't know the referrer's uid until we
+  // read the pending doc — chicken-and-egg). We re-verify the status
+  // inside the tx for atomicity.
+  const pendingPeek = await pendingRef.get();
+  const pendingReferrerUid = pendingPeek.exists && pendingPeek.data()?.status === "pending"
+    ? (pendingPeek.data()?.referrerUid as string | undefined) ?? null
+    : null;
+  const referrerWalletRef = pendingReferrerUid
+    ? db.collection("creditWallets").doc(pendingReferrerUid)
+    : null;
 
   return await db.runTransaction(async (tx) => {
     const existing = await tx.get(paymentRef);
@@ -201,6 +215,33 @@ export async function applyPaystackChargeSuccess(event: PaystackWebhookEvent): P
     }
 
     const walletSnap = await tx.get(walletRef);
+
+    // Re-read the pending doc atomically to confirm it's still releasable.
+    // If a parallel charge already paid it out, or an admin voided it
+    // between our peek and the tx, we skip the referral payout cleanly.
+    let releaseReferral = false;
+    let referrerCurrentCredits = 0;
+    let referralRewardAmount = 0;
+    if (referrerWalletRef) {
+      const [pendingSnap, referrerWalletSnap] = await Promise.all([
+        tx.get(pendingRef),
+        tx.get(referrerWalletRef),
+      ]);
+      const pendingData = pendingSnap.data() ?? {};
+      if (pendingSnap.exists && pendingData.status === "pending") {
+        releaseReferral = true;
+        referrerCurrentCredits = referrerWalletSnap.exists
+          ? (referrerWalletSnap.data()?.credits ?? 0)
+          : 0;
+        // Snapshot the reward amount from the pending doc (not the live
+        // REFERRAL_REWARD constant). If we ever change the constant,
+        // already-pending referrals still pay out at the promised rate.
+        referralRewardAmount = typeof pendingData.rewardAmount === "number"
+          ? pendingData.rewardAmount
+          : 0;
+      }
+    }
+
     const currentCredits = walletSnap.exists ? (walletSnap.data()?.credits ?? 0) : 0;
     const nextCredits    = currentCredits + creditsToGrant;
 
@@ -227,6 +268,34 @@ export async function applyPaystackChargeSuccess(event: PaystackWebhookEvent): P
       provider:  "paystack",
       createdAt: now,
     });
+
+    // Referral release — credits the referrer + flips the pending doc to
+    // paid_out in the same transaction as the purchase, so an outside
+    // observer never sees the purchase committed without the referral
+    // payout having been at least scheduled.
+    if (releaseReferral && referrerWalletRef && referralRewardAmount > 0) {
+      const refTxRef = db.collection("creditTransactions").doc();
+      tx.set(referrerWalletRef, {
+        credits:   referrerCurrentCredits + referralRewardAmount,
+        updatedAt: now,
+      }, { merge: true });
+      tx.set(pendingRef, {
+        status:                "paid_out",
+        paidOutAt:             now,
+        triggeringPaymentRef:  reference,
+        paidOutTxRef:          refTxRef.id,
+        paidOutReason:         "first_paid_purchase",
+      }, { merge: true });
+      tx.set(refTxRef, {
+        userId:                pendingReferrerUid,
+        amount:                referralRewardAmount,
+        type:                  "referral_reward",
+        referredUserId:        userId,
+        triggeringPaymentRef:  reference,
+        createdAt:             now,
+      });
+    }
+
     return {
       applied:         true as const,
       newCredits:      nextCredits,

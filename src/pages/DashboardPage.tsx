@@ -1356,7 +1356,7 @@ function ReferralCard({ userId }: { userId: string | undefined }) {
           <div className="flex-1 min-w-0">
             <h3 className="text-lg font-bold tracking-tight text-slate-900">Refer friends, earn credits</h3>
             <p className="text-sm text-slate-500 leading-relaxed mt-0.5">
-              You get <span className="font-semibold text-emerald-700">5 free credits</span> when a friend signs up with your link.
+              You get <span className="font-semibold text-emerald-700">5 free credits</span> the moment a friend you referred makes their first credit purchase.
             </p>
           </div>
         </div>

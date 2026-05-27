@@ -242,7 +242,7 @@ export default function SignupPage() {
                   </p>
                   {referralCode.trim() && (
                     <p className="text-[11px] text-emerald-700 mt-1 leading-relaxed">
-                      Referral code <span className="font-mono font-bold">{referralCode.trim().toUpperCase()}</span> will be applied automatically when you land.
+                      Referral code <span className="font-mono font-bold">{referralCode.trim().toUpperCase()}</span> will be applied automatically when you land. Your referrer gets 5 credits once you make your first purchase.
                     </p>
                   )}
                 </div>
