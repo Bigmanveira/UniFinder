@@ -27,6 +27,7 @@ import {
   isSignInWithEmailLink,
   signInWithEmailLink,
   getAdditionalUserInfo,
+  GoogleAuthProvider,
 } from "firebase/auth";
 import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
@@ -38,6 +39,11 @@ import {
   readPendingReferralCode,
   clearPendingReferralCode,
 } from "../lib/referrals";
+import {
+  stashPendingCredential,
+  stashPendingEmailLink,
+  tryLinkPendingCredential,
+} from "../lib/accountLinking";
 
 const EMAIL_LS_KEY = "userApp:emailForSignIn";
 
@@ -148,6 +154,13 @@ export default function LoginPage() {
       return;
     }
 
+    // Remember the link URL up front. If sign-in fails because a
+    // Google account already exists for this email, we'll stash the
+    // (email, link) pair and rebuild the credential later — after the
+    // user re-authenticates via Google and we attach this email-link
+    // method to their existing UID.
+    const incomingLink = window.location.href;
+
     (async () => {
       try {
         const credential = await signInWithEmailLink(auth, storedEmail, window.location.href);
@@ -156,10 +169,30 @@ export default function LoginPage() {
         // an already-spent link.
         window.history.replaceState({}, "", window.location.pathname + window.location.search.replace(/[?&]oobCode=[^&]*/g, "").replace(/[?&]apiKey=[^&]*/g, "").replace(/[?&]mode=[^&]*/g, "").replace(/[?&]continueUrl=[^&]*/g, "").replace(/[?&]lang=[^&]*/g, "").replace(/^&/, "?") || "");
 
+        // Account linking — if the user got here from a Google attempt
+        // that bounced because the email-link account already existed,
+        // there's a Google credential waiting in sessionStorage. Attach
+        // it to this UID so the user has a single account with both
+        // sign-in methods.
+        await tryLinkPendingCredential(credential.user);
+
         await bootstrapUser(credential.user.uid, credential.user.email);
         await applyReferralIfPresent();
         navigate(computePostLoginPath());
       } catch (err: any) {
+        // Mirror case of the Google flow: an account exists for this
+        // email via Google. Stash the email-link credential and walk
+        // the user through Google sign-in — the Google handler above
+        // calls tryLinkPendingCredential after a successful sign-in
+        // and attaches the email-link to that UID.
+        if (err?.code === "auth/account-exists-with-different-credential") {
+          stashPendingEmailLink(storedEmail, incomingLink);
+          setError(
+            `An account for ${storedEmail} already exists via Google. Click "Continue with Google" below to link your email sign-in to that account.`,
+          );
+          setVerifying(false);
+          return;
+        }
         setError(err?.message ?? "Sign-in link could not be verified. Request a new link.");
         setVerifying(false);
       }
@@ -204,6 +237,14 @@ export default function LoginPage() {
       const userCredential = await signInWithPopup(auth, googleProvider);
       const additionalInfo = getAdditionalUserInfo(userCredential);
 
+      // Account linking — if the user previously kicked off an email-link
+      // sign-in that got blocked because a Google account already
+      // existed, the email-link credential is sitting in sessionStorage.
+      // Attach it to this Google UID now so future email-link sign-ins
+      // for the same address land on this same UID. Best-effort: if it
+      // fails (token expired, etc.) we just continue with sign-in.
+      await tryLinkPendingCredential(userCredential.user);
+
       // Returning user → ensure their /users doc is around (merge:true
       // makes this a no-op if it exists) + apply any pending referral
       // code (rare on login, but if they followed a referral link to
@@ -218,6 +259,43 @@ export default function LoginPage() {
       await applyReferralIfPresent();
       navigate(computePostLoginPath());
     } catch (err: any) {
+      // Account-linking branch: an account already exists for this email
+      // via a DIFFERENT method (email-link). We can't sign in with
+      // Google because doing so would create a second UID. Instead:
+      //   1. Stash the Google credential so we can attach it after the
+      //      user signs in with their existing method.
+      //   2. Auto-send the email-link to the same address.
+      //   3. Tell the user to check their inbox.
+      // When they click the link, the email-link useEffect below
+      // succeeds (existing UID), then calls tryLinkPendingCredential
+      // which attaches the stashed Google credential to that UID.
+      if (err?.code === "auth/account-exists-with-different-credential") {
+        const email = (err.customData?.email ?? "").toString().toLowerCase();
+        const pendingCred = GoogleAuthProvider.credentialFromError(err);
+        if (email && pendingCred) {
+          stashPendingCredential(pendingCred, email);
+          try {
+            const dest = computePostLoginPath();
+            const params = new URLSearchParams();
+            params.set("next", dest);
+            const returnUrl = `${window.location.origin}/login?${params.toString()}`;
+            const fn = httpsCallable<
+              { email: string; returnUrl: string; intent: "signup" | "signin" },
+              { ok: boolean }
+            >(functions, "sendUserSignInLink");
+            await fn({ email, returnUrl, intent: "signin" });
+            localStorage.setItem(EMAIL_LS_KEY, email);
+            setSent(true);
+            setEmail(email);
+            setError("We've already got an account for this email. We just sent you a sign-in link — click it to link Google to that account.");
+            return;
+          } catch (sendErr) {
+            console.warn("[login] could not auto-send link for account link:", sendErr);
+            setError(`An account for ${email} already exists. Sign in with the email-link option to access it.`);
+            return;
+          }
+        }
+      }
       console.error(err);
       setError("Google sign-in failed. Try again.");
     } finally {

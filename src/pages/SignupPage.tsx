@@ -18,7 +18,7 @@
 
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { signInWithPopup } from "firebase/auth";
+import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { auth, googleProvider, db, functions } from "../lib/firebase";
@@ -31,6 +31,10 @@ import {
   clearPendingReferralCode,
   setPendingReferralCode,
 } from "../lib/referrals";
+import {
+  stashPendingCredential,
+  tryLinkPendingCredential,
+} from "../lib/accountLinking";
 
 // Same key the LoginPage reads. Pinned here so a rename in one place
 // doesn't silently break the round-trip.
@@ -156,6 +160,12 @@ export default function SignupPage() {
       persistReferralCode();
       const userCredential = await signInWithPopup(auth, googleProvider);
 
+      // Account linking — if a previous email-link attempt got blocked
+      // because a Google account already existed, the email-link
+      // credential is in sessionStorage waiting for this Google sign-in.
+      // Attach it here so both methods land on this single UID.
+      await tryLinkPendingCredential(userCredential.user);
+
       try {
         const uid = userCredential.user.uid;
         const userEmail = userCredential.user.email;
@@ -176,7 +186,39 @@ export default function SignupPage() {
 
       await applyReferralIfPresent();
       navigate(computePostSignupPath());
-    } catch (err) {
+    } catch (err: any) {
+      // Mirror LoginPage: existing account via email-link → stash the
+      // Google credential and send the user a sign-in link. When they
+      // click it, the LoginPage email-link handler runs
+      // tryLinkPendingCredential and attaches Google to the existing
+      // UID. End state: one account, two sign-in methods.
+      if (err?.code === "auth/account-exists-with-different-credential") {
+        const linkEmail = (err.customData?.email ?? "").toString().toLowerCase();
+        const pendingCred = GoogleAuthProvider.credentialFromError(err);
+        if (linkEmail && pendingCred) {
+          stashPendingCredential(pendingCred, linkEmail);
+          try {
+            const dest = computePostSignupPath();
+            const params = new URLSearchParams();
+            params.set("next", dest);
+            const returnUrl = `${window.location.origin}/login?${params.toString()}`;
+            const fn = httpsCallable<
+              { email: string; returnUrl: string; intent: "signup" | "signin" },
+              { ok: boolean }
+            >(functions, "sendUserSignInLink");
+            await fn({ email: linkEmail, returnUrl, intent: "signin" });
+            localStorage.setItem(EMAIL_LS_KEY, linkEmail);
+            setEmail(linkEmail);
+            setSent(true);
+            setError("You already have an account for this email. We sent you a sign-in link — click it to link Google to that account.");
+            return;
+          } catch (sendErr) {
+            console.warn("[signup] could not auto-send link for account link:", sendErr);
+            setError(`An account for ${linkEmail} already exists. Use email-link sign-in to access it.`);
+            return;
+          }
+        }
+      }
       console.error(err);
       setError("Google sign-up failed. Try again.");
     } finally {
