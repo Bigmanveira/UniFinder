@@ -162,18 +162,21 @@ Rank the top ${TARGET_TOP_K} for this student and return the JSON described in t
 
   let raw: string;
   try {
-    // Sonnet for the matching ranking — this is the headline product surface;
-    // worth the extra ~10s vs Haiku for the quality bump.
+    // Haiku for the guest /results preview — ranking + bucketing is a
+    // structured classification task that Haiku handles well, while the
+    // full match report (unlockMatchReport → claudeExplainMatches) stays
+    // on Sonnet for the explanation depth users actually pay for. Net
+    // result: ~3× cheaper per preview call, no measurable quality change
+    // on the bucketed-12-school output, and a materially smaller blast
+    // radius if this anonymous endpoint gets abused.
     //
-    // Prompt caching (audit 2026-05-15): the SYSTEM_PROMPT is static across
-    // every call, so mark it cache_control:ephemeral. When the same user re-
-    // runs matching within the 5-minute TTL — or two different users hit
-    // back-to-back — Anthropic charges 1/10× input tokens for the cached
-    // block. At 1M DAU this is the single biggest cost lever in this file.
-    // Sonnet's minimum cacheable prompt is 1024 tokens; the system prompt is
-    // borderline, so cache hits will be inconsistent until the prompt grows.
+    // Prompt caching (audit 2026-05-15): SYSTEM_PROMPT is static across
+    // every call, so mark it cache_control:ephemeral. Haiku's cacheable
+    // minimum is 2048 tokens; if the system prompt sits below that the
+    // cache won't kick in, but the raw cost is already low enough that
+    // it doesn't matter much at this scale.
     const response = await anthropic.messages.create({
-      model:      "claude-sonnet-4-5",
+      model:      "claude-haiku-4-5-20251001",
       max_tokens: 4000,
       temperature: 0.3,
       system: [
