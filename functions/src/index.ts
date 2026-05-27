@@ -2472,6 +2472,57 @@ export const onUserCreated = onDocumentCreated(
     }
     const uid = event.params.userId;
     const data = snap.data() ?? {};
+
+    // ── Wallet materialization ─────────────────────────────────────────────
+    // Eagerly create /creditWallets/{uid} with the FREE_CREDITS_ON_SIGNUP
+    // grant so every surface that reads wallets (ops portal, analytics,
+    // future migrations) sees the user's correct balance from the moment
+    // of signup. Previously the wallet was lazily materialized on first
+    // credit-spending action, which left newly-signed-up users showing
+    // credits:0 in the ops portal until they touched the product.
+    //
+    // Transactional + existence check: a concurrent applyMarketerCode or
+    // applyPaystackChargeSuccess could materialise the wallet first (rare
+    // but possible if the client fires fast enough); we never overwrite
+    // an existing wallet. Cloud Function retries are also safe — the
+    // second pass sees the wallet and no-ops.
+    //
+    // Independent of the welcome-email path below: a failure here doesn't
+    // skip the email, and a duplicate-trigger short-circuit on the email
+    // doesn't skip wallet creation.
+    try {
+      const db = admin.firestore();
+      const walletRef = db.collection("creditWallets").doc(uid);
+      await db.runTransaction(async (tx) => {
+        const walletSnap = await tx.get(walletRef);
+        if (walletSnap.exists) {
+          return;
+        }
+        tx.set(walletRef, {
+          credits:   FREE_CREDITS_ON_SIGNUP,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          source:    "signup_grant",
+        });
+      });
+    } catch (err: any) {
+      // Best-effort: log and continue. The spending callables retain
+      // their lazy-init fallback as a backstop, so a failed eager
+      // materialisation here doesn't break the user's ability to use
+      // their free credits — it just leaves them displaying as 0 in the
+      // ops portal until they spend, which is the same state as before
+      // this fix landed.
+      console.error("[users] wallet materialization failed", { uid, err: err?.message ?? err });
+      void logError({
+        category: "other",
+        source:   "onUserCreated.wallet",
+        severity: "warning",
+        message:  err?.message ?? String(err),
+        userId:   uid,
+        context:  {},
+      });
+    }
+
     if (data.welcomeEmailSentAt) {
       console.log("[users] welcome email already sent for", uid, "skipping");
       return;
@@ -2525,6 +2576,90 @@ export const onUserCreated = onDocumentCreated(
         { merge: true },
       );
     }
+  },
+);
+
+// ============================================================
+// backfillCreditWallets — admin-only one-shot
+// ============================================================
+/**
+ * Walks every doc in /users and creates a /creditWallets/{uid} doc with the
+ * FREE_CREDITS_ON_SIGNUP grant for any user who doesn't already have one.
+ * Lets us clean up the long tail of users who signed up before the
+ * eager-materialization fix in onUserCreated landed — without this they
+ * keep displaying as 0 credits in the ops portal until they spend.
+ *
+ * Idempotent: only creates wallets that don't already exist; safe to
+ * re-run any time. Returns counts so the operator can sanity-check.
+ *
+ * Dry-run by default so the operator can see the scope before mutating
+ * anything. Pass `{ dryRun: false }` to actually create wallets.
+ */
+export const backfillCreditWallets = onCall(
+  { ...LIGHT_OPTS, timeoutSeconds: 540 },
+  async (request) => {
+    const authToken = request.auth?.token;
+    if (!authToken || authToken.admin !== true) {
+      throw new HttpsError("permission-denied", "Admin only.");
+    }
+
+    const dryRun = request.data?.dryRun !== false;  // default TRUE — explicit opt-out required
+
+    const db = admin.firestore();
+    // Snapshot all users. Collection is small (early-stage product); if it
+    // ever grows past a few thousand, we'd switch to cursoring. Cheap for
+    // now.
+    const usersSnap = await db.collection("users").get();
+
+    let totalUsers   = 0;
+    let alreadyHas   = 0;
+    let created      = 0;
+    let failed       = 0;
+    const failures: Array<{ uid: string; error: string }> = [];
+    const wouldCreate: string[] = [];
+
+    for (const userDoc of usersSnap.docs) {
+      totalUsers++;
+      const uid = userDoc.id;
+      const walletRef = db.collection("creditWallets").doc(uid);
+
+      try {
+        // Read outside a transaction (we're not racing anything here —
+        // backfill is a manual operator action, not a hot path).
+        const walletSnap = await walletRef.get();
+        if (walletSnap.exists) {
+          alreadyHas++;
+          continue;
+        }
+
+        if (dryRun) {
+          wouldCreate.push(uid);
+          continue;
+        }
+
+        await walletRef.set({
+          credits:   FREE_CREDITS_ON_SIGNUP,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          source:    "backfill_grant",
+        });
+        created++;
+      } catch (err: any) {
+        const msg = err?.message ?? String(err);
+        failed++;
+        failures.push({ uid, error: msg });
+      }
+    }
+
+    return {
+      dryRun,
+      totalUsers,
+      alreadyHas,
+      ...(dryRun
+        ? { wouldCreate: wouldCreate.length, sampleUids: wouldCreate.slice(0, 10) }
+        : { created, failed, sampleFailures: failures.slice(0, 5) }
+      ),
+    };
   },
 );
 
