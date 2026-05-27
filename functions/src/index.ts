@@ -5,6 +5,9 @@ import * as admin from "firebase-admin";
 import { generateClaudeMatchExplanation } from "./claudeExplainMatches.js";
 import { sendWaitlistWelcome } from "./waitlistEmail.js";
 import { sendLaunchAnnouncement } from "./launchAnnouncementEmail.js";
+import { buildBulkEmailHtml, buildBulkEmailText } from "./bulkEmailChrome.js";
+import { BULK_EMAIL_TEMPLATES } from "./bulkEmailTemplates.js";
+import { Resend } from "resend";
 import {
   generateOfficerTurn, scoreVisaInterview, VISA_DISCLAIMER,
   pickIntroQuestion,
@@ -2660,6 +2663,497 @@ export const backfillCreditWallets = onCall(
         : { created, failed, sampleFailures: failures.slice(0, 5) }
       ),
     };
+  },
+);
+
+// ============================================================
+// Bulk email — templates, audience resolution, dry-run + live send
+// ============================================================
+/**
+ * Returns the catalogue of pre-built bulk-email templates the operator
+ * picks from. Templates live in code (bulkEmailTemplates.ts) for review
+ * + version-control; clients never write to this surface.
+ */
+export const listBulkEmailTemplates = onCall(
+  { ...LIGHT_OPTS },
+  async (request) => {
+    const authToken = request.auth?.token;
+    if (!authToken || authToken.admin !== true) {
+      throw new HttpsError("permission-denied", "Admin only.");
+    }
+    return { templates: BULK_EMAIL_TEMPLATES };
+  },
+);
+
+/** Doc-id-safe key for a recipient address. Firestore doc ids can't
+ *  contain slashes, '#', '[', ']', or '*' — emails don't contain those
+ *  anyway, but we lowercase + trim to dedupe and replace '@' with '_at_'
+ *  so the key stays human-readable in the Firebase console. */
+function recipientKey(email: string): string {
+  return email.trim().toLowerCase().replace(/[^a-z0-9._-]/g, "_");
+}
+
+type AudienceKind = "all_users" | "paying_customers" | "free_users" | "waitlist" | "custom";
+
+interface AudienceSpec {
+  kind:    AudienceKind;
+  /** Comma-separated or array of emails. Required when kind === "custom". */
+  emails?: string[];
+}
+
+async function resolveAudience(spec: AudienceSpec): Promise<string[]> {
+  const db = admin.firestore();
+  const out = new Set<string>();
+
+  switch (spec.kind) {
+    case "all_users": {
+      const snap = await db.collection("users").get();
+      for (const d of snap.docs) {
+        const email = (d.data()?.email ?? "").toString().trim().toLowerCase();
+        if (email) out.add(email);
+      }
+      break;
+    }
+    case "paying_customers": {
+      // Anyone with at least one successful paystackPayments doc. Read
+      // payments first (smaller set than /users in most cohorts), pull
+      // userIds, then look up the user docs for their emails.
+      const paymentsSnap = await db.collection("paystackPayments").get();
+      const payingUids = new Set<string>();
+      for (const d of paymentsSnap.docs) {
+        const uid = d.data()?.userId;
+        if (typeof uid === "string" && uid) payingUids.add(uid);
+      }
+      // Batch user lookups so we don't fire N round-trips. Firestore
+      // getAll caps at 500 refs per call — chunk if we ever cross that.
+      const uids = Array.from(payingUids);
+      for (let i = 0; i < uids.length; i += 100) {
+        const chunk = uids.slice(i, i + 100);
+        const refs = chunk.map((uid) => db.collection("users").doc(uid));
+        const snaps = await db.getAll(...refs);
+        for (const s of snaps) {
+          const email = (s.data()?.email ?? "").toString().trim().toLowerCase();
+          if (email) out.add(email);
+        }
+      }
+      break;
+    }
+    case "free_users": {
+      // All users MINUS paying users. Two reads then a set difference.
+      const [usersSnap, paymentsSnap] = await Promise.all([
+        db.collection("users").get(),
+        db.collection("paystackPayments").get(),
+      ]);
+      const payingUids = new Set<string>();
+      for (const d of paymentsSnap.docs) {
+        const uid = d.data()?.userId;
+        if (typeof uid === "string" && uid) payingUids.add(uid);
+      }
+      for (const d of usersSnap.docs) {
+        if (payingUids.has(d.id)) continue;
+        const email = (d.data()?.email ?? "").toString().trim().toLowerCase();
+        if (email) out.add(email);
+      }
+      break;
+    }
+    case "waitlist": {
+      const snap = await db.collection("waitlist").get();
+      for (const d of snap.docs) {
+        const email = (d.data()?.email ?? "").toString().trim().toLowerCase();
+        if (email) out.add(email);
+      }
+      break;
+    }
+    case "custom": {
+      const raw = spec.emails ?? [];
+      for (const e of raw) {
+        const email = e.trim().toLowerCase();
+        if (/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/.test(email)) {
+          out.add(email);
+        }
+      }
+      break;
+    }
+  }
+
+  return Array.from(out);
+}
+
+/**
+ * Operator-driven bulk email send. Admin-only. Dry-run by default.
+ *
+ * Idempotency: each call carries a `campaignId` (UUID generated by the
+ * UI). The function creates /bulkCampaigns/{campaignId} on first call
+ * and a per-recipient subdoc at
+ * /bulkCampaigns/{campaignId}/recipients/{key} that flips to "sent"
+ * after Resend succeeds. Re-running with the same campaignId picks up
+ * where it left off — already-mailed recipients are skipped, only
+ * failed/un-attempted ones get a fresh try. Safe to retry any time.
+ *
+ * Caps in place:
+ *   • maxToSend: 5000 per invocation (operator picks; UI defaults to
+ *     5000 for full audience or smaller for smoke tests)
+ *   • 100ms throttle between sends to stay polite to Resend rate-limit
+ *   • timeoutSeconds: 540 so a few thousand emails fit one invocation
+ */
+export const sendBulkEmail = onCall(
+  { ...LIGHT_OPTS, timeoutSeconds: 540, secrets: [RESEND_API_KEY] },
+  async (request) => {
+    const authToken = request.auth?.token;
+    if (!authToken || authToken.admin !== true) {
+      throw new HttpsError("permission-denied", "Admin only.");
+    }
+
+    const dryRun     = request.data?.dryRun !== false;  // default TRUE
+    const subject    = String(request.data?.subject  ?? "").trim();
+    const headline   = String(request.data?.headline ?? "").trim();
+    const body       = String(request.data?.body     ?? "").trim();
+    const ctaTextRaw = request.data?.ctaText;
+    const ctaUrlRaw  = request.data?.ctaUrl;
+    const ctaText    = typeof ctaTextRaw === "string" ? ctaTextRaw.trim() : "";
+    const ctaUrl     = typeof ctaUrlRaw  === "string" ? ctaUrlRaw.trim()  : "";
+    const audience   = request.data?.audience as AudienceSpec | undefined;
+    const maxToSend  = Math.max(0, Math.min(5000, Number(request.data?.maxToSend ?? 5000)));
+    const campaignId = String(request.data?.campaignId ?? "").trim() || null;
+    const operatorUid = request.auth?.uid ?? null;
+
+    if (!subject)  throw new HttpsError("invalid-argument", "Subject required.");
+    if (!headline) throw new HttpsError("invalid-argument", "Headline required.");
+    if (!body)     throw new HttpsError("invalid-argument", "Body required.");
+    if (!audience || !audience.kind) {
+      throw new HttpsError("invalid-argument", "Audience required.");
+    }
+    if (Boolean(ctaText) !== Boolean(ctaUrl)) {
+      throw new HttpsError("invalid-argument", "CTA text and URL must both be set or both omitted.");
+    }
+
+    const emails = await resolveAudience(audience);
+    if (emails.length === 0) {
+      return {
+        dryRun, audienceKind: audience.kind,
+        totalCandidates: 0, alreadySent: 0, wouldSend: 0,
+        sent: 0, failed: 0, sampleEmails: [], sampleFailures: [],
+      };
+    }
+
+    // Dry run — no writes, no sends.
+    if (dryRun) {
+      return {
+        dryRun:           true,
+        audienceKind:     audience.kind,
+        totalCandidates:  emails.length,
+        wouldSend:        Math.min(emails.length, maxToSend),
+        sampleEmails:     emails.slice(0, 5),
+      };
+    }
+
+    if (!campaignId) {
+      throw new HttpsError("invalid-argument", "campaignId required for live send.");
+    }
+
+    const db = admin.firestore();
+    const campaignRef = db.collection("bulkCampaigns").doc(campaignId);
+
+    // Create the campaign doc on first call. Merge so re-runs with the
+    // same id don't blow away the original metadata.
+    await campaignRef.set({
+      campaignId,
+      subject,
+      headline,
+      bodyPreview: body.length > 500 ? body.slice(0, 500) + "…" : body,
+      ctaText:     ctaText || null,
+      ctaUrl:      ctaUrl  || null,
+      audienceKind: audience.kind,
+      audienceSize: emails.length,
+      operatorUid,
+      createdAt:    admin.firestore.FieldValue.serverTimestamp(),
+      lastRunAt:    admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    // Look up already-sent recipients for this campaign so we skip them
+    // on retries. For a fresh campaign this is one empty read.
+    const recipientsCol = campaignRef.collection("recipients");
+    const recipientsSnap = await recipientsCol.where("status", "==", "sent").get();
+    const alreadySentKeys = new Set<string>(recipientsSnap.docs.map((d) => d.id));
+
+    const toAttempt: string[] = [];
+    for (const email of emails) {
+      const key = recipientKey(email);
+      if (alreadySentKeys.has(key)) continue;
+      toAttempt.push(email);
+      if (toAttempt.length >= maxToSend) break;
+    }
+
+    const resend = new Resend(RESEND_API_KEY.value());
+    const html = buildBulkEmailHtml({ subject, headline, body, ctaText, ctaUrl });
+    const text = buildBulkEmailText({ subject, headline, body, ctaText, ctaUrl });
+
+    let sent   = 0;
+    let failed = 0;
+    const failures: Array<{ email: string; error: string }> = [];
+
+    for (const email of toAttempt) {
+      const key = recipientKey(email);
+      const recipientRef = recipientsCol.doc(key);
+      const now = admin.firestore.FieldValue.serverTimestamp();
+      try {
+        const result = await resend.emails.send({
+          from:    "College Ready <noreply@collegeready.io>",
+          to:      [email],
+          subject,
+          html,
+          text,
+        });
+        if (result.error) {
+          throw new Error(result.error.message ?? "Resend rejected the send.");
+        }
+        if (!result.data?.id) {
+          throw new Error("Resend returned no message id.");
+        }
+        await recipientRef.set({
+          email,
+          status:    "sent",
+          messageId: result.data.id,
+          sentAt:    now,
+          // Clear any prior failure so retries surface as fresh-success.
+          error:     admin.firestore.FieldValue.delete(),
+          erroredAt: admin.firestore.FieldValue.delete(),
+        }, { merge: true });
+        sent++;
+      } catch (err: any) {
+        const msg = err?.message ?? String(err);
+        failed++;
+        failures.push({ email, error: msg });
+        await recipientRef.set({
+          email,
+          status:    "failed",
+          error:     msg,
+          erroredAt: now,
+        }, { merge: true });
+        void logError({
+          category: "email_send",
+          source:   "bulk_email.resend_failed",
+          severity: "warning",
+          message:  msg,
+          context:  { campaignId, email },
+        });
+      }
+      // Polite gap between sends so Resend burst-limiter doesn't trip.
+      await new Promise((r) => setTimeout(r, 100));
+    }
+
+    await campaignRef.set({
+      lastRunAt:        admin.firestore.FieldValue.serverTimestamp(),
+      // Counters are merged (latest values overwrite). Cumulative
+      // totals across reruns live on the recipient subdocs.
+      lastRunSent:      sent,
+      lastRunFailed:    failed,
+      lastRunAttempted: toAttempt.length,
+    }, { merge: true });
+
+    return {
+      dryRun:          false,
+      campaignId,
+      audienceKind:    audience.kind,
+      totalCandidates: emails.length,
+      alreadySent:     alreadySentKeys.size,
+      attempted:       toAttempt.length,
+      sent,
+      failed,
+      sampleFailures:  failures.slice(0, 5),
+    };
+  },
+);
+
+// ============================================================
+// Failed transactional emails — listing + retry
+// ============================================================
+/**
+ * Lists transactional emails that failed to send across three doc-
+ * stamped surfaces: user welcome, waitlist signup welcome, and waitlist
+ * launch announcement. Each row carries the source identifier so the
+ * retryEmail callable can route the retry to the right send function.
+ *
+ * Payment-receipt failures are tracked in /errorLogs (not stamped on
+ * any doc), so they're handled via the existing Errors page rather
+ * than included here — a separate v2 if the user wants them surfaced
+ * alongside the others.
+ */
+export const listFailedEmails = onCall(
+  { ...LIGHT_OPTS },
+  async (request) => {
+    const authToken = request.auth?.token;
+    if (!authToken || authToken.admin !== true) {
+      throw new HttpsError("permission-denied", "Admin only.");
+    }
+
+    const db = admin.firestore();
+    const out: Array<{
+      source:   "user_welcome" | "waitlist_welcome" | "waitlist_launch";
+      docId:    string;
+      to:       string | null;
+      failedAt: number | null;
+      error:    string;
+    }> = [];
+
+    // /users docs with welcomeEmailError set. We scan rather than use a
+    // where-not-null query so we don't have to maintain a composite
+    // index for this rarely-hit ops surface.
+    const usersSnap = await db.collection("users").get();
+    for (const d of usersSnap.docs) {
+      const data = d.data() ?? {};
+      if (!data.welcomeEmailError) continue;
+      out.push({
+        source:   "user_welcome",
+        docId:    d.id,
+        to:       (data.email ?? null) as string | null,
+        failedAt: tsToMillis(data.welcomeEmailErrorAt),
+        error:    String(data.welcomeEmailError),
+      });
+    }
+
+    // /waitlist docs with emailError or launchEmailError set. One scan,
+    // two emits per doc max.
+    const waitlistSnap = await db.collection("waitlist").get();
+    for (const d of waitlistSnap.docs) {
+      const data = d.data() ?? {};
+      if (data.emailError) {
+        out.push({
+          source:   "waitlist_welcome",
+          docId:    d.id,
+          to:       (data.email ?? null) as string | null,
+          failedAt: tsToMillis(data.emailErrorAt),
+          error:    String(data.emailError),
+        });
+      }
+      if (data.launchEmailError) {
+        out.push({
+          source:   "waitlist_launch",
+          docId:    d.id,
+          to:       (data.email ?? null) as string | null,
+          failedAt: tsToMillis(data.launchEmailErrorAt),
+          error:    String(data.launchEmailError),
+        });
+      }
+    }
+
+    out.sort((a, b) => (b.failedAt ?? 0) - (a.failedAt ?? 0));
+    return { failures: out };
+  },
+);
+
+function tsToMillis(value: any): number | null {
+  if (!value) return null;
+  if (typeof value === "number") return value;
+  if (typeof value.toMillis === "function") return value.toMillis();
+  if (typeof value.seconds === "number") return value.seconds * 1000;
+  return null;
+}
+
+/**
+ * Retry a failed transactional email. Admin-only. Routes to the right
+ * Resend sender based on `source`, clears the error stamp on success,
+ * updates the stamp on a fresh failure.
+ */
+export const retryEmail = onCall(
+  { ...LIGHT_OPTS, secrets: [RESEND_API_KEY] },
+  async (request) => {
+    const authToken = request.auth?.token;
+    if (!authToken || authToken.admin !== true) {
+      throw new HttpsError("permission-denied", "Admin only.");
+    }
+
+    const source = String(request.data?.source ?? "");
+    const docId  = String(request.data?.docId  ?? "").trim();
+    if (!docId) throw new HttpsError("invalid-argument", "docId required.");
+
+    const db = admin.firestore();
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    const apiKey = RESEND_API_KEY.value();
+
+    if (source === "user_welcome") {
+      const userRef = db.collection("users").doc(docId);
+      const snap = await userRef.get();
+      if (!snap.exists) throw new HttpsError("not-found", "User doc not found.");
+      // Read email from Auth (authoritative), not from the Firestore doc.
+      let authUser: admin.auth.UserRecord;
+      try {
+        authUser = await admin.auth().getUser(docId);
+      } catch {
+        throw new HttpsError("not-found", "No Firebase Auth record for that user.");
+      }
+      const email = authUser.email;
+      if (!email) throw new HttpsError("failed-precondition", "User has no email on file.");
+      try {
+        const { id } = await sendWelcomeEmail({ apiKey, to: email, displayName: authUser.displayName });
+        await userRef.set({
+          welcomeEmailSentAt:    now,
+          welcomeEmailMessageId: id,
+          welcomeEmailError:     admin.firestore.FieldValue.delete(),
+          welcomeEmailErrorAt:   admin.firestore.FieldValue.delete(),
+        }, { merge: true });
+        return { ok: true as const, messageId: id, source, docId };
+      } catch (err: any) {
+        const msg = err?.message ?? String(err);
+        await userRef.set({
+          welcomeEmailError:   msg,
+          welcomeEmailErrorAt: now,
+        }, { merge: true });
+        return { ok: false as const, error: msg, source, docId };
+      }
+    }
+
+    if (source === "waitlist_welcome") {
+      const ref = db.collection("waitlist").doc(docId);
+      const snap = await ref.get();
+      if (!snap.exists) throw new HttpsError("not-found", "Waitlist doc not found.");
+      const email = (snap.data()?.email ?? "").toString().trim();
+      if (!email) throw new HttpsError("failed-precondition", "Waitlist entry has no email.");
+      try {
+        const { id } = await sendWaitlistWelcome({ apiKey, to: email });
+        await ref.set({
+          emailSentAt:    now,
+          emailMessageId: id,
+          emailError:     admin.firestore.FieldValue.delete(),
+          emailErrorAt:   admin.firestore.FieldValue.delete(),
+        }, { merge: true });
+        return { ok: true as const, messageId: id, source, docId };
+      } catch (err: any) {
+        const msg = err?.message ?? String(err);
+        await ref.set({
+          emailError:   msg,
+          emailErrorAt: now,
+        }, { merge: true });
+        return { ok: false as const, error: msg, source, docId };
+      }
+    }
+
+    if (source === "waitlist_launch") {
+      const ref = db.collection("waitlist").doc(docId);
+      const snap = await ref.get();
+      if (!snap.exists) throw new HttpsError("not-found", "Waitlist doc not found.");
+      const email = (snap.data()?.email ?? "").toString().trim();
+      if (!email) throw new HttpsError("failed-precondition", "Waitlist entry has no email.");
+      try {
+        const { id } = await sendLaunchAnnouncement({ apiKey, to: email });
+        await ref.set({
+          launchEmailSentAt:    now,
+          launchEmailMessageId: id,
+          launchEmailError:     admin.firestore.FieldValue.delete(),
+          launchEmailErrorAt:   admin.firestore.FieldValue.delete(),
+        }, { merge: true });
+        return { ok: true as const, messageId: id, source, docId };
+      } catch (err: any) {
+        const msg = err?.message ?? String(err);
+        await ref.set({
+          launchEmailError:   msg,
+          launchEmailErrorAt: now,
+        }, { merge: true });
+        return { ok: false as const, error: msg, source, docId };
+      }
+    }
+
+    throw new HttpsError("invalid-argument", `Unknown source: ${source}`);
   },
 );
 
