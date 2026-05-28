@@ -31,11 +31,23 @@ import { sendOpsSignInLinkEmail } from "./opsSignInEmail.js";
 
 const EMAIL_REGEX = /^[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}$/;
 
+/** Three roles the ops portal recognises. `founder` matches the
+ *  original boolean `admin: true` claim — sees and does everything,
+ *  including managing roles + inviting/revoking admins. `analyst` and
+ *  `developer` are scoped roles whose page access is configured by a
+ *  founder via the Roles section of the Admins page; they always also
+ *  carry admin:true so Firestore Rules' isAdmin() check passes for
+ *  any read they're permitted to do via UI gating. */
+export type OpsRole = "founder" | "analyst" | "developer";
+
+export const OPS_ROLES: readonly OpsRole[] = ["founder", "analyst", "developer"];
+
 export interface OpsAdminRow {
   uid:           string;
   email:         string | null;
   displayName:   string | null;
   photoURL:      string | null;
+  role:          OpsRole;
   createdAtMs:   number | null;
   lastSignInMs:  number | null;
   emailVerified: boolean;
@@ -48,12 +60,23 @@ function hasAdminClaim(user: admin.auth.UserRecord): boolean {
   return user.customClaims?.admin === true;
 }
 
+/** Read the role custom claim, defaulting to founder for legacy
+ *  admin-only accounts that haven't been migrated yet. Anyone with
+ *  admin:true but no role gets treated as founder so day-one upgrade
+ *  doesn't drop privileges. */
+function readRole(user: admin.auth.UserRecord): OpsRole {
+  const raw = user.customClaims?.role;
+  if (raw === "analyst" || raw === "developer") return raw;
+  return "founder";
+}
+
 function userToRow(user: admin.auth.UserRecord): OpsAdminRow {
   return {
     uid:           user.uid,
     email:         user.email ?? null,
     displayName:   user.displayName ?? null,
     photoURL:      user.photoURL ?? null,
+    role:          readRole(user),
     createdAtMs:   user.metadata.creationTime ? new Date(user.metadata.creationTime).getTime() : null,
     lastSignInMs:  user.metadata.lastSignInTime ? new Date(user.metadata.lastSignInTime).getTime() : null,
     emailVerified: user.emailVerified,
@@ -82,6 +105,9 @@ export interface InviteAdminArgs {
   /** Resend API key — injected by the callable so this module
    *  doesn't have to know about the secret directly. */
   resendKey: string;
+  /** Role to assign to the new admin. Defaults to founder for
+   *  backwards compatibility with the original boolean-admin flow. */
+  role?:     OpsRole;
 }
 
 export interface InviteAdminResult {
@@ -122,12 +148,20 @@ export async function inviteOpsAdmin(args: InviteAdminArgs): Promise<InviteAdmin
     }
   }
 
-  // 2. Set the admin custom claim. If they already have it, we
-  //    short-circuit so the audit log doesn't record a no-op as a
-  //    grant.
-  const alreadyAdmin = hasAdminClaim(userRecord);
-  if (!alreadyAdmin) {
-    await admin.auth().setCustomUserClaims(userRecord.uid, { admin: true });
+  // 2. Set the admin custom claim AND the role claim. If they already
+  //    carry both, we short-circuit so the audit log doesn't record a
+  //    no-op as a grant. We write claims merged with the existing set
+  //    so other unrelated claims (if any are added later) survive.
+  const targetRole: OpsRole = args.role ?? "founder";
+  const currentClaims = userRecord.customClaims ?? {};
+  const alreadyAdmin  = currentClaims.admin === true;
+  const sameRole      = currentClaims.role === targetRole;
+  if (!alreadyAdmin || !sameRole) {
+    await admin.auth().setCustomUserClaims(userRecord.uid, {
+      ...currentClaims,
+      admin: true,
+      role:  targetRole,
+    });
   }
 
   // 3. Send the sign-in link. We do this even when the user was
@@ -194,4 +228,87 @@ export async function revokeOpsAdmin(args: RevokeAdminArgs): Promise<{ revoked: 
   // we ever add other claims that should default to absent.
   await admin.auth().setCustomUserClaims(args.targetUid, {});
   return { revoked: true, uid: args.targetUid };
+}
+
+// ─── Role change ────────────────────────────────────────────────────────
+
+export interface SetRoleArgs {
+  /** UID of the admin whose role is being changed. */
+  targetUid: string;
+  /** UID of the caller doing the change. Refuse a founder demoting
+   *  themselves to prevent locking the org out of founder access. */
+  actorUid:  string;
+  /** Role to assign. */
+  role:      OpsRole;
+}
+
+export async function setOpsAdminRole(args: SetRoleArgs): Promise<{ uid: string; role: OpsRole }> {
+  if (!OPS_ROLES.includes(args.role)) {
+    throw new HttpsError("invalid-argument", `Unknown role: ${args.role}`);
+  }
+  let user: admin.auth.UserRecord;
+  try {
+    user = await admin.auth().getUser(args.targetUid);
+  } catch {
+    throw new HttpsError("not-found", `No user with UID ${args.targetUid}`);
+  }
+  if (!hasAdminClaim(user)) {
+    throw new HttpsError("failed-precondition", "Target user is not an admin.");
+  }
+  // Self-demote guard. The actor may freely change other people's
+  // roles, but downgrading themselves out of `founder` could leave
+  // the org with no founder. Frontend should also count founders
+  // before showing this option, but defence-in-depth here.
+  const currentRole = readRole(user);
+  if (args.targetUid === args.actorUid && currentRole === "founder" && args.role !== "founder") {
+    throw new HttpsError(
+      "failed-precondition",
+      "You can't demote yourself out of the Founder role from the ops portal.",
+    );
+  }
+  const currentClaims = user.customClaims ?? {};
+  await admin.auth().setCustomUserClaims(args.targetUid, {
+    ...currentClaims,
+    admin: true,
+    role:  args.role,
+  });
+  return { uid: args.targetUid, role: args.role };
+}
+
+// ─── One-shot migration: any admin without a role becomes founder ───────
+
+export interface MigrationResult {
+  scanned:  number;
+  migrated: number;
+  alreadyRoled: number;
+}
+
+/** Idempotent backfill: every Firebase Auth user carrying admin:true
+ *  without a `role` claim gets `role: "founder"` added. Used once after
+ *  the role-based UI ships to ensure no current admin is left without a
+ *  role. Safe to re-run. */
+export async function migrateAdminsToFounders(): Promise<MigrationResult> {
+  // Single-page listUsers is enough at current scale (see TODO at top
+  // of this file). When we cross 1k users this will need pagination.
+  const page = await admin.auth().listUsers(1000);
+  let migrated     = 0;
+  let alreadyRoled = 0;
+  let scanned      = 0;
+  for (const user of page.users) {
+    if (!hasAdminClaim(user)) continue;
+    scanned++;
+    const role = user.customClaims?.role;
+    if (role === "founder" || role === "analyst" || role === "developer") {
+      alreadyRoled++;
+      continue;
+    }
+    const currentClaims = user.customClaims ?? {};
+    await admin.auth().setCustomUserClaims(user.uid, {
+      ...currentClaims,
+      admin: true,
+      role:  "founder",
+    });
+    migrated++;
+  }
+  return { scanned, migrated, alreadyRoled };
 }

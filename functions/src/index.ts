@@ -40,6 +40,10 @@ import {
   listOpsAdmins,
   inviteOpsAdmin,
   revokeOpsAdmin,
+  setOpsAdminRole,
+  migrateAdminsToFounders,
+  OPS_ROLES,
+  type OpsRole,
 } from "./opsAdmins.js";
 import { logError } from "./errorLogger.js";
 import { createRateLimiter, extractClientIp } from "./rateLimiter.js";
@@ -2333,10 +2337,11 @@ export const onWaitlistEntry = onDocumentCreated(
 export const announceLaunch = onCall(
   { ...LIGHT_OPTS, timeoutSeconds: 540, secrets: [RESEND_API_KEY] },
   async (request) => {
-    const authToken = request.auth?.token;
-    if (!authToken || authToken.admin !== true) {
-      throw new HttpsError("permission-denied", "Admin only.");
-    }
+    // Bulk mail to the entire waitlist — founder-only by policy. An
+    // analyst with /admins access could not reach this anyway because
+    // the front-end never surfaces it; this is the defence-in-depth
+    // backstop.
+    requireFounder(request);
 
     const dryRun    = request.data?.dryRun !== false;  // default TRUE — explicit opt-out required
     const maxToSend = Math.max(0, Math.min(5000, Number(request.data?.maxToSend ?? 5000)));
@@ -2601,10 +2606,9 @@ export const onUserCreated = onDocumentCreated(
 export const backfillCreditWallets = onCall(
   { ...LIGHT_OPTS, timeoutSeconds: 540 },
   async (request) => {
-    const authToken = request.auth?.token;
-    if (!authToken || authToken.admin !== true) {
-      throw new HttpsError("permission-denied", "Admin only.");
-    }
+    // Materialises wallets across all users — privileged maintenance,
+    // founder-only.
+    requireFounder(request);
 
     const dryRun = request.data?.dryRun !== false;  // default TRUE — explicit opt-out required
 
@@ -2687,10 +2691,8 @@ export const backfillCreditWallets = onCall(
 export const restoreSignupCredits = onCall(
   { ...LIGHT_OPTS, timeoutSeconds: 540 },
   async (request) => {
-    const authToken = request.auth?.token;
-    if (!authToken || authToken.admin !== true) {
-      throw new HttpsError("permission-denied", "Admin only.");
-    }
+    // Grants credits across the wallet base — founder-only.
+    requireFounder(request);
 
     const dryRun = request.data?.dryRun !== false;  // default TRUE
 
@@ -2881,10 +2883,10 @@ async function resolveAudience(spec: AudienceSpec): Promise<string[]> {
 export const sendBulkEmail = onCall(
   { ...LIGHT_OPTS, timeoutSeconds: 540, secrets: [RESEND_API_KEY] },
   async (request) => {
-    const authToken = request.auth?.token;
-    if (!authToken || authToken.admin !== true) {
-      throw new HttpsError("permission-denied", "Admin only.");
-    }
+    // Mass outbound communications — founder-only. The UI never
+    // surfaces the Bulk Email page to other roles, but this is the
+    // hard backstop.
+    requireFounder(request);
 
     const dryRun     = request.data?.dryRun !== false;  // default TRUE
     const subject    = String(request.data?.subject  ?? "").trim();
@@ -3635,10 +3637,8 @@ export const cleanupTestPayments = onCall(
   // headroom is free.
   { ...LIGHT_OPTS, timeoutSeconds: 540 },
   async (request) => {
-    const token = request.auth?.token;
-    if (!token || token.admin !== true) {
-      throw new HttpsError("permission-denied", "Admin only.");
-    }
+    // Destructive data wipe — founder-only.
+    requireFounder(request);
     const liveReference = String(request.data?.liveReference ?? "").trim();
     const confirm       = String(request.data?.confirm ?? "");
     if (!liveReference) {
@@ -3666,7 +3666,7 @@ export const cleanupTestPayments = onCall(
     try {
       await admin.firestore().collection("auditLogs").add({
         actorUid:    request.auth!.uid,
-        actorEmail:  token.email ?? null,
+        actorEmail:  request.auth?.token?.email ?? null,
         action:      "test_payments_cleanup",
         targetType:  "paystackPayments",
         targetId:    liveReference,
@@ -3877,9 +3877,30 @@ export const deleteMarketerReferralCode = onCall(
 // fail-fast.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** Centralised founder-role gate. Founder is the only role that can
+ *  invite admins, revoke admins, change other admins' roles, or edit
+ *  the role-permissions config. Frontend mirrors this — the Admins
+ *  page is reachable only by founders — but defence in depth on the
+ *  backend keeps an analyst who pokes around in DevTools from
+ *  escalating their own privileges. */
+function requireFounder(request: any): void {
+  const token = request.auth?.token;
+  if (!token || token.admin !== true) {
+    throw new HttpsError("permission-denied", "Admin only.");
+  }
+  // Legacy admins (admin:true with no role claim) are treated as
+  // founders until the migration callable runs. That's by design —
+  // it keeps existing admins working through the migration without
+  // a flag day.
+  const role = token.role;
+  if (role && role !== "founder") {
+    throw new HttpsError("permission-denied", "Founder role required.");
+  }
+}
+
 async function writeOpsAdminAudit(
   request: any,
-  action: "admin_invited" | "admin_revoked",
+  action: "admin_invited" | "admin_revoked" | "admin_role_changed" | "role_permissions_updated",
   targetUid: string,
   metadata: Record<string, unknown>,
 ): Promise<void> {
@@ -3903,10 +3924,7 @@ async function writeOpsAdminAudit(
 export const listOpsAdminsFn = onCall(
   { ...LIGHT_OPTS },
   async (request) => {
-    const token = request.auth?.token;
-    if (!token || token.admin !== true) {
-      throw new HttpsError("permission-denied", "Admin only.");
-    }
+    requireFounder(request);
     const rows = await listOpsAdmins();
     return { rows };
   },
@@ -3915,10 +3933,7 @@ export const listOpsAdminsFn = onCall(
 export const inviteOpsAdminFn = onCall(
   { ...LIGHT_OPTS, secrets: [RESEND_API_KEY] },
   async (request) => {
-    const token = request.auth?.token;
-    if (!token || token.admin !== true) {
-      throw new HttpsError("permission-denied", "Admin only.");
-    }
+    requireFounder(request);
     const email = String(request.data?.email ?? "");
     const returnUrl = String(request.data?.returnUrl ?? "");
 
@@ -3936,10 +3951,16 @@ export const inviteOpsAdminFn = onCall(
       throw new HttpsError("invalid-argument", "Unauthorized returnUrl origin.");
     }
 
+    const requestedRole = String(request.data?.role ?? "founder") as OpsRole;
+    if (!OPS_ROLES.includes(requestedRole)) {
+      throw new HttpsError("invalid-argument", `Unknown role: ${requestedRole}`);
+    }
+
     const result = await inviteOpsAdmin({
       email,
       returnUrl,
       resendKey: RESEND_API_KEY.value(),
+      role:      requestedRole,
     });
 
     await writeOpsAdminAudit(request, "admin_invited", result.uid, {
@@ -3947,6 +3968,7 @@ export const inviteOpsAdminFn = onCall(
       granted:     result.granted,
       userCreated: result.userCreated,
       emailSent:   result.emailSent,
+      role:        requestedRole,
     });
 
     return result;
@@ -3956,10 +3978,7 @@ export const inviteOpsAdminFn = onCall(
 export const revokeOpsAdminFn = onCall(
   { ...LIGHT_OPTS },
   async (request) => {
-    const token = request.auth?.token;
-    if (!token || token.admin !== true) {
-      throw new HttpsError("permission-denied", "Admin only.");
-    }
+    requireFounder(request);
     const targetUid = String(request.data?.uid ?? "");
     if (!targetUid) {
       throw new HttpsError("invalid-argument", "Missing target uid.");
@@ -3972,5 +3991,108 @@ export const revokeOpsAdminFn = onCall(
       await writeOpsAdminAudit(request, "admin_revoked", targetUid, { actor: request.auth!.uid });
     }
     return result;
+  },
+);
+
+// ─── Role management — founder-only ─────────────────────────────────────
+
+/** Change another admin's role. Founder-only; the source helper also
+ *  refuses self-demotion away from founder. */
+export const setOpsAdminRoleFn = onCall(
+  { ...LIGHT_OPTS },
+  async (request) => {
+    requireFounder(request);
+    const targetUid = String(request.data?.uid ?? "");
+    const role      = String(request.data?.role ?? "") as OpsRole;
+    if (!targetUid) throw new HttpsError("invalid-argument", "Missing target uid.");
+    if (!OPS_ROLES.includes(role)) {
+      throw new HttpsError("invalid-argument", `Unknown role: ${role}`);
+    }
+    const result = await setOpsAdminRole({
+      targetUid,
+      actorUid: request.auth!.uid,
+      role,
+    });
+    await writeOpsAdminAudit(request, "admin_role_changed", targetUid, { newRole: role });
+    return result;
+  },
+);
+
+/** Idempotent migration: any admin without a role claim becomes
+ *  founder. Safe to re-run. Used once after the role-based UI rolls
+ *  out so existing admins don't have to wait for a fresh sign-in
+ *  before their permissions resolve. */
+export const migrateAdminsToFoundersFn = onCall(
+  { ...LIGHT_OPTS },
+  async (request) => {
+    requireFounder(request);
+    const result = await migrateAdminsToFounders();
+    return result;
+  },
+);
+
+// ─── Role permissions — page allow-lists per role, stored as a Firestore
+//     doc so the founder can edit them live and every ops portal session
+//     picks the change up via onSnapshot. ────────────────────────────────
+
+const DEFAULT_ROLE_PERMISSIONS: Record<"analyst" | "developer", string[]> = {
+  // Sensible starting point — customer-support shaped role. The
+  // founder can flip toggles to add Payments, Errors, etc. later.
+  analyst:   ["/", "/users", "/audit", "/report", "/email/failures"],
+  // Engineering-shaped role: ops, errors, health, audit. Maintenance
+  // toggle is on the Dashboard so granting "/" gives the developer
+  // the maintenance card too.
+  developer: ["/", "/errors", "/health", "/audit"],
+};
+
+/** Read the current role permissions doc, returning defaults for any
+ *  missing role. The founder doesn't appear in this map — founder
+ *  always sees everything. */
+export const getRolePermissions = onCall(
+  { ...LIGHT_OPTS },
+  async (request) => {
+    const token = request.auth?.token;
+    if (!token || token.admin !== true) {
+      throw new HttpsError("permission-denied", "Admin only.");
+    }
+    const snap = await admin.firestore().doc("appConfig/rolePermissions").get();
+    const data = snap.exists ? (snap.data() ?? {}) : {};
+    return {
+      analyst:   Array.isArray(data.analyst)   ? data.analyst   : DEFAULT_ROLE_PERMISSIONS.analyst,
+      developer: Array.isArray(data.developer) ? data.developer : DEFAULT_ROLE_PERMISSIONS.developer,
+    };
+  },
+);
+
+/** Founder-only: overwrite the allowed-pages list for one role. The
+ *  doc is merged so editing analyst doesn't touch developer. */
+export const setRolePermissions = onCall(
+  { ...LIGHT_OPTS },
+  async (request) => {
+    requireFounder(request);
+    const role = String(request.data?.role ?? "");
+    if (role !== "analyst" && role !== "developer") {
+      throw new HttpsError("invalid-argument", "Role must be analyst or developer.");
+    }
+    const rawPages = request.data?.allowedPages;
+    if (!Array.isArray(rawPages)) {
+      throw new HttpsError("invalid-argument", "allowedPages must be an array.");
+    }
+    // Sanitise + dedupe. Pages must be string paths beginning with /.
+    const pages = Array.from(new Set(
+      rawPages
+        .filter((p: unknown) => typeof p === "string")
+        .map((p: string) => p.trim())
+        .filter((p: string) => p.startsWith("/"))
+        .slice(0, 100),
+    ));
+    const ref = admin.firestore().doc("appConfig/rolePermissions");
+    await ref.set({
+      [role]:      pages,
+      updatedAt:   admin.firestore.FieldValue.serverTimestamp(),
+      updatedBy:   request.auth!.uid,
+    }, { merge: true });
+    await writeOpsAdminAudit(request, "role_permissions_updated", role, { pages });
+    return { ok: true, role, pages };
   },
 );
