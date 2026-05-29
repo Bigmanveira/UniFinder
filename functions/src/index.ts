@@ -3115,6 +3115,127 @@ export const grantManualCredits = onCall(
 );
 
 // ============================================================
+// repairManualGrantPayments — one-shot backfill
+// ============================================================
+/**
+ * Walks /paystackPayments looking for docs that were created by the
+ * first version of grantManualCredits (manuallyApplied:true but
+ * missing the financial fields needed by the Business Report —
+ * amountSubunit, currency, packId, priceLocal). For each one, infers
+ * the pack from creditsGranted (every pack has a distinct credit
+ * count, so the lookup is unambiguous) and stamps the missing fields.
+ *
+ * Why this exists: the V1 of grantManualCredits wrote the dedup
+ * marker without those fields. Users credited via that path got their
+ * credits but the Business Report's revenue + pack-mix counts treated
+ * them as $0 transactions. This callable fixes the historical record
+ * without requiring a manual Firebase Console edit per affected doc.
+ *
+ * Idempotent. Dry-run by default. Safe to re-run any time — docs
+ * that already carry amountSubunit are skipped.
+ */
+export const repairManualGrantPayments = onCall(
+  { ...LIGHT_OPTS, timeoutSeconds: 300 },
+  async (request) => {
+    requireFounder(request);
+    const dryRun = request.data?.dryRun !== false;  // default TRUE
+
+    const db = admin.firestore();
+    const snap = await db.collection("paystackPayments")
+      .where("manuallyApplied", "==", true)
+      .get();
+
+    let scanned     = 0;
+    let alreadyOk   = 0;
+    let repaired    = 0;
+    let unmatched   = 0;
+    const wouldRepair: Array<{ ref: string; packId: string; amountSubunit: number; credits: number }> = [];
+    const skipped:     Array<{ ref: string; reason: string }> = [];
+
+    for (const doc of snap.docs) {
+      scanned++;
+      const data = doc.data() ?? {};
+      if (typeof data.amountSubunit === "number" && data.amountSubunit > 0) {
+        alreadyOk++;
+        continue;
+      }
+
+      const credits = typeof data.creditsGranted === "number" ? data.creditsGranted : 0;
+      if (credits <= 0) {
+        skipped.push({ ref: doc.id, reason: "no creditsGranted on doc" });
+        unmatched++;
+        continue;
+      }
+
+      // Find the pack whose credits match. Every pack has a distinct
+      // credit count so the match is unambiguous; if the operator
+      // granted a custom amount via the "Custom" pack option, there
+      // won't be a match — leave the doc alone (it's intentionally
+      // not revenue).
+      const entry = Object.entries(CREDIT_PACKS).find(([_id, p]) => p.credits === credits);
+      if (!entry) {
+        skipped.push({ ref: doc.id, reason: `no pack matches ${credits} credits — looks like a custom grant, no revenue attribution intended` });
+        unmatched++;
+        continue;
+      }
+      const [packId, pack] = entry;
+      const amountSubunit  = Math.round(pack.priceLocal * 100);
+
+      if (dryRun) {
+        wouldRepair.push({ ref: doc.id, packId, amountSubunit, credits });
+        continue;
+      }
+
+      try {
+        await doc.ref.set({
+          packId,
+          amountSubunit,
+          currency: "GHS",
+          // Tag the repair so it shows up in the audit trail.
+          repairedAt:        admin.firestore.FieldValue.serverTimestamp(),
+          repairedBy:        request.auth!.uid,
+          repairedByEmail:   request.auth?.token?.email ?? null,
+        }, { merge: true });
+        repaired++;
+      } catch (err: any) {
+        skipped.push({ ref: doc.id, reason: err?.message ?? String(err) });
+      }
+    }
+
+    // Audit-log the repair pass so anyone looking at /auditLogs later
+    // can see what happened. Only on live runs — dry-runs aren't
+    // mutations.
+    if (!dryRun) {
+      try {
+        await db.collection("auditLogs").add({
+          actorUid:    request.auth!.uid,
+          actorEmail:  request.auth?.token?.email ?? null,
+          action:      "manual_grants_repaired",
+          targetType:  "paystackPayments",
+          targetId:    "(batch)",
+          metadata:    { scanned, alreadyOk, repaired, unmatched },
+          ip:          extractClientIp(request.rawRequest),
+          userAgent:   String(request.rawRequest?.headers?.["user-agent"] ?? "").slice(0, 240),
+          createdAt:   admin.firestore.FieldValue.serverTimestamp(),
+        });
+      } catch (err) {
+        console.warn("[repair-manual-grants] audit write failed:", err);
+      }
+    }
+
+    return {
+      dryRun,
+      scanned,
+      alreadyOk,
+      unmatched,
+      ...(dryRun
+        ? { wouldRepair: wouldRepair.length, sample: wouldRepair.slice(0, 10) }
+        : { repaired, skipped: skipped.slice(0, 10) }),
+    };
+  },
+);
+
+// ============================================================
 // Bulk email — templates, audience resolution, dry-run + live send
 // ============================================================
 /**
