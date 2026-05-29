@@ -23,6 +23,7 @@ import {
   applyPaystackChargeSuccess,
   applyPaystackRefund,
 } from "./paystackPayments.js";
+import { logUserActivity } from "./userActivityLogger.js";
 import { sendPurchaseReceipt } from "./paymentReceiptEmail.js";
 import { sendWelcomeEmail } from "./welcomeEmail.js";
 import { sendOpsSignInLinkEmail } from "./opsSignInEmail.js";
@@ -554,6 +555,23 @@ export const applyReferralCode = onCall({ ...LIGHT_OPTS }, async (request) => {
     return { ok: true as const, status: "pending" as const };
   });
 
+  // Stamp the activity log if the apply landed (any non-error result
+  // counts). Records the status so support can see "did this user
+  // actually apply a code, and what happened with it?" at a glance.
+  if (result && (result.ok === true || result.reason === "already_referred")) {
+    void logUserActivity({
+      userId:     uid,
+      action:     "referral_code_applied",
+      targetType: "referralCode",
+      targetId:   code,
+      metadata:   {
+        referrerUid,
+        status:        result.ok ? result.status : "already_referred",
+        creditsAwarded: result.ok && result.status === "paid_out" ? result.creditsAwarded : 0,
+      },
+    });
+  }
+
   return result;
 });
 
@@ -957,6 +975,22 @@ export const unlockMatchReport = onCall(
       });
     });
 
+    // Stamp the user's activity log so the unlock shows up on their
+    // detail page next to the credit-transactions ledger.
+    void logUserActivity({
+      userId:     uid,
+      action:     "match_report_unlocked",
+      targetType: "matchReport",
+      targetId:   reportRef.id,
+      metadata:   {
+        creditsUsed:         founder ? 0 : MATCH_REPORT_CREDIT_COST,
+        founderBypass:       founder,
+        aiModel:             AI_MODEL,
+        aiStatus:            aiResult.status,
+        eligibleSchoolCount: programEligibleMatches.length,
+      },
+    });
+
     // ── Step 5: Log AI run ────────────────────────────────────────────────────
     try {
       await db.collection("aiRuns").add({
@@ -1235,6 +1269,19 @@ export const startVisaInterviewSession = onCall(
           ? { clientRequestId }
           : {}),
       });
+    });
+
+    // Stamp the user's activity log after the credit deduction commits.
+    void logUserActivity({
+      userId:     uid,
+      action:     "visa_interview_started",
+      targetType: "visaInterviewSession",
+      targetId:   sessionRef.id,
+      metadata:   {
+        creditsUsed:   founder ? 0 : VISA_INTERVIEW_CREDIT_COST,
+        founderBypass: founder,
+        mode:          interviewMode,
+      },
     });
 
     return {
@@ -1593,6 +1640,22 @@ export const recordVisaInterviewDocument = onCall(
 
     await sessionRef.update(updates);
 
+    // Stamp the activity log only for real uploads (not skip events).
+    // Surfaces on the user's timeline so support can see "did Anna
+    // actually receive their I-20?" without digging into the session.
+    if (!isSkip) {
+      void logUserActivity({
+        userId:     uid,
+        action:     "visa_document_uploaded",
+        targetType: "visaInterviewSession",
+        targetId:   sessionId,
+        metadata:   {
+          documentType,
+          extractionStatus: extracted ? "ok" : "skipped",
+        },
+      });
+    }
+
     return {
       messageId:              officerMsgRef.id,
       officerText:            nextOfficerText,
@@ -1706,6 +1769,21 @@ export const finishVisaInterviewSession = onCall(
       type: "visa_interview_scoring",
       status: score.status,
       errorMessage: score.errorMessage,
+    });
+
+    // Stamp the activity log after the report commit. metadata captures
+    // the headline score so support can spot a failed interview at a
+    // glance on the user's timeline.
+    void logUserActivity({
+      userId:     uid,
+      action:     "visa_interview_completed",
+      targetType: "visaInterviewReport",
+      targetId:   reportRef.id,
+      metadata:   {
+        sessionId,
+        overallScore:  typeof reportData.overallScore === "number" ? reportData.overallScore : null,
+        scoringStatus: score.status,
+      },
     });
 
     return { reportId: reportRef.id, ...reportData };
@@ -1991,6 +2069,25 @@ export const createPaystackCheckout = onCall(
           currency:       "GHS",
         },
       });
+      // Stamp the activity log BEFORE returning so the row is in place
+      // by the time the user redirects to Paystack. If the user gets
+      // debited and the webhook never fires, support can still see the
+      // intent here ("they at least made it to checkout for $5").
+      void logUserActivity({
+        userId:     uid,
+        action:     "purchase_initiated",
+        targetType: "paystackReference",
+        targetId:   reference,
+        metadata:   {
+          packId,
+          packLabel:  pack.label,
+          credits:    pack.credits,
+          priceUsd:   pack.priceUsd,
+          priceLocal: pack.priceLocal,
+          currency:   "GHS",
+        },
+      });
+
       // Client side calls this `sessionId` historically — keep the alias
       // so DashboardPage doesn't need a rename in the same deploy.
       return { checkoutUrl, sessionId: reference };
@@ -2081,6 +2178,24 @@ export const paystackWebhook = onRequest(
             userId:    typeof evMd.userId === "string" ? evMd.userId : null,
             context:   { eventType: event.event, packId: evMd.packId },
           });
+          // ALSO stamp the user's activity log so the failure shows up
+          // on their detail page next to the purchase_initiated row.
+          // Without this, a "paid but no credits" incident is invisible
+          // to support until they go digging in errorLogs by hand.
+          if (typeof evMd.userId === "string" && evMd.userId) {
+            void logUserActivity({
+              userId:     evMd.userId,
+              action:     "purchase_failed",
+              targetType: "paystackReference",
+              targetId:   typeof evData.reference === "string" ? evData.reference : undefined,
+              metadata:   {
+                reason:    result.reason ?? "charge.success not applied",
+                packId:    evMd.packId ?? null,
+                amount:    evData.amount ?? null,
+                currency:  evData.currency ?? null,
+              },
+            });
+          }
         }
         // Receipt email — fire-and-forget. Credits already landed; if Resend
         // fails the customer keeps their credits and Paystack's own receipt
@@ -2088,6 +2203,23 @@ export const paystackWebhook = onRequest(
         if (result.applied) {
           const pack = CREDIT_PACKS[result.packId];
           const packLabel = pack?.label ?? result.packId;
+          // Activity log: this is the row that confirms "the purchase
+          // landed and the wallet was credited". Pairs with the earlier
+          // purchase_initiated row so the timeline reads end-to-end.
+          void logUserActivity({
+            userId:     typeof event.data?.metadata?.userId === "string" ? event.data.metadata.userId : "",
+            action:     "purchase_completed",
+            targetType: "paystackReference",
+            targetId:   result.reference,
+            metadata:   {
+              packId:         result.packId,
+              packLabel,
+              creditsGranted: result.creditsGranted,
+              newBalance:     result.newCredits,
+              priceLocal:     result.priceLocal,
+              currency:       result.currency,
+            },
+          });
           if (result.customerEmail) {
             sendPurchaseReceipt({
               apiKey:     RESEND_API_KEY.value(),
@@ -2127,7 +2259,21 @@ export const paystackWebhook = onRequest(
       // Refunds + chargebacks reverse the credit grant.
       if (event.event === "refund.processed" || event.event === "charge.dispute.create") {
         const result = await applyPaystackRefund(event);
-        if (!result.applied && !result.duplicated) {
+        if (result.applied) {
+          // Stamp the user's activity log so a refund is visible on
+          // the User detail page alongside the original purchase.
+          void logUserActivity({
+            userId:     result.userId,
+            action:     "purchase_refunded",
+            targetType: "paystackReference",
+            targetId:   result.reference,
+            metadata:   {
+              packId:          result.packId,
+              refundedCredits: result.refundedCredits,
+              eventType:       event.event,
+            },
+          });
+        } else if (!result.duplicated) {
           console.warn(`[paystack] ${event.event} not applied:`, result.reason);
           const evData: any = event.data ?? {};
           void logError({
@@ -2139,7 +2285,9 @@ export const paystackWebhook = onRequest(
             context:   { eventType: event.event },
           });
         }
-        res.status(200).json({ ok: result.applied, duplicated: !!result.duplicated });
+        // `duplicated` only exists on the not-applied branch — narrow.
+        const duplicated = result.applied ? false : !!result.duplicated;
+        res.status(200).json({ ok: result.applied, duplicated });
         return;
       }
       // Other events (charge.failed, transfer.success, etc.): log + 200.

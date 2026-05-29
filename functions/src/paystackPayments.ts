@@ -315,11 +315,10 @@ export async function applyPaystackChargeSuccess(event: PaystackWebhookEvent): P
  * marker on the original paystackPayments record. Negative wallet
  * balances are allowed (intentional anti-fraud behaviour).
  */
-export async function applyPaystackRefund(event: PaystackWebhookEvent): Promise<{
-  applied: boolean;
-  duplicated?: boolean;
-  reason?: string;
-}> {
+export async function applyPaystackRefund(event: PaystackWebhookEvent): Promise<
+  | { applied: false; duplicated?: boolean; reason?: string }
+  | { applied: true;  userId: string; reference: string; refundedCredits: number; packId: string | null }
+> {
   const data = event.data;
   if (!data) return { applied: false, reason: "missing data" };
 
@@ -368,6 +367,12 @@ export async function applyPaystackRefund(event: PaystackWebhookEvent): Promise<
       provider:  "paystack",
       createdAt: now,
     });
-    return { applied: true };
+    return {
+      applied:         true as const,
+      userId,
+      reference,
+      refundedCredits: credits,
+      packId:          (payment.packId as string | undefined) ?? null,
+    };
   });
 }
