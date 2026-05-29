@@ -2899,6 +2899,179 @@ export const restoreSignupCredits = onCall(
 );
 
 // ============================================================
+// grantManualCredits — founder-only recovery tool
+// ============================================================
+/**
+ * Atomically credits a user's wallet with a manual grant. Built primarily
+ * to recover users whose Paystack webhook silently failed — instead of
+ * three Firestore console edits per incident, support runs this once.
+ *
+ * What it writes (all atomic):
+ *   1. /creditWallets/{uid}  — wallet credits += amount
+ *   2. /creditTransactions   — type:"manual_grant" with reason + actor
+ *   3. /paystackPayments/{ref} (optional) — manuallyApplied marker, so if
+ *      Paystack later re-delivers the original webhook, the dedup check
+ *      sees the doc exists and short-circuits without double-crediting.
+ *
+ * Plus best-effort side writes (post-commit):
+ *   • /userAuditLogs — credits_granted_manual entry on user timeline
+ *   • /auditLogs     — admin_credit_grant entry for ops audit
+ *
+ * Founder-only. The audit-log trail is non-optional — every grant
+ * needs an actor + reason on the record.
+ */
+export const grantManualCredits = onCall(
+  { ...LIGHT_OPTS },
+  async (request) => {
+    requireFounder(request);
+
+    const targetUid       = String(request.data?.uid ?? "").trim();
+    const amount          = Number(request.data?.amount ?? 0);
+    const reason          = String(request.data?.reason ?? "").trim();
+    const paymentRefRaw   = String(request.data?.paymentReference ?? "").trim();
+    const paymentReference: string | null = paymentRefRaw || null;
+    const actorUid        = request.auth!.uid;
+    const actorEmail      = request.auth?.token?.email ?? null;
+
+    if (!targetUid) {
+      throw new HttpsError("invalid-argument", "Missing target uid.");
+    }
+    if (!Number.isInteger(amount) || amount <= 0 || amount > 10_000) {
+      throw new HttpsError("invalid-argument", "Amount must be a positive integer between 1 and 10,000.");
+    }
+    if (!reason || reason.length < 4) {
+      throw new HttpsError("invalid-argument", "Reason required (≥ 4 chars) for the audit trail.");
+    }
+
+    const db        = admin.firestore();
+    const walletRef = db.collection("creditWallets").doc(targetUid);
+    const txRef     = db.collection("creditTransactions").doc();
+    const paystackRef = paymentReference
+      ? db.collection("paystackPayments").doc(paymentReference)
+      : null;
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
+    // Confirm the user exists. Without this an admin could grant
+    // credits to a typo'd uid and we'd never know — the wallet write
+    // succeeds because we use set+merge.
+    const userSnap = await db.collection("users").doc(targetUid).get();
+    if (!userSnap.exists) {
+      throw new HttpsError("not-found", `No /users doc for uid ${targetUid}. Refusing to grant credits to a non-existent user.`);
+    }
+
+    const result = await db.runTransaction(async (tx) => {
+      // Dedup check: if the operator linked a Paystack reference and
+      // a payment doc already exists, the wallet was already credited
+      // by the webhook (or another manual grant for the same ref). Bail
+      // before writing — otherwise we double-credit.
+      if (paystackRef) {
+        const existing = await tx.get(paystackRef);
+        if (existing.exists) {
+          return {
+            ok:           false as const,
+            reason:       "payment_already_processed" as const,
+            message:      "A /paystackPayments doc already exists for this reference. Wallet was already credited.",
+          };
+        }
+      }
+
+      const walletSnap = await tx.get(walletRef);
+      // Missing wallet (rare after eager materialisation) — fall back
+      // to the implicit signup grant so we don't accidentally erase a
+      // user's free 2 credits by overwriting with just the manual
+      // amount.
+      const currentCredits = walletSnap.exists
+        ? (walletSnap.data()?.credits ?? 0)
+        : FREE_CREDITS_ON_SIGNUP;
+      const newBalance = currentCredits + amount;
+
+      tx.set(walletRef, {
+        credits:   newBalance,
+        updatedAt: now,
+      }, { merge: true });
+
+      tx.set(txRef, {
+        userId:           targetUid,
+        amount:           amount,
+        type:             "manual_grant",
+        reason,
+        paymentReference: paymentReference,
+        actorUid,
+        actorEmail,
+        createdAt:        now,
+      });
+
+      // Optional: also write a /paystackPayments doc tagged as manually
+      // applied. Future re-deliveries of the original webhook hit the
+      // dedup check inside applyPaystackChargeSuccess and short-circuit.
+      if (paystackRef) {
+        tx.set(paystackRef, {
+          reference:        paymentReference,
+          userId:           targetUid,
+          creditsGranted:   amount,
+          provider:         "paystack",
+          providerStatus:   "manual_grant",
+          manuallyApplied:  true,
+          appliedBy:        actorUid,
+          appliedReason:    reason,
+          createdAt:        now,
+        });
+      }
+
+      return {
+        ok:              true as const,
+        previousBalance: currentCredits,
+        newBalance,
+      };
+    });
+
+    if (!result.ok) {
+      return result;
+    }
+
+    // Best-effort side writes — failures here don't undo the grant.
+    void logUserActivity({
+      userId:     targetUid,
+      action:     "credits_granted_manual",
+      targetType: paymentReference ? "paystackReference" : "creditTransaction",
+      targetId:   paymentReference ?? txRef.id,
+      metadata: {
+        amount,
+        reason,
+        previousBalance: result.previousBalance,
+        newBalance:      result.newBalance,
+        actorEmail,
+        ...(paymentReference ? { paymentReference } : {}),
+      },
+    });
+
+    try {
+      await admin.firestore().collection("auditLogs").add({
+        actorUid,
+        actorEmail,
+        action:     "admin_credit_grant",
+        targetType: "user",
+        targetId:   targetUid,
+        metadata:   {
+          amount,
+          reason,
+          paymentReference,
+          previousBalance: result.previousBalance,
+          newBalance:      result.newBalance,
+        },
+        ip:        extractClientIp(request.rawRequest),
+        userAgent: String(request.rawRequest?.headers?.["user-agent"] ?? "").slice(0, 240),
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      });
+    } catch (err) {
+      console.warn("[manual-grant] audit write failed:", err);
+    }
+
+    return result;
+  },
+);
+
+// ============================================================
 // Bulk email — templates, audience resolution, dry-run + live send
 // ============================================================
 /**
