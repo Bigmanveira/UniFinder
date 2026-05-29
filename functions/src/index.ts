@@ -2930,6 +2930,8 @@ export const grantManualCredits = onCall(
     const reason          = String(request.data?.reason ?? "").trim();
     const paymentRefRaw   = String(request.data?.paymentReference ?? "").trim();
     const paymentReference: string | null = paymentRefRaw || null;
+    const packIdRaw       = String(request.data?.packId ?? "").trim();
+    const packId: string | null = packIdRaw || null;
     const actorUid        = request.auth!.uid;
     const actorEmail      = request.auth?.token?.email ?? null;
 
@@ -2941,6 +2943,36 @@ export const grantManualCredits = onCall(
     }
     if (!reason || reason.length < 4) {
       throw new HttpsError("invalid-argument", "Reason required (≥ 4 chars) for the audit trail.");
+    }
+
+    // When a paymentReference is provided, the grant is recovering a
+    // real charge — it MUST count toward revenue + pack mix in the
+    // Business Report. To attribute it correctly we need the pack the
+    // user actually bought (so the /paystackPayments doc carries
+    // amountSubunit + currency + packId, exactly what the webhook
+    // would have written had it landed).
+    let resolvedPack: { id: string; priceLocal: number; credits: number; label: string } | null = null;
+    if (paymentReference) {
+      if (!packId) {
+        throw new HttpsError(
+          "invalid-argument",
+          "When supplying a Paystack reference, you must also specify the pack the user purchased so the report reflects the revenue.",
+        );
+      }
+      const pack = CREDIT_PACKS[packId];
+      if (!pack) {
+        throw new HttpsError("invalid-argument", `Unknown pack id: ${packId}.`);
+      }
+      // Confirm the credits amount matches the pack the operator picked.
+      // Mismatch usually means a typo — refuse rather than book the
+      // wrong revenue against the wrong pack.
+      if (pack.credits !== amount) {
+        throw new HttpsError(
+          "invalid-argument",
+          `Pack ${packId} grants ${pack.credits} credits, but the form requests ${amount}. Pick a different pack or adjust the credits.`,
+        );
+      }
+      resolvedPack = { id: packId, priceLocal: pack.priceLocal, credits: pack.credits, label: pack.label };
     }
 
     const db        = admin.firestore();
@@ -3004,11 +3036,22 @@ export const grantManualCredits = onCall(
       // Optional: also write a /paystackPayments doc tagged as manually
       // applied. Future re-deliveries of the original webhook hit the
       // dedup check inside applyPaystackChargeSuccess and short-circuit.
+      // We write the SAME fields the webhook would have written
+      // (amountSubunit, currency, packId) so the Business Report's
+      // revenue + pack-mix aggregations pick up this recovery exactly
+      // as if the original webhook had landed normally. Without these,
+      // a manual grant would credit the user but show up as $0 revenue.
       if (paystackRef) {
+        // resolvedPack is guaranteed non-null here — paymentReference
+        // implies packId implies a resolved pack (validated above).
+        const amountSubunit = Math.round((resolvedPack?.priceLocal ?? 0) * 100);
         tx.set(paystackRef, {
           reference:        paymentReference,
           userId:           targetUid,
+          packId:           resolvedPack?.id ?? null,
           creditsGranted:   amount,
+          amountSubunit,
+          currency:         "GHS",
           provider:         "paystack",
           providerStatus:   "manual_grant",
           manuallyApplied:  true,
