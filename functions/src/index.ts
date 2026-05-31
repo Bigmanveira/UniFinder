@@ -3262,7 +3262,14 @@ function recipientKey(email: string): string {
   return email.trim().toLowerCase().replace(/[^a-z0-9._-]/g, "_");
 }
 
-type AudienceKind = "all_users" | "paying_customers" | "free_users" | "waitlist" | "custom";
+type AudienceKind =
+  | "all_users"
+  | "paying_customers"
+  | "free_users"
+  | "waitlist"
+  | "waitlist_emailed_not_signed_up"   // got the launch email, never created an account
+  | "waitlist_signed_up_inactive"      // joined waitlist + signed up, but no product activity
+  | "custom";
 
 interface AudienceSpec {
   kind:    AudienceKind;
@@ -3330,6 +3337,79 @@ async function resolveAudience(spec: AudienceSpec): Promise<string[]> {
       for (const d of snap.docs) {
         const email = (d.data()?.email ?? "").toString().trim().toLowerCase();
         if (email) out.add(email);
+      }
+      break;
+    }
+    case "waitlist_emailed_not_signed_up": {
+      // Waitlist signups who received the "we're live" launch email
+      // (launchEmailSentAt is set) but never created a /users account
+      // afterwards. Built for re-engagement: these are people who
+      // raised their hand pre-launch + got the announcement + chose
+      // not to sign up. A nudge can convert some of them.
+      const [waitlistSnap, usersSnap] = await Promise.all([
+        db.collection("waitlist").get(),
+        db.collection("users").get(),
+      ]);
+      const userEmails = new Set<string>();
+      for (const d of usersSnap.docs) {
+        const e = (d.data()?.email ?? "").toString().trim().toLowerCase();
+        if (e) userEmails.add(e);
+      }
+      for (const d of waitlistSnap.docs) {
+        const data = d.data() ?? {};
+        // Only count waitlist rows that actually received the launch
+        // blast — un-emailed rows might be too fresh or stuck in the
+        // failures queue, neither of which is a re-engagement target.
+        if (!data.launchEmailSentAt) continue;
+        const email = (data.email ?? "").toString().trim().toLowerCase();
+        if (email && !userEmails.has(email)) out.add(email);
+      }
+      break;
+    }
+    case "waitlist_signed_up_inactive": {
+      // Joined the waitlist + signed up + never did anything meaningful
+      // (no match report unlocks, no visa interview sessions, no
+      // purchases). "Inactive but engaged enough to sign up" is the
+      // highest-yield re-engagement segment — they already crossed
+      // the signup hurdle, just need a reason to come back.
+      //
+      // Full-collection reads on five collections. Fine at current
+      // scale; if any of these crosses 10k+ docs we'd switch to
+      // cursored reads + an aggregated activity-summary collection.
+      const [waitlistSnap, usersSnap, reportsSnap, sessionsSnap, paymentsSnap] = await Promise.all([
+        db.collection("waitlist").get(),
+        db.collection("users").get(),
+        db.collection("matchReports").get(),
+        db.collection("visaInterviewSessions").get(),
+        db.collection("paystackPayments").get(),
+      ]);
+
+      const waitlistEmails = new Set<string>();
+      for (const d of waitlistSnap.docs) {
+        const e = (d.data()?.email ?? "").toString().trim().toLowerCase();
+        if (e) waitlistEmails.add(e);
+      }
+
+      // Union of UIDs that have done ANY value-generating action.
+      // Anyone in this set is considered "active" and excluded from
+      // the re-engagement cohort.
+      const activeUids = new Set<string>();
+      const tagActive = (snap: FirebaseFirestore.QuerySnapshot) => {
+        for (const d of snap.docs) {
+          const uid = d.data()?.userId;
+          if (typeof uid === "string" && uid) activeUids.add(uid);
+        }
+      };
+      tagActive(reportsSnap);
+      tagActive(sessionsSnap);
+      tagActive(paymentsSnap);
+
+      // The cohort: /users docs whose email is on the waitlist AND
+      // whose uid is NOT in the active set.
+      for (const d of usersSnap.docs) {
+        if (activeUids.has(d.id)) continue;
+        const email = (d.data()?.email ?? "").toString().trim().toLowerCase();
+        if (email && waitlistEmails.has(email)) out.add(email);
       }
       break;
     }
