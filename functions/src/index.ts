@@ -185,6 +185,40 @@ const MATCH_REPORT_CREDIT_COST = 1;
 const VISA_INTERVIEW_CREDIT_COST = 15;
 const FREE_CREDITS_ON_SIGNUP   = 2;
 
+// HeyGen plan-side concurrent-session cap. The base plan allows 3
+// simultaneous LiveKit rooms; anything beyond that hits HTTP 429.
+// We enforce the cap on our side BEFORE charging credits so a user
+// who tries to start when rooms are full sees a friendly "rooms full,
+// try again" message instead of getting charged then watching the
+// avatar fail to load. Update this constant if the HeyGen plan
+// upgrade lifts the cap.
+const HEYGEN_CONCURRENT_SESSIONS_CAP = 3;
+
+/**
+ * Count visa interview sessions that currently hold a HeyGen room.
+ * "Currently hold" = avatarStartedAt within the last 10 minutes AND
+ * avatarStatus is anything OTHER than ended/failed/aborted_at_capacity.
+ *
+ * Why 10 minutes: visa interviews hard-cap at 5 min, HeyGen reaps
+ * idle rooms server-side around 10. A session older than that is
+ * guaranteed reaped regardless of what our local status field says —
+ * skip it cheaply rather than scanning the whole collection.
+ */
+async function countActiveHeygenSessions(db: FirebaseFirestore.Firestore): Promise<number> {
+  const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000);
+  const snap = await db.collection("visaInterviewSessions")
+    .where("avatarStartedAt", ">", admin.firestore.Timestamp.fromDate(tenMinAgo))
+    .get();
+  let active = 0;
+  for (const d of snap.docs) {
+    const status = d.data()?.avatarStatus;
+    if (status !== "ended" && status !== "failed" && status !== "aborted_at_capacity") {
+      active++;
+    }
+  }
+  return active;
+}
+
 // ─── Founders / unlimited-credit allowlist ────────────────────────────────
 // Both accounts can run every credit-spending callable without their
 // wallet getting touched. Strictly for product testing — the founders
@@ -1204,6 +1238,29 @@ export const startVisaInterviewSession = onCall(
       }
     }
 
+    // HeyGen concurrency pre-check. Only relevant for avatar mode —
+    // text/voice interviews don't hold a HeyGen room. Done BEFORE the
+    // credit-deduction transaction so a user who hits the cap sees a
+    // friendly popup ("rooms full, try again") without losing 15
+    // credits to a session they can never actually run.
+    //
+    // The check has a race window: between the count and the
+    // createLiveAvatarSession call, another user could grab the
+    // remaining slot. We catch that case in createLiveAvatarSession
+    // (429 from HeyGen → refund the credits + mark the session
+    // aborted_at_capacity) so the race never leaves a paying user
+    // with no interview.
+    if (interviewMode === "avatar") {
+      const activeCount = await countActiveHeygenSessions(db);
+      if (activeCount >= HEYGEN_CONCURRENT_SESSIONS_CAP) {
+        throw new HttpsError(
+          "resource-exhausted",
+          "Interview rooms are full at the moment. Kindly check back shortly.",
+          { reason: "heygen_at_capacity", activeCount, cap: HEYGEN_CONCURRENT_SESSIONS_CAP },
+        );
+      }
+    }
+
     const walletRef  = db.collection("creditWallets").doc(uid);
     const sessionRef = db.collection("visaInterviewSessions").doc();
     const txRef      = db.collection("creditTransactions").doc();
@@ -1845,14 +1902,87 @@ export const createLiveAvatarSession = onCall(
         avatarStartedAt:  now,
         updatedAt:        now,
       });
-    } else {
+      return result;
+    }
+
+    // HeyGen rejected the session. If it looks like an at-capacity
+    // rejection (HTTP 429 → "rate-limited" reason text), this is the
+    // race-window we expected: startVisaInterviewSession's pre-check
+    // saw an open slot, but it got taken by another user before our
+    // HeyGen call landed. The user has already been charged 15
+    // credits but never got an interview — refund them.
+    const reasonText = (result.reason ?? "").toLowerCase();
+    const atCapacity = reasonText.includes("rate-limited") || reasonText.includes("rate limit") || reasonText.includes("capacity");
+
+    if (atCapacity) {
+      const founder = isFounderEmail(request.auth?.token?.email as string | undefined);
+      // Mark the session aborted so the count-active-sessions helper
+      // skips it (instead of counting it against the cap during its
+      // 10-minute window).
       await sessionRef.update({
         avatarProvider:      "heygen_liveavatar",
-        avatarStatus:        "failed",
-        avatarFailureReason: result.reason ?? "unknown",
+        avatarStatus:        "aborted_at_capacity",
+        avatarFailureReason: result.reason ?? "heygen_at_capacity",
+        status:              "aborted",
+        endedAt:             now,
         updatedAt:           now,
       });
+
+      // Refund the credits the start-session callable charged. Founder
+      // sessions never charged, so skip the refund there. Atomic
+      // transaction so a parallel spend can't race the refund out of
+      // order.
+      if (!founder) {
+        const userWalletRef = db.collection("creditWallets").doc(uid);
+        const refundTxRef   = db.collection("creditTransactions").doc();
+        await db.runTransaction(async (tx) => {
+          const walletDoc = await tx.get(userWalletRef);
+          const current   = walletDoc.exists ? (walletDoc.data()?.credits ?? 0) : 0;
+          tx.set(userWalletRef, { credits: current + VISA_INTERVIEW_CREDIT_COST, updatedAt: now }, { merge: true });
+          tx.set(refundTxRef, {
+            userId:    uid,
+            amount:    VISA_INTERVIEW_CREDIT_COST,
+            type:      "visa_interview_refund_at_capacity",
+            sessionId,
+            reason:    "HeyGen at capacity — interview never started",
+            createdAt: now,
+          });
+        });
+        // Surface on the user's activity timeline so support can see
+        // why the credits flickered up-and-down.
+        void logUserActivity({
+          userId:     uid,
+          action:     "credits_granted_manual",   // refund variant — reuse the manual-grant chip
+          targetType: "visaInterviewSession",
+          targetId:   sessionId,
+          metadata:   {
+            amount:        VISA_INTERVIEW_CREDIT_COST,
+            reason:        "Auto-refund: HeyGen at capacity",
+            kind:          "auto_refund_at_capacity",
+          },
+        });
+      }
+
+      // Tell the client this was an at-capacity event so the UI can
+      // show the friendly popup, not a generic failure.
+      throw new HttpsError(
+        "resource-exhausted",
+        "Interview rooms are full at the moment. Kindly check back shortly. Your credits have been refunded.",
+        { reason: "heygen_at_capacity", refunded: !founder, refundedAmount: founder ? 0 : VISA_INTERVIEW_CREDIT_COST },
+      );
     }
+
+    // Non-capacity failure (HeyGen 4xx config error, network blip,
+    // etc.). Mark the session failed but DON'T refund here — these
+    // failures typically reflect a real misconfiguration that needs
+    // operator attention, and auto-refunding would mask the signal.
+    // The frontend renders result.reason directly.
+    await sessionRef.update({
+      avatarProvider:      "heygen_liveavatar",
+      avatarStatus:        "failed",
+      avatarFailureReason: result.reason ?? "unknown",
+      updatedAt:           now,
+    });
 
     // Frontend gets only the safe fields (token + non-secret config). The
     // raw HEYGEN_API_KEY never crosses the wire.

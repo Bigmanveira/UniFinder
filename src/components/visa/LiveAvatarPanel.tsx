@@ -147,6 +147,22 @@ export default function LiveAvatarPanel({
         tokenData = res.data;
       } catch (err: any) {
         if (cancelled) return;
+        // Race-window: startVisaInterviewSession saw an open slot but
+        // it got taken before our HeyGen call. The backend has already
+        // refunded the 15 credits + marked the session aborted —
+        // surface the friendly at-capacity message to the user with a
+        // line about the refund.
+        const detailsReason = err?.details?.reason;
+        if (detailsReason === "heygen_at_capacity") {
+          const refundedAmount = err?.details?.refundedAmount ?? 15;
+          const msg = err?.details?.refunded === false
+            ? "Interview rooms are full at the moment. Kindly check back shortly."
+            : `Interview rooms are full at the moment. Kindly check back shortly. Your ${refundedAmount} credits have been refunded.`;
+          setPhase("failed");
+          setReason(msg);
+          onFallbackRef.current?.(msg);
+          return;
+        }
         const msg = err?.message ?? "Could not start the avatar session.";
         setPhase("failed");
         setReason(msg);

@@ -37,6 +37,11 @@ export default function VisaInterviewPage() {
   const [ending,       setEnding]       = useState(false);
   const [report,       setReport]       = useState<VisaInterviewReport | null>(null);
   const [error,        setError]        = useState("");
+  // At-capacity popup state. Surfaced when HeyGen has no concurrent
+  // session slots free — we throw before charging credits so this is
+  // a "try again in a moment" UX, not a "you've been charged and
+  // it failed" UX.
+  const [atCapacityOpen, setAtCapacityOpen] = useState(false);
   const [latestOfficer, setLatestOfficer] = useState<string | undefined>(undefined);
   const [pendingUpload, setPendingUpload] = useState<VisaDocumentType | null>(null);
   // When set, the upload modal opens AFTER the avatar finishes speaking the
@@ -193,7 +198,16 @@ export default function VisaInterviewPage() {
       setPhase("active");
     } catch (e: any) {
       console.error(e);
-      if (e?.code === "resource-exhausted" || /Insufficient credits/i.test(e?.message ?? "")) {
+      // HeyGen has a concurrent-session cap (3 on the base plan). When
+      // it's hit, the server throws resource-exhausted with
+      // details.reason === "heygen_at_capacity". Distinguish that from
+      // the generic "not enough credits" case so the user sees the
+      // right message — and so they know their wallet wasn't charged.
+      // Firebase exposes the HttpsError details on `e.details`.
+      const detailsReason = e?.details?.reason;
+      if (detailsReason === "heygen_at_capacity") {
+        setAtCapacityOpen(true);
+      } else if (e?.code === "resource-exhausted" || /Insufficient credits/i.test(e?.message ?? "")) {
         setError("Not enough credits to start a practice interview. Top up your wallet to try again.");
       } else {
         setError(e?.message ?? "Could not start the interview. Please try again.");
@@ -469,6 +483,12 @@ export default function VisaInterviewPage() {
             )}
           </div>
         )}
+
+        <AtCapacityModal
+          open={atCapacityOpen}
+          onClose={() => setAtCapacityOpen(false)}
+        />
+
 
         {phase === "intro" && (
           <div className="max-w-2xl mx-auto">
@@ -748,6 +768,43 @@ function BeautifulStatusPill({ stage }: { stage: ActiveStage }) {
     <div className={`inline-flex items-center gap-2.5 px-4 py-2.5 rounded-full backdrop-blur-xl border text-sm font-bold tracking-tight shadow-xl shadow-black/30 ${v.cls}`}>
       {v.icon}
       {v.label}
+    </div>
+  );
+}
+
+// ─── At-capacity modal ───────────────────────────────────────────────
+// Surfaced when the HeyGen concurrent-session cap is hit. The server
+// refuses the start BEFORE deducting credits, so the user explicitly
+// hasn't lost anything. The copy mirrors the user's preferred wording.
+
+function AtCapacityModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/60"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-sm w-full p-6 text-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="w-12 h-12 mx-auto mb-4 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center">
+          <ShieldAlert size={22} />
+        </div>
+        <h2 className="text-lg font-black text-slate-900 mb-2">Interview rooms are full</h2>
+        <p className="text-sm text-slate-600 leading-relaxed mb-1">
+          All our practice rooms are in use at the moment. Kindly check back shortly.
+        </p>
+        <p className="text-xs text-emerald-700 font-bold mb-5">
+          You haven't been charged — your credits are safe.
+        </p>
+        <button
+          onClick={onClose}
+          className="w-full inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-2xl text-sm transition-colors"
+        >
+          Got it
+        </button>
+      </div>
     </div>
   );
 }
