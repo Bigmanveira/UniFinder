@@ -14,6 +14,8 @@ import SchoolCardArt from "../components/schools/SchoolCardArt";
 import { logoUrl, faviconUrl } from "../lib/schools/schoolLogo";
 import type { SchoolMatch } from "../types";
 import { FadeIn, FadeInItem } from "../components/FadeIn";
+import FeedbackSurveyModal from "../components/FeedbackSurveyModal";
+import { useShouldShowSurvey } from "../hooks/useShouldShowSurvey";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SchoolLogo — small circular logo badge with graceful Clearbit → favicon
@@ -536,6 +538,19 @@ export default function FullReportPage() {
   const [activeFilter, setActiveFilter] = useState<BucketKey>("all");
   const [openMatch, setOpenMatch] = useState<{ match: SchoolMatch; bucket: keyof typeof BUCKETS } | null>(null);
 
+  // Feedback survey eligibility — gated by useShouldShowSurvey
+  // (14-day cooldown + 50% probability). Prompt opens once per
+  // report view, ~5 seconds after the report has loaded so the
+  // user has time to actually look at it before being asked to
+  // rate it.
+  const { shouldShow: surveyEligible } = useShouldShowSurvey();
+  const [surveyOpen, setSurveyOpen] = useState(false);
+  useEffect(() => {
+    if (!surveyEligible || loading || error || !report) return;
+    const t = setTimeout(() => setSurveyOpen(true), 5_000);
+    return () => clearTimeout(t);
+  }, [surveyEligible, loading, error, report]);
+
   // Re-match flow: clear cached profile so the wizard starts fresh, then go to /intake
   const handleRunNewMatch = () => {
     try { localStorage.removeItem("unifinder_guest_profile"); } catch { /* noop */ }
@@ -763,6 +778,13 @@ export default function FullReportPage() {
           />
         )}
       </AnimatePresence>
+
+      <FeedbackSurveyModal
+        open={surveyOpen}
+        trigger="match_report"
+        triggerId={reportId}
+        onClose={() => setSurveyOpen(false)}
+      />
     </div>
   );
 }

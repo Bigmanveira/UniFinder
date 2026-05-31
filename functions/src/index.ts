@@ -3366,6 +3366,141 @@ export const repairManualGrantPayments = onCall(
 );
 
 // ============================================================
+// submitFeedbackSurvey — user-facing rating + optional comment
+// ============================================================
+/**
+ * Writes a /surveyResponses doc capturing the user's rating + free-text
+ * comment after they finish a match report unlock or a visa interview.
+ *
+ * Design constraints from the product side:
+ *   • Survey shouldn't bore users — keep it to a star rating + one
+ *     optional comment field. Both can be empty (skipped).
+ *   • At most once per 14 days per user. The client gates this via
+ *     useShouldShowSurvey; we ALSO check it here so a bug in the
+ *     client (or a determined power-user mashing buttons) can't
+ *     spam the responses collection.
+ *   • Trigger is either "match_report" or "visa_interview" — closed
+ *     allow-list to keep ops surface clean.
+ *
+ * Schema written to /surveyResponses:
+ *   {
+ *     userId, userEmail, trigger, triggerId?, rating?, comment?,
+ *     status: "submitted" | "skipped", createdAt, userAgent?
+ *   }
+ *
+ * Status "skipped" records that the user saw the prompt and dismissed
+ * — important for measuring response rate AND for cooldown
+ * enforcement (a skip starts the 14-day clock just like a submit).
+ */
+const FEEDBACK_SURVEY_COOLDOWN_DAYS = 14;
+const FEEDBACK_SURVEY_TRIGGERS = new Set(["match_report", "visa_interview"]);
+
+export const submitFeedbackSurvey = onCall(
+  { ...LIGHT_OPTS },
+  async (request) => {
+    const uid = request.auth?.uid;
+    if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
+
+    const userEmail = (request.auth?.token?.email as string | undefined) ?? null;
+
+    const trigger   = String(request.data?.trigger ?? "").trim();
+    const triggerId = String(request.data?.triggerId ?? "").trim() || null;
+    const status    = String(request.data?.status ?? "").trim();
+    const rawRating = request.data?.rating;
+    const rawComment = request.data?.comment;
+
+    if (!FEEDBACK_SURVEY_TRIGGERS.has(trigger)) {
+      throw new HttpsError("invalid-argument", `Unknown trigger: ${trigger}`);
+    }
+    if (status !== "submitted" && status !== "skipped") {
+      throw new HttpsError("invalid-argument", "Status must be 'submitted' or 'skipped'.");
+    }
+
+    // Rating: integer 1-5 when status === submitted, null/missing
+    // otherwise. We accept ratings on skipped responses too in case
+    // the client wants to record a partial; treat 0/missing as null.
+    let rating: number | null = null;
+    if (typeof rawRating === "number" && Number.isInteger(rawRating) && rawRating >= 1 && rawRating <= 5) {
+      rating = rawRating;
+    } else if (rawRating !== undefined && rawRating !== null && rawRating !== 0) {
+      throw new HttpsError("invalid-argument", "Rating must be an integer 1-5 if provided.");
+    }
+    // A "submitted" response must have a rating — otherwise it's a
+    // skip. Belt-and-braces: client-side button copy already enforces
+    // this, this is the server-side guard.
+    if (status === "submitted" && rating === null) {
+      throw new HttpsError("invalid-argument", "Submitted responses must include a rating.");
+    }
+
+    // Comment: optional, capped at 1000 chars. Trim whitespace; empty
+    // string becomes null.
+    let comment: string | null = null;
+    if (typeof rawComment === "string") {
+      const trimmed = rawComment.trim().slice(0, 1000);
+      if (trimmed) comment = trimmed;
+    }
+
+    // Cooldown enforcement. Look up the most recent response by this
+    // user; refuse if it's within the cooldown window. Skipped
+    // responses count — a skip is the user telling us "not now",
+    // which we honour for the same 14 days.
+    const db = admin.firestore();
+    const cooldownMs = FEEDBACK_SURVEY_COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
+    const recent = await db.collection("surveyResponses")
+      .where("userId", "==", uid)
+      .orderBy("createdAt", "desc")
+      .limit(1)
+      .get();
+    if (!recent.empty) {
+      const lastCreatedAt = recent.docs[0].data()?.createdAt;
+      const lastMs = lastCreatedAt?.toMillis?.() ?? 0;
+      if (Date.now() - lastMs < cooldownMs) {
+        // Don't throw — the client UI would already have hidden the
+        // prompt. This is a defensive duplicate-submit guard. Return
+        // a benign result so a misbehaving client doesn't show an
+        // error message.
+        return { ok: false as const, reason: "cooldown_active" as const };
+      }
+    }
+
+    const userAgent = String(request.rawRequest?.headers?.["user-agent"] ?? "").slice(0, 240) || null;
+
+    const ref = db.collection("surveyResponses").doc();
+    await ref.set({
+      userId:    uid,
+      userEmail,
+      trigger,
+      triggerId,
+      rating,
+      comment,
+      status,
+      userAgent,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // Surface on the user's activity timeline so support can see when
+    // a user gave feedback (and how they rated). Useful for spotting
+    // power-user testimonials and unhappy-user retention plays.
+    void logUserActivity({
+      userId:     uid,
+      action:     "credits_granted_manual",   // reuse a generic chip — no dedicated survey action yet
+      targetType: "surveyResponse",
+      targetId:   ref.id,
+      metadata: {
+        kind:      "feedback_survey",
+        trigger,
+        triggerId,
+        rating,
+        status,
+        commentLen: comment?.length ?? 0,
+      },
+    });
+
+    return { ok: true as const, id: ref.id };
+  },
+);
+
+// ============================================================
 // Bulk email — templates, audience resolution, dry-run + live send
 // ============================================================
 /**
@@ -4731,9 +4866,10 @@ export const migrateAdminsToFoundersFn = onCall(
 //     picks the change up via onSnapshot. ────────────────────────────────
 
 const DEFAULT_ROLE_PERMISSIONS: Record<"analyst" | "developer", string[]> = {
-  // Sensible starting point — customer-support shaped role. The
+  // Sensible starting point — customer-support shaped role. Includes
+  // /surveys so analysts can see post-completion feedback. The
   // founder can flip toggles to add Payments, Errors, etc. later.
-  analyst:   ["/", "/users", "/audit", "/report", "/email/failures"],
+  analyst:   ["/", "/users", "/audit", "/report", "/surveys", "/email/failures"],
   // Engineering-shaped role: ops, errors, health, audit. Maintenance
   // toggle is on the Dashboard so granting "/" gives the developer
   // the maintenance card too.

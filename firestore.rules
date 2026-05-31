@@ -123,6 +123,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Feedback survey responses — written exclusively by the
+    // submitFeedbackSurvey Cloud Function (Admin SDK bypasses these
+    // rules). Each row captures a user's post-match-report or
+    // post-visa-interview rating + optional comment. Owner can read
+    // their own row (for the "you've already given feedback" UI
+    // signal); admin reads all for the ops portal Surveys page.
+    match /surveyResponses/{responseId} {
+      allow read: if (request.auth != null && request.auth.uid == resource.data.userId) || isAdmin();
+      allow write: if false;
+    }
+
     // Pending referrals — server-managed ledger for the deferred referral
     // payout flow (referrer's 5 credits only post after the referee's
     // first paid purchase, defeats self-referral fraud). Doc id is the

@@ -13,6 +13,8 @@ import DocumentUploadModal from "../components/visa/DocumentUploadModal";
 import InterviewReportView from "../components/visa/InterviewReportView";
 import LiveAvatarPanel from "../components/visa/LiveAvatarPanel";
 import { useSpeechRecognition } from "../lib/visa/useSpeechRecognition";
+import FeedbackSurveyModal from "../components/FeedbackSurveyModal";
+import { useShouldShowSurvey } from "../hooks/useShouldShowSurvey";
 
 type Phase = "intro" | "active" | "report";
 
@@ -42,6 +44,23 @@ export default function VisaInterviewPage() {
   // a "try again in a moment" UX, not a "you've been charged and
   // it failed" UX.
   const [atCapacityOpen, setAtCapacityOpen] = useState(false);
+
+  // Feedback survey — opens ~7 seconds after the report renders so
+  // the user has time to actually read their score before we ask
+  // them to rate the experience. Eligibility gate (14-day cooldown
+  // + 50% probability) lives in useShouldShowSurvey.
+  const { shouldShow: surveyEligible } = useShouldShowSurvey();
+  const [surveyOpen, setSurveyOpen] = useState(false);
+  useEffect(() => {
+    if (!surveyEligible) return;
+    if (phase !== "report" || !report) return;
+    const t = setTimeout(() => setSurveyOpen(true), 7_000);
+    return () => clearTimeout(t);
+    // We intentionally depend on phase + report so the timer (re)
+    // starts the moment the report state lands. The eligibility
+    // flag is stable for the page lifetime.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, report, surveyEligible]);
   const [latestOfficer, setLatestOfficer] = useState<string | undefined>(undefined);
   const [pendingUpload, setPendingUpload] = useState<VisaDocumentType | null>(null);
   // When set, the upload modal opens AFTER the avatar finishes speaking the
@@ -487,6 +506,13 @@ export default function VisaInterviewPage() {
         <AtCapacityModal
           open={atCapacityOpen}
           onClose={() => setAtCapacityOpen(false)}
+        />
+
+        <FeedbackSurveyModal
+          open={surveyOpen}
+          trigger="visa_interview"
+          triggerId={sessionId ?? undefined}
+          onClose={() => setSurveyOpen(false)}
         />
 
 
