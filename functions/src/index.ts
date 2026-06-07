@@ -152,16 +152,46 @@ const userSignInRateLimit = createRateLimiter({
 // Accepts:
 //   • any vercel.app subdomain (production + preview deployments)
 //   • collegeready.io and any collegeready.io subdomain (custom ops domain)
-//   • http://localhost (Vite dev server, any port)
+//   • http://localhost — ONLY when running under the Functions emulator
+//
+// Why the emulator gate: a deployed (production) function should never
+// generate magic-link / invite emails pointing at localhost. The
+// returnUrl is baked into the email, so if a founder fires an invite
+// from a local dev session, the live function would happily produce a
+// link the invitee can't click. Caught one of these in the wild — a
+// production-deployed sign-in email had continueUrl=http://localhost:5173.
+// Now production refuses; emulator runs still allow localhost so the
+// dev workflow keeps working.
+const FUNCTIONS_EMULATOR_MODE = process.env.FUNCTIONS_EMULATOR === "true";
+
 function isAllowedOpsPortalOrigin(origin: string): boolean {
   let parsed: URL;
   try { parsed = new URL(origin); } catch { return false; }
   const { protocol, hostname } = parsed;
-  if (protocol === "http:" && hostname === "localhost") return true;
+  if (protocol === "http:" && (hostname === "localhost" || hostname === "127.0.0.1")) {
+    return FUNCTIONS_EMULATOR_MODE;
+  }
   if (protocol !== "https:") return false;
   if (hostname === "collegeready.io" || hostname.endsWith(".collegeready.io")) return true;
   if (hostname.endsWith(".vercel.app")) return true;
   return false;
+}
+
+/** Throws a specific HttpsError explaining WHY a returnUrl was rejected.
+ *  Used after isAllowedOpsPortalOrigin returns false so the caller sees
+ *  a useful message — "you're on localhost, fire from the live portal"
+ *  instead of a generic "invalid-argument" they'd have to debug. */
+function rejectReturnUrl(origin: string, source: "ops-signin" | "ops-admin-invite" | "user-signin"): never {
+  let parsed: URL | null = null;
+  try { parsed = new URL(origin); } catch { /* keep null */ }
+  if (parsed && parsed.protocol === "http:" && (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1")) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Localhost URLs aren't allowed from production functions. Sign-in emails fired from localhost embed the wrong URL into the magic link, so the invitee lands on a broken page. Open the live ops portal and try again from there.",
+    );
+  }
+  console.warn(`[${source}] rejected returnUrl origin:`, origin);
+  throw new HttpsError("invalid-argument", `Unauthorized returnUrl origin: ${origin}`);
 }
 
 // ─── Credit pricing ──────────────────────────────────────────────────────────
@@ -4119,8 +4149,7 @@ export const sendOpsSignInLink = onCall(
       throw new HttpsError("invalid-argument", "Invalid returnUrl.");
     }
     if (!isAllowedOpsPortalOrigin(returnOrigin)) {
-      console.warn("[ops-signin] rejected returnUrl origin:", returnOrigin);
-      throw new HttpsError("invalid-argument", "Unauthorized returnUrl origin.");
+      rejectReturnUrl(returnOrigin, "ops-signin");
     }
 
     // Existence check — only send to pre-provisioned auth users. We
@@ -4234,10 +4263,9 @@ export const sendUserSignInLink = onCall(
     }
     if (!isAllowedOpsPortalOrigin(returnOrigin)) {
       // The user app shares the same origin allow-list as the ops portal
-      // (collegeready.io / vercel.app / localhost). Reusing the same
-      // predicate keeps one source of truth.
-      console.warn("[user-signin] rejected returnUrl origin:", returnOrigin);
-      throw new HttpsError("invalid-argument", "Unauthorized returnUrl origin.");
+      // (collegeready.io / vercel.app / localhost-under-emulator only).
+      // Reusing the same predicate keeps one source of truth.
+      rejectReturnUrl(returnOrigin, "user-signin");
     }
 
     // ANTI-ENUMERATION: we deliberately do NOT check whether an account
@@ -4777,8 +4805,7 @@ export const inviteOpsAdminFn = onCall(
       throw new HttpsError("invalid-argument", "Invalid returnUrl.");
     }
     if (!isAllowedOpsPortalOrigin(returnOrigin)) {
-      console.warn("[ops-admin-invite] rejected returnUrl origin:", returnOrigin);
-      throw new HttpsError("invalid-argument", "Unauthorized returnUrl origin.");
+      rejectReturnUrl(returnOrigin, "ops-admin-invite");
     }
 
     const requestedRole = String(request.data?.role ?? "founder") as OpsRole;
