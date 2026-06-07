@@ -52,10 +52,7 @@ const htmlBody = (opts: { link: string }) => `
                   <a href="${opts.link}" style="display:inline-block;background:#1e3a8a;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:12px;font-size:14px;">Sign in to Ops →</a>
                 </p>
 
-                <p style="margin:0 0 8px 0;color:#475569;font-size:13px;">If the button doesn't work, copy and paste this URL into the same browser you requested the link from:</p>
-                <p style="margin:0 0 18px 0;font-size:12px;color:#475569;word-break:break-all;background:#f1f5f9;border-radius:8px;padding:10px 12px;border:1px solid #e2e8f0;">
-                  ${opts.link}
-                </p>
+                <p style="margin:0 0 18px 0;color:#475569;font-size:13px;">Open this email in the same browser where you requested the link.</p>
 
                 <p style="margin:18px 0 0 0;color:#64748b;font-size:13px;">Thanks,<br/>The College Ready team</p>
               </td>
