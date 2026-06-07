@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
-import { db } from "../lib/firebase";
-import { doc, getDoc, setDoc, updateDoc, arrayUnion } from "firebase/firestore";
+import { db, functions } from "../lib/firebase";
+import { doc, getDoc, setDoc, updateDoc, arrayUnion, onSnapshot } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import {
   MapPin, Globe, Heart, ArrowLeft, ArrowRight, AlertTriangle, Sparkles,
   Check, ChevronDown, ChevronUp, Lightbulb, DollarSign,
-  Star, Loader2, Target, Percent, Send, BookOpen, RefreshCw,
+  Star, Loader2, Target, Percent, Send, BookOpen, RefreshCw, Lock,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { bucketizeMatches } from "../lib/matching/matchSchools";
@@ -551,6 +552,55 @@ export default function FullReportPage() {
     return () => clearTimeout(t);
   }, [surveyEligible, loading, error, report]);
 
+  // Live wallet balance — drives the "you have N credits" hint on the
+  // locked-bucket cards + grays out the Reveal button when the user
+  // can't afford a 5-credit reveal. onSnapshot so a successful
+  // purchase mid-page-view enables the button without a refresh.
+  const [walletCredits, setWalletCredits] = useState<number | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    const unsub = onSnapshot(doc(db, "creditWallets", user.uid), (snap) => {
+      if (snap.exists()) {
+        const c = snap.data()?.credits;
+        setWalletCredits(typeof c === "number" ? c : 0);
+      } else {
+        // Wallet not yet materialised — treat as the implicit signup grant
+        // so the UI matches the dashboard / ops portal default.
+        setWalletCredits(2);
+      }
+    });
+    return () => unsub();
+  }, [user]);
+
+  // Per-bucket reveal action. Atomic on the backend; we optimistically
+  // toggle local state once the callable resolves so the locked card
+  // flips to the school list immediately. The report `unlockedBuckets`
+  // field is also updated server-side; if the user navigates away and
+  // back, the new state is persisted.
+  const [revealingBucket, setRevealingBucket] = useState<"reach" | "safety" | null>(null);
+  const [revealError, setRevealError] = useState<string | null>(null);
+  const handleReveal = async (bucket: "reach" | "safety") => {
+    if (!reportId || revealingBucket) return;
+    setRevealingBucket(bucket);
+    setRevealError(null);
+    try {
+      const fn = httpsCallable<{ reportId: string; bucket: "reach" | "safety" }, { ok: boolean; alreadyUnlocked: boolean }>(
+        functions, "revealMatchReportBucket",
+      );
+      await fn({ reportId, bucket });
+      // Optimistic local update — the server-side write is in flight
+      // (or done). Either way the UI should flip to "unlocked" now.
+      setReport((prev: any) => prev ? {
+        ...prev,
+        unlockedBuckets: { ...(prev.unlockedBuckets ?? {}), [bucket]: true },
+      } : prev);
+    } catch (err: any) {
+      setRevealError(err?.message ?? "Could not reveal this category. Please try again.");
+    } finally {
+      setRevealingBucket(null);
+    }
+  };
+
   // Re-match flow: clear cached profile so the wizard starts fresh, then go to /intake
   const handleRunNewMatch = () => {
     try { localStorage.removeItem("unifinder_guest_profile"); } catch { /* noop */ }
@@ -725,14 +775,47 @@ export default function FullReportPage() {
           </div>
         </FadeIn>
 
-        <div className="space-y-10">
-          {(activeFilter === "all" || activeFilter === "reach") &&
-            <BucketSection bucket="reach"  matches={bucketed.reach}  schoolAiMap={schoolAiMap} savedIds={savedIds} onCardClick={(m, b) => setOpenMatch({ match: m, bucket: b })} showHeader={activeFilter === "all"} />}
-          {(activeFilter === "all" || activeFilter === "target") &&
-            <BucketSection bucket="target" matches={bucketed.target} schoolAiMap={schoolAiMap} savedIds={savedIds} onCardClick={(m, b) => setOpenMatch({ match: m, bucket: b })} showHeader={activeFilter === "all"} />}
-          {(activeFilter === "all" || activeFilter === "safety") &&
-            <BucketSection bucket="safety" matches={bucketed.safety} schoolAiMap={schoolAiMap} savedIds={savedIds} onCardClick={(m, b) => setOpenMatch({ match: m, bucket: b })} showHeader={activeFilter === "all"} />}
-        </div>
+        {/* Per-bucket lock gating. Legacy reports without an
+            unlockedBuckets field are treated as fully unlocked so we
+            don't retroactively re-gate old reports. New reports
+            (post-feature) start with only Target unlocked; Reach +
+            Safety stay behind a 5-credit reveal each. */}
+        {(() => {
+          const unlocks = report.unlockedBuckets ?? { target: true, reach: true, safety: true };
+          const isUnlocked = (b: "reach" | "target" | "safety") => unlocks[b] !== false;
+          const showSection = (b: "reach" | "target" | "safety") =>
+            activeFilter === "all" || activeFilter === b;
+
+          return (
+            <div className="space-y-10">
+              {showSection("reach") && (
+                isUnlocked("reach")
+                  ? <BucketSection bucket="reach"  matches={bucketed.reach}  schoolAiMap={schoolAiMap} savedIds={savedIds} onCardClick={(m, b) => setOpenMatch({ match: m, bucket: b })} showHeader={activeFilter === "all"} />
+                  : <LockedBucketCard bucket="reach"  count={bucketed.reach.length}  walletCredits={walletCredits} busy={revealingBucket === "reach"}  onReveal={() => handleReveal("reach")}  showHeader={activeFilter === "all"} />
+              )}
+              {showSection("target") && (
+                // Target is always unlocked post-initial-unlock. We
+                // still gate on the field for completeness — if it
+                // somehow says target:false, render the lock. In
+                // practice this branch is the BucketSection path
+                // 100% of the time.
+                isUnlocked("target")
+                  ? <BucketSection bucket="target" matches={bucketed.target} schoolAiMap={schoolAiMap} savedIds={savedIds} onCardClick={(m, b) => setOpenMatch({ match: m, bucket: b })} showHeader={activeFilter === "all"} />
+                  : <div className="text-xs text-slate-400">Target should always be unlocked after the initial report unlock — report this if you see it.</div>
+              )}
+              {showSection("safety") && (
+                isUnlocked("safety")
+                  ? <BucketSection bucket="safety" matches={bucketed.safety} schoolAiMap={schoolAiMap} savedIds={savedIds} onCardClick={(m, b) => setOpenMatch({ match: m, bucket: b })} showHeader={activeFilter === "all"} />
+                  : <LockedBucketCard bucket="safety" count={bucketed.safety.length} walletCredits={walletCredits} busy={revealingBucket === "safety"} onReveal={() => handleReveal("safety")} showHeader={activeFilter === "all"} />
+              )}
+              {revealError && (
+                <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
+                  {revealError}
+                </p>
+              )}
+            </div>
+          );
+        })()}
 
         {/* Next stage — roadmap CTA */}
         <FadeIn>
@@ -786,5 +869,95 @@ export default function FullReportPage() {
         onClose={() => setSurveyOpen(false)}
       />
     </div>
+  );
+}
+
+// ── Locked bucket card ────────────────────────────────────────────────
+// Renders in place of <BucketSection> when the user hasn't unlocked
+// that bucket yet. Shows a count of schools waiting + the reveal CTA.
+// Wallet-aware: if the user can't afford the 5-credit reveal, swap the
+// button for a "Get credits" link pointing at /pricing so they don't
+// dead-end.
+
+const REVEAL_BUCKET_COST = 5;
+
+function LockedBucketCard({
+  bucket, count, walletCredits, busy, onReveal, showHeader,
+}: {
+  bucket:        "reach" | "safety";
+  count:         number;
+  walletCredits: number | null;
+  busy:          boolean;
+  onReveal:      () => void;
+  showHeader:    boolean;
+}) {
+  const meta = BUCKETS[bucket];
+  const canAfford = walletCredits !== null && walletCredits >= REVEAL_BUCKET_COST;
+
+  return (
+    <section>
+      {showHeader && (
+        <div className="flex items-center gap-3 mb-4">
+          <span className={`inline-block w-2.5 h-2.5 rounded-full ${meta.dot}`} aria-hidden />
+          <h3 className={`text-base font-bold tracking-tight ${meta.accent}`}>{meta.title}</h3>
+          <span className="text-xs text-slate-400 font-medium tabular-nums">{count} school{count === 1 ? "" : "s"}</span>
+        </div>
+      )}
+      <div className="relative bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        {/* Decorative blurred placeholder rows underneath the card so
+            the user gets a visual sense of "schools are here, you just
+            can't see them yet." */}
+        <div className="absolute inset-0 p-6 space-y-3 pointer-events-none opacity-30 blur-sm select-none" aria-hidden>
+          {Array.from({ length: Math.min(count, 3) }).map((_, i) => (
+            <div key={i} className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-slate-200" />
+              <div className="flex-1 space-y-1.5">
+                <div className="h-3 rounded bg-slate-200 w-2/3" />
+                <div className="h-2.5 rounded bg-slate-200 w-1/3" />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="relative p-7 sm:p-8 text-center">
+          <div className={`w-14 h-14 rounded-2xl ${meta.chip} flex items-center justify-center mx-auto mb-4`}>
+            <Lock size={22} />
+          </div>
+          <h4 className="text-lg font-black text-slate-900 mb-1">
+            {count} {meta.title} school{count === 1 ? "" : "s"} waiting
+          </h4>
+          <p className="text-sm text-slate-500 max-w-md mx-auto leading-relaxed mb-5">
+            {meta.desc} Unlock this category to see the full list with the same per-school detail as your Target picks.
+          </p>
+          {canAfford ? (
+            <>
+              <button
+                onClick={onReveal}
+                disabled={busy}
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold transition-colors shadow-md bg-primary-600 hover:bg-primary-700 text-white shadow-primary-600/30 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {busy ? <Loader2 size={14} className="animate-spin" /> : <Lock size={14} />}
+                {busy ? "Revealing…" : `Reveal ${meta.title} for ${REVEAL_BUCKET_COST} credits`}
+              </button>
+              <p className="text-[11px] text-slate-400 mt-2">
+                You have {walletCredits} credit{walletCredits === 1 ? "" : "s"} · this leaves you with {(walletCredits ?? 0) - REVEAL_BUCKET_COST}.
+              </p>
+            </>
+          ) : (
+            <>
+              <Link
+                to="/pricing"
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold transition-colors shadow-md bg-slate-900 hover:bg-slate-800 text-white"
+              >
+                <ArrowRight size={14} /> Get credits to reveal
+              </Link>
+              <p className="text-[11px] text-slate-500 mt-2">
+                Revealing this category costs {REVEAL_BUCKET_COST} credits. You currently have {walletCredits ?? 0}.
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+    </section>
   );
 }

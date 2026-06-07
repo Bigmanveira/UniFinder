@@ -214,6 +214,14 @@ function rejectReturnUrl(origin: string, source: "ops-signin" | "ops-admin-invit
 const MATCH_REPORT_CREDIT_COST = 1;
 const VISA_INTERVIEW_CREDIT_COST = 15;
 const FREE_CREDITS_ON_SIGNUP   = 2;
+// Reveal-bucket pricing — match reports now unlock the TARGET bucket
+// by default (the most actionable cohort for an applicant). Reach +
+// Safety stay locked behind a 5-credit per-bucket reveal so users
+// who want the full picture have to top up. A user starting with the
+// 2-credit signup grant spends 1 on unlock, has 1 left, then has to
+// buy a pack to see the other two buckets — by design, this is the
+// new revenue funnel.
+const REVEAL_BUCKET_CREDIT_COST = 5;
 
 // HeyGen plan-side concurrent-session cap. The base plan allows 3
 // simultaneous LiveKit rooms; anything beyond that hits HTTP 429.
@@ -1007,6 +1015,13 @@ export const unlockMatchReport = onCall(
         bucketReach:          bucketed.reach,
         bucketTarget:         bucketed.target,
         bucketSafety:         bucketed.safety,
+        // Per-bucket reveal gating. Target opens by default after the
+        // initial 1-credit unlock (it's the most actionable cohort).
+        // Reach + Safety stay locked behind revealMatchReportBucket
+        // (5 credits each). Older reports (pre-feature) lack this
+        // field — frontend treats missing as "all unlocked" so legacy
+        // unlocks aren't retroactively re-gated.
+        unlockedBuckets:      { target: true, reach: false, safety: false },
         normalisedField,
         normalisedLevel,
         programGateEnforced:  canEnforceGate,
@@ -1223,6 +1238,122 @@ async function logAiRun(args: {
     console.warn("[visa] aiRuns log failed:", err?.message);
   }
 }
+
+// ── revealMatchReportBucket ──────────────────────────────────────────────────
+// Pay-per-reveal: after the initial 1-credit unlock opens the Target
+// bucket, users spend REVEAL_BUCKET_CREDIT_COST (5) per additional
+// bucket (Reach or Safety). Atomic transaction so a parallel spend
+// can't race the wallet out of order.
+//
+// Idempotency: if the requested bucket is already unlocked on this
+// report (e.g. the user double-tapped the Reveal button before the
+// UI updated), we short-circuit without re-charging. The frontend
+// also disables the button after click, but defence-in-depth here.
+//
+// Founder bypass mirrors unlockMatchReport — founders flip the
+// bucket flag without paying, and a creditTransactions row is still
+// written (type:"founder_bucket_reveal", amount:0) so the audit
+// trail captures the action.
+export const revealMatchReportBucket = onCall(
+  { ...LIGHT_OPTS },
+  async (request) => {
+    await assertNotInMaintenance(request);
+    const uid = request.auth?.uid;
+    if (!uid) throw new HttpsError("unauthenticated", "Sign in to reveal more schools.");
+
+    const reportId = String(request.data?.reportId ?? "").trim();
+    const bucket   = String(request.data?.bucket ?? "").trim() as "reach" | "safety";
+    if (!reportId) {
+      throw new HttpsError("invalid-argument", "Missing reportId.");
+    }
+    if (bucket !== "reach" && bucket !== "safety") {
+      // Target is free with the initial unlock; we don't accept it
+      // as an explicit reveal target. Front-end won't surface a
+      // "Reveal Target" button — this is the backstop.
+      throw new HttpsError("invalid-argument", "Bucket must be 'reach' or 'safety'.");
+    }
+
+    const db        = admin.firestore();
+    const reportRef = db.collection("matchReports").doc(reportId);
+    const walletRef = db.collection("creditWallets").doc(uid);
+    const txRef     = db.collection("creditTransactions").doc();
+    const now       = admin.firestore.FieldValue.serverTimestamp();
+    const founder   = isFounderEmail(request.auth?.token?.email as string | undefined);
+
+    const result = await db.runTransaction(async (tx) => {
+      const reportSnap = await tx.get(reportRef);
+      if (!reportSnap.exists) {
+        throw new HttpsError("not-found", "Report not found.");
+      }
+      const reportData = reportSnap.data() ?? {};
+      if (reportData.userId !== uid) {
+        // Refuse cross-user reveals — a user shouldn't be able to
+        // pay to unlock someone else's report.
+        throw new HttpsError("permission-denied", "Not your report.");
+      }
+
+      const currentUnlocks = (reportData.unlockedBuckets ?? {}) as Record<string, boolean | undefined>;
+      if (currentUnlocks[bucket] === true) {
+        // Already unlocked — no-op, no charge.
+        return { ok: true as const, alreadyUnlocked: true as const, newBalance: null };
+      }
+
+      // Wallet check + deduction. Founder bypass skips the balance
+      // gate but still writes the ledger row for audit.
+      const walletSnap = await tx.get(walletRef);
+      const credits = walletSnap.exists
+        ? (walletSnap.data()?.credits ?? 0)
+        : FREE_CREDITS_ON_SIGNUP;
+      let newBalance: number | null = null;
+      if (!founder) {
+        if (credits < REVEAL_BUCKET_CREDIT_COST) {
+          throw new HttpsError("resource-exhausted", "Insufficient credits to reveal this bucket.");
+        }
+        newBalance = credits - REVEAL_BUCKET_CREDIT_COST;
+        if (walletSnap.exists) {
+          tx.update(walletRef, { credits: newBalance, updatedAt: now });
+        } else {
+          tx.set(walletRef, { credits: newBalance, updatedAt: now });
+        }
+      }
+
+      tx.update(reportRef, {
+        [`unlockedBuckets.${bucket}`]: true,
+        updatedAt: now,
+      });
+
+      tx.set(txRef, {
+        userId:   uid,
+        amount:   founder ? 0 : -REVEAL_BUCKET_CREDIT_COST,
+        type:     founder ? "founder_bucket_reveal" : "match_report_bucket_reveal",
+        reportId,
+        bucket,
+        createdAt: now,
+      });
+
+      return { ok: true as const, alreadyUnlocked: false as const, newBalance };
+    });
+
+    // Activity log (post-commit, side-effect, never blocks the
+    // primary action). Skipped on idempotent no-op so the timeline
+    // doesn't fill up with duplicate entries on double-clicks.
+    if (!result.alreadyUnlocked) {
+      void logUserActivity({
+        userId:     uid,
+        action:     "match_report_bucket_revealed",
+        targetType: "matchReport",
+        targetId:   reportId,
+        metadata:   {
+          bucket,
+          creditsUsed:   founder ? 0 : REVEAL_BUCKET_CREDIT_COST,
+          founderBypass: founder,
+        },
+      });
+    }
+
+    return result;
+  },
+);
 
 // ── startVisaInterviewSession ─────────────────────────────────────────────────
 export const startVisaInterviewSession = onCall(

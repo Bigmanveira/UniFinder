@@ -30,6 +30,7 @@ export type UserActivityAction =
   | "purchase_failed"           // Webhook fired but processing rejected (signature, metadata, amount, etc.)
   | "purchase_refunded"         // Refund processed via webhook
   | "match_report_unlocked"     // 1 credit spent on a match report
+  | "match_report_bucket_revealed" // 5 credits spent to reveal a Reach/Safety bucket
   | "visa_interview_started"    // 15 credits spent on a visa session
   | "visa_interview_completed"  // Session finished + scored
   | "visa_document_uploaded"    // I-20 / DS-160 uploaded + extracted

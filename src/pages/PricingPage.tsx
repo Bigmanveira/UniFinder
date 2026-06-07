@@ -298,6 +298,33 @@ export default function PricingPage() {
         )}
       </section>
 
+      {/* How credits are spent — a single-screen explainer the user can
+          glance at before buying. Calls out the three concrete spends so
+          the per-category 5-credit reveal isn't a surprise once they're
+          inside the report. */}
+      <section className="max-w-6xl mx-auto px-6 pb-12">
+        <div className="rounded-3xl border border-slate-200 bg-slate-50/60 p-6 sm:p-8">
+          <p className="text-[11px] font-black tracking-[0.2em] uppercase text-slate-500 mb-4">How credits are spent</p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <CreditSpend
+              cost="1 credit"
+              title="Unlock a match report"
+              body="Generates your full AI shortlist + roadmap. Target schools are visible right away."
+            />
+            <CreditSpend
+              cost="5 credits"
+              title="Reveal a category"
+              body="Unlocks Reach or Safety schools inside an existing report. Optional — only if you want the wider list."
+            />
+            <CreditSpend
+              cost="15 credits"
+              title="F-1 visa interview"
+              body="One live AI mock interview with feedback. Practice until you're confident."
+            />
+          </div>
+        </div>
+      </section>
+
       {/* Trust strip — restrained, status-page-style row that explains the
           payment posture and currency conversion in plain language. */}
       <section className="max-w-6xl mx-auto px-6 pb-20">
@@ -344,6 +371,18 @@ export default function PricingPage() {
           </p>
         </div>
       </footer>
+    </div>
+  );
+}
+
+function CreditSpend({ cost, title, body }: { cost: string; title: string; body: string }) {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-5">
+      <span className="inline-block text-[10px] font-black tracking-widest uppercase text-primary-600 bg-primary-50 border border-primary-100 rounded-full px-2 py-0.5 mb-3">
+        {cost}
+      </span>
+      <p className="text-sm font-black text-slate-900 mb-1.5">{title}</p>
+      <p className="text-xs text-slate-600 leading-relaxed">{body}</p>
     </div>
   );
 }

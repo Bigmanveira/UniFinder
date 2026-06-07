@@ -11,7 +11,7 @@ const FAQS = [
   },
   {
     question: "What are Credits and how do I use them?",
-    answer: "College Ready operates on a simple pay-as-you-go credit system. One credit unlocks a full, deeply personalized match report for your profile. Two credits can be used to run our AI Transcript Analysis tool. You get 2 free credits just for signing up!"
+    answer: "College Ready uses a simple pay-as-you-go credit system. 1 credit unlocks a full personalised match report — your Target schools are visible right away. 5 credits reveal a Reach or Safety category inside that report if you want the wider list (optional — Target alone is enough for most users). 15 credits unlock a live F-1 visa interview practice session. You get 2 free credits just for signing up."
   },
   {
     question: "Does College Ready guarantee my admission?",
