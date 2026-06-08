@@ -31,6 +31,8 @@ export type UserActivityAction =
   | "purchase_refunded"         // Refund processed via webhook
   | "match_report_unlocked"     // 1 credit spent on a match report
   | "match_report_bucket_revealed" // 5 credits spent to reveal a Reach/Safety bucket
+  | "academic_cv_generated"     // Free generation; preview stored, paywall in place
+  | "academic_cv_unlocked"      // 5/8 credits spent to unlock the full CV
   | "visa_interview_started"    // 15 credits spent on a visa session
   | "visa_interview_completed"  // Session finished + scored
   | "visa_document_uploaded"    // I-20 / DS-160 uploaded + extracted

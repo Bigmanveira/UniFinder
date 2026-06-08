@@ -16,6 +16,11 @@ import {
 import { createHeyGenSessionToken, endHeyGenSession } from "./liveAvatarSession.js";
 import { synthesizeOfficerAudio } from "./avatarTts.js";
 import { extractVisaDocument, type VisaDocumentType, type ExtractedDocument } from "./visaDocExtractor.js";
+import {
+  generateAcademicCv,
+  extractCvText,
+  type AcademicCvMode,
+} from "./academicCv.js";
 import { aiMatchSchools, type AiCandidate } from "./aiMatch.js";
 import {
   initPaystackTransaction,
@@ -239,6 +244,29 @@ const REVEAL_BUCKET_CREDIT_COST = 5;
 const VISA_PREVIEW_DURATION_SEC = 180;
 const VISA_PAID_DURATION_SEC    = 300;
 const VISA_PREVIEW_COOLDOWN_DAYS = 7;
+
+// Academic CV Studio — three AI tools with a free-preview + paid-unlock
+// model. Generation runs once on submit (Sonnet, ~$0.015 per doc on our
+// side). The free preview is the first ~30% of the document; unlocking
+// the rest costs credits. Cost tiers reflect compute weight + value:
+//   - review:  5 credits — read user's CV + critique + rewrite (one Claude call)
+//   - build:   8 credits — generate from a structured intake (longest output)
+//   - convert: 8 credits — restructure a professional CV (Claude has to interpret)
+// All three sit above the 2-credit signup grant, so a new user always
+// hits the buy-credits paywall before unlocking.
+//
+// Abuse cap: each user can run a max of ACADEMIC_CV_FREE_GENERATIONS_PER_DAY
+// free previews per tool per 24h. Without the cap, a single user could
+// generate unlimited Sonnet calls without ever paying.
+const ACADEMIC_CV_REVIEW_CREDIT_COST  = 5;
+const ACADEMIC_CV_BUILD_CREDIT_COST   = 8;
+const ACADEMIC_CV_CONVERT_CREDIT_COST = 8;
+const ACADEMIC_CV_FREE_GENERATIONS_PER_DAY = 1;
+function academicCvCreditCost(mode: AcademicCvMode): number {
+  return mode === "review"  ? ACADEMIC_CV_REVIEW_CREDIT_COST
+       : mode === "convert" ? ACADEMIC_CV_CONVERT_CREDIT_COST
+       :                      ACADEMIC_CV_BUILD_CREDIT_COST;
+}
 
 // HeyGen plan-side concurrent-session cap. The base plan allows 3
 // simultaneous LiveKit rooms; anything beyond that hits HTTP 429.
@@ -2120,6 +2148,263 @@ export const finishVisaInterviewSession = onCall(
     });
 
     return { reportId: reportRef.id, ...reportData };
+  },
+);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Academic CV Studio — three AI tools (review / build / convert) sharing
+// one generate-then-paywall pipeline.
+//
+// generateAcademicCvDocument: takes the user's input, generates the full
+//   CV with Sonnet, stores it server-side, returns ONLY the preview slice
+//   (~30%) + a documentId. No credits charged at this step.
+// unlockAcademicCvDocument: deducts credits from the wallet, flips the
+//   doc to unlocked: true, returns the full Markdown.
+//
+// Generation cost is borne by us up-front. To stop a single user farming
+// previews, we cap free generations per user per tool per 24h. Founder
+// accounts bypass both the cap AND the credit charge.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const ACADEMIC_CV_MODES = new Set<string>(["review", "build", "convert"]);
+
+export const generateAcademicCvDocument = onCall(
+  { ...HEAVY_OPTS, secrets: [ANTHROPIC_API_KEY] },
+  async (request) => {
+    await assertNotInMaintenance(request);
+    const uid = request.auth?.uid;
+    if (!uid) throw new HttpsError("unauthenticated", "Sign in to use the CV Studio.");
+
+    const mode = String(request.data?.mode ?? "").trim() as AcademicCvMode;
+    if (!ACADEMIC_CV_MODES.has(mode)) {
+      throw new HttpsError("invalid-argument", "Mode must be 'review', 'build', or 'convert'.");
+    }
+
+    // The input is either raw text (paste-text path) or a base64 file
+    // (PDF / image upload path). For builder, it's a JSON string of the
+    // structured intake. Cap input size at 200KB to keep Claude calls
+    // bounded — a CV that won't fit in 200KB of text is malformed.
+    const inputText: string | undefined = typeof request.data?.inputText === "string" ? request.data.inputText : undefined;
+    const fileBase64: string | undefined = typeof request.data?.fileBase64 === "string" ? request.data.fileBase64 : undefined;
+    const fileMediaType: string | undefined = typeof request.data?.fileMediaType === "string" ? request.data.fileMediaType : undefined;
+
+    if (!inputText && !fileBase64) {
+      throw new HttpsError("invalid-argument", "Provide inputText or a file (fileBase64 + fileMediaType).");
+    }
+    if (mode === "build" && !inputText) {
+      // Builder is intake-form-driven only; PDF upload makes no sense for it.
+      throw new HttpsError("invalid-argument", "Builder mode requires structured inputText (intake JSON).");
+    }
+    if (inputText && inputText.length > 200_000) {
+      throw new HttpsError("invalid-argument", "Input is too large. Trim to under 200KB.");
+    }
+    if (fileBase64 && fileBase64.length > 14_000_000) {
+      // 14MB base64 ≈ 10MB binary, well above any plausible single-page CV.
+      throw new HttpsError("invalid-argument", "File is too large. Use a file under 10MB.");
+    }
+
+    const founder = isFounderEmail(request.auth?.token?.email as string | undefined);
+    const db = admin.firestore();
+
+    // Per-user, per-tool free-generation rate limit. Founder bypass for
+    // internal QA — they need to be able to spam-test the prompts.
+    if (!founder) {
+      const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - 24 * 60 * 60 * 1000);
+      const recent = await db.collection("academicCvDocuments")
+        .where("userId", "==", uid)
+        .where("mode",   "==", mode)
+        .where("createdAt", ">", cutoff)
+        .limit(ACADEMIC_CV_FREE_GENERATIONS_PER_DAY)
+        .get();
+      if (recent.size >= ACADEMIC_CV_FREE_GENERATIONS_PER_DAY) {
+        // The user can still UNLOCK any of those recent docs by paying
+        // credits — the rate limit only stops them from generating a
+        // brand-new free preview. Surface that distinction in the message.
+        throw new HttpsError(
+          "resource-exhausted",
+          "You've already used your free preview for this tool in the last 24 hours. Unlock one of your existing previews or come back tomorrow.",
+          { reason: "academic_cv_rate_limited", mode },
+        );
+      }
+    }
+
+    // Build the input string that gets fed to Claude. PDF path runs
+    // through extractCvText first; text path is used directly.
+    let resolvedInput = inputText ?? "";
+    if (!resolvedInput && fileBase64 && fileMediaType) {
+      const extracted = await extractCvText({
+        apiKey:     ANTHROPIC_API_KEY.value(),
+        fileBase64,
+        mediaType:  fileMediaType,
+      });
+      if (extracted.status !== "completed" || !extracted.text) {
+        throw new HttpsError(
+          "invalid-argument",
+          "Could not read text from the uploaded file. Paste the CV text directly or try a clearer scan.",
+          { reason: "academic_cv_extraction_failed", detail: extracted.errorMessage },
+        );
+      }
+      resolvedInput = extracted.text;
+    }
+
+    const gen = await generateAcademicCv({
+      apiKey: ANTHROPIC_API_KEY.value(),
+      mode,
+      input:  resolvedInput,
+    });
+    if (gen.status !== "completed" || !gen.fullMarkdown) {
+      throw new HttpsError(
+        "internal",
+        "The CV generator hit a snag. Please try again in a moment.",
+        { detail: gen.errorMessage },
+      );
+    }
+
+    const now    = admin.firestore.FieldValue.serverTimestamp();
+    const cost   = academicCvCreditCost(mode);
+    const docRef = db.collection("academicCvDocuments").doc();
+    const fullRef = docRef.collection("full").doc("payload");
+
+    // Two-doc write. The public doc holds preview-safe fields and is
+    // client-readable (subject to the userId-matches-auth rule). The
+    // private "full" subdoc holds the fullMarkdown and is blocked from
+    // client reads by Firestore Rules — the only way to fetch it is via
+    // unlockAcademicCvDocument, which deducts credits first.
+    const batch = db.batch();
+    batch.set(docRef, {
+      userId:          uid,
+      mode,
+      status:          "preview",
+      creditCost:      cost,
+      unlocked:        false,
+      sourceInput:     resolvedInput.slice(0, 30_000),
+      previewMarkdown: gen.previewMarkdown,
+      createdAt:       now,
+      updatedAt:       now,
+    });
+    batch.set(fullRef, {
+      userId:       uid,
+      fullMarkdown: gen.fullMarkdown,
+      createdAt:    now,
+    });
+    await batch.commit();
+
+    void logUserActivity({
+      userId:     uid,
+      action:     "academic_cv_generated",
+      targetType: "academicCvDocument",
+      targetId:   docRef.id,
+      metadata:   { mode, creditCost: cost, founderBypass: founder },
+    });
+
+    return {
+      documentId:      docRef.id,
+      mode,
+      previewMarkdown: gen.previewMarkdown,
+      creditCost:      cost,
+      unlocked:        false,
+    };
+  },
+);
+
+export const unlockAcademicCvDocument = onCall(
+  { ...LIGHT_OPTS },
+  async (request) => {
+    await assertNotInMaintenance(request);
+    const uid = request.auth?.uid;
+    if (!uid) throw new HttpsError("unauthenticated", "Sign in to unlock your CV.");
+
+    const documentId = String(request.data?.documentId ?? "").trim();
+    if (!documentId) throw new HttpsError("invalid-argument", "Missing documentId.");
+
+    const db        = admin.firestore();
+    const docRef    = db.collection("academicCvDocuments").doc(documentId);
+    const fullRef   = docRef.collection("full").doc("payload");
+    const walletRef = db.collection("creditWallets").doc(uid);
+    const txRef     = db.collection("creditTransactions").doc();
+    const now       = admin.firestore.FieldValue.serverTimestamp();
+    const founder   = isFounderEmail(request.auth?.token?.email as string | undefined);
+
+    // Read both the public doc + the private full payload OUTSIDE the
+    // transaction. The transaction only mutates the wallet + flips the
+    // unlock flag.
+    const [docSnap, fullSnap] = await Promise.all([docRef.get(), fullRef.get()]);
+    if (!docSnap.exists) throw new HttpsError("not-found", "CV not found.");
+    const docData = docSnap.data() as any;
+    if (docData.userId !== uid) {
+      throw new HttpsError("permission-denied", "Not your CV.");
+    }
+    const fullMarkdown = fullSnap.exists ? String(fullSnap.data()?.fullMarkdown ?? "") : "";
+    if (!fullMarkdown) {
+      throw new HttpsError("internal", "CV payload is missing on the server. Please regenerate.");
+    }
+
+    const cost: number = typeof docData.creditCost === "number" ? docData.creditCost : 5;
+    const mode: AcademicCvMode = (docData.mode === "build" || docData.mode === "convert") ? docData.mode : "review";
+
+    // Idempotency. If someone double-taps Unlock or the network retries
+    // the callable, just return the full doc — no double-charge.
+    if (docData.unlocked === true) {
+      return {
+        documentId,
+        mode,
+        fullMarkdown,
+        unlocked:        true,
+        alreadyUnlocked: true,
+      };
+    }
+
+    let newBalance: number | null = null;
+    await db.runTransaction(async (tx) => {
+      const wallet = await tx.get(walletRef);
+      const credits: number = wallet.exists ? (wallet.data()?.credits ?? 0) : FREE_CREDITS_ON_SIGNUP;
+      if (!founder) {
+        if (credits < cost) {
+          throw new HttpsError(
+            "resource-exhausted",
+            "Not enough credits to unlock this CV. Top up your wallet to continue.",
+            { reason: "insufficient_credits", required: cost, balance: credits },
+          );
+        }
+        newBalance = credits - cost;
+        if (wallet.exists) {
+          tx.update(walletRef, { credits: newBalance, updatedAt: now });
+        } else {
+          tx.set(walletRef, { credits: newBalance, updatedAt: now });
+        }
+      }
+      tx.update(docRef, {
+        unlocked:  true,
+        status:    "unlocked",
+        unlockedAt: now,
+        updatedAt:  now,
+      });
+      tx.set(txRef, {
+        userId:    uid,
+        amount:    founder ? 0 : -cost,
+        type:      founder ? "founder_academic_cv_unlock" : "academic_cv_unlock",
+        documentId,
+        mode,
+        createdAt: now,
+      });
+    });
+
+    void logUserActivity({
+      userId:     uid,
+      action:     "academic_cv_unlocked",
+      targetType: "academicCvDocument",
+      targetId:   documentId,
+      metadata:   { mode, creditCost: founder ? 0 : cost, founderBypass: founder },
+    });
+
+    return {
+      documentId,
+      mode,
+      fullMarkdown,
+      unlocked:        true,
+      alreadyUnlocked: false,
+      newBalance,
+    };
   },
 );
 

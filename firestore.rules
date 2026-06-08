@@ -56,6 +56,23 @@ service cloud.firestore {
       allow read: if (request.auth != null && request.auth.uid == resource.data.userId) || isAdmin();
       allow write: if false; // Protected. Modified only by Cloud Functions
     }
+    // Academic CV Studio docs. The PUBLIC doc holds preview-safe fields
+    // (preview Markdown, mode, status, credit cost). The FULL Markdown
+    // lives in a /full/payload subdoc that's blocked from client reads
+    // entirely — the only path to fullMarkdown is the unlock callable
+    // which deducts credits atomically. Without this split, the
+    // paywall would be trivially bypassable via the Firestore SDK
+    // (a user could just fetch the doc and read fullMarkdown directly,
+    // never paying).
+    match /academicCvDocuments/{docId} {
+      allow read: if (request.auth != null && request.auth.uid == resource.data.userId) || isAdmin();
+      allow write: if false;
+
+      match /full/{full} {
+        // Server-only. fullMarkdown lives here; client reads forbidden.
+        allow read, write: if false;
+      }
+    }
     match /aiRuns/{aiRunId} {
       allow read: if (request.auth != null && request.auth.uid == resource.data.userId) || isAdmin();
       allow write: if false; // Protected. Written only by Cloud Functions via Admin SDK
