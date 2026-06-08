@@ -544,7 +544,7 @@ export function getProfileImprovementAdvice(profile: StudentProfile): ProfileAdv
   if (profile.funding && profile.funding.toLowerCase().includes("full")) {
     advice.push({
       title: "High financial need",
-      body: "You indicated a need for a full scholarship. We recommend filtering for lower-cost public institutions and checking funding options directly with the colleges.",
+      body: "You indicated a need for full funding. We recommend filtering for lower-cost public institutions and checking funding options directly with the colleges.",
       actions: ["Check official funding options"]
     });
   }
@@ -814,7 +814,9 @@ export function getDeterministicMatches(
   let maxBudget = 50000;
   if (profile?.funding === "Self-Funded") maxBudget = 60000;
   if (profile?.funding === "Partial Scholarship") maxBudget = 25000;
-  if (profile?.funding === "Full Scholarship") maxBudget = 15000;
+  // Accept the legacy "Full Scholarship" label too so profiles created
+  // before the rename still hit the high-financial-need budget tier.
+  if (profile?.funding === "Full Funding" || profile?.funding === "Full Scholarship") maxBudget = 15000;
 
   const targetCountry = (profile?.destination || "us").toLowerCase();
   const isUndergrad = isUndergraduateApplicant(profile);

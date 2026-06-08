@@ -355,7 +355,7 @@ export default function GuestMatchWizard() {
             <div>
               {renderHeader("Funding")}
               <div className="space-y-3">
-                {["Full Scholarship", "Partial Scholarship", "Self-Funded"].map(f => (
+                {["Full Funding", "Partial Scholarship", "Self-Funded"].map(f => (
                   <button key={f} onClick={() => updateForm("funding", f)} className={`w-full text-left p-5 rounded-2xl border-2 transition-all font-bold ${formData.funding === f ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-slate-100 bg-white text-slate-600 hover:border-slate-200'}`}>
                     {f}
                   </button>

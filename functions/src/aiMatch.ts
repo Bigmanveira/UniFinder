@@ -76,7 +76,7 @@ EVALUATION CRITERIA (apply judgment, not a formula):
 - Academic fit: how the student's stats (GPA, test scores) compare to the school's typical admit. Be calibrated — at 3.6 GPA, MIT is reach, not target.
 - Programme strength for the student's stated field. Recognise programmes known for the field even if not "elite overall" (e.g. Iowa State for agriculture; Georgia Tech for engineering).
 - Selectivity vs applicant strength. Schools with admit rate ≤ 15% are reach for almost everyone; ≥ 60% is safety for a competent applicant.
-- Funding viability vs the student's funding situation (Full Scholarship / Partial / Self-Funded). For Self-Funded, weight cost more heavily.
+- Funding viability vs the student's funding situation (Full Funding / Partial Scholarship / Self-Funded). For Self-Funded, weight cost more heavily.
 - Geographic / institutional diversity in the picked set — avoid 10 schools that all look the same. Mix selectivity tiers within each bucket.
 - For doctoral candidates, weight research colleges heavily over teaching-focused schools.
 - For masters, weight programme depth and funding availability.
