@@ -164,7 +164,7 @@ export default function DashboardPage() {
           <DesktopNavItem icon={<Bookmark size={18} />} label="Saved Schools" active={activeTab === "saved"} onClick={() => setActiveTab("saved")} badge={savedSchools.length} />
           <DesktopNavItem icon={<Map size={18} />} label="Roadmap" active={false} onClick={() => navigate("/app/roadmap")} />
           <DesktopNavItem icon={<ShieldAlert size={18} />} label="Live interview practice" active={false} onClick={() => navigate("/app/visa-interview")} />
-          <DesktopNavItem icon={<FileText size={18} />} label="Academic CV Studio" active={false} onClick={() => navigate("/app/cv-studio")} />
+          <DesktopNavItem icon={<FileText size={18} />} label="Academic CV Studio" active={false} onClick={() => {}} badge="SOON" disabled />
           <DesktopNavItem icon={<Mic size={18} />} label="Interview history" active={activeTab === "interviews"} onClick={() => setActiveTab("interviews")} badge={interviewReports.length} />
           <DesktopNavItem icon={<Wallet size={18} />} label="Credits & Billing" active={activeTab === "billing"} onClick={() => setActiveTab("billing")} />
           <DesktopNavItem icon={<User size={18} />} label="Profile" active={activeTab === "profile"} onClick={() => setActiveTab("profile")} />
@@ -557,7 +557,7 @@ export default function DashboardPage() {
                 <DesktopNavItem icon={<Bookmark size={18} />}    label="Saved Schools"      active={activeTab === "saved"}   onClick={() => { setActiveTab("saved");   setMobileNavOpen(false); }} badge={savedSchools.length} />
                 <DesktopNavItem icon={<Map size={18} />}         label="Roadmap"            active={false} onClick={() => { navigate("/app/roadmap");        setMobileNavOpen(false); }} />
                 <DesktopNavItem icon={<ShieldAlert size={18} />} label="Live interview practice" active={false} onClick={() => { navigate("/app/visa-interview"); setMobileNavOpen(false); }} />
-                <DesktopNavItem icon={<FileText size={18} />}    label="Academic CV Studio"     active={false} onClick={() => { navigate("/app/cv-studio");      setMobileNavOpen(false); }} />
+                <DesktopNavItem icon={<FileText size={18} />}    label="Academic CV Studio"     active={false} onClick={() => {}} badge="SOON" disabled />
                 <DesktopNavItem icon={<Mic size={18} />}         label="Interview history"  active={activeTab === "interviews"} onClick={() => { setActiveTab("interviews"); setMobileNavOpen(false); }} badge={interviewReports.length} />
                 <DesktopNavItem icon={<Wallet size={18} />}      label="Credits & Billing"  active={activeTab === "billing"} onClick={() => { setActiveTab("billing"); setMobileNavOpen(false); }} />
                 <DesktopNavItem icon={<User size={18} />}        label="Profile"            active={activeTab === "profile"} onClick={() => { setActiveTab("profile"); setMobileNavOpen(false); }} />
@@ -1156,24 +1156,34 @@ function BillingTab({ credits, userId, isFounder }: { credits: number; userId: s
   );
 }
 
-function DesktopNavItem({ icon, label, active, onClick, badge }: { icon: React.ReactNode, label: string, active: boolean, onClick: () => void, badge?: string | number }) {
+function DesktopNavItem({ icon, label, active, onClick, badge, disabled }: { icon: React.ReactNode, label: string, active: boolean, onClick: () => void, badge?: string | number, disabled?: boolean }) {
   return (
-    <button 
-      onClick={onClick}
+    <button
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      aria-disabled={disabled}
       className={`w-full flex items-center justify-between px-4 py-3.5 rounded-[20px] font-bold text-sm transition-all ${
-        active 
-          ? 'bg-primary-50 text-primary-700 shadow-sm border border-primary-100/50' 
-          : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 border border-transparent'
+        disabled
+          ? 'text-slate-400 cursor-not-allowed border border-transparent'
+          : active
+            ? 'bg-primary-50 text-primary-700 shadow-sm border border-primary-100/50'
+            : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 border border-transparent'
       }`}
     >
       <div className="flex items-center gap-3">
-        <div className={`${active ? 'text-primary-600' : 'text-slate-400'}`}>
+        <div className={`${disabled ? 'text-slate-300' : active ? 'text-primary-600' : 'text-slate-400'}`}>
           {icon}
         </div>
         {label}
       </div>
       {badge !== undefined && (
-        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${active ? 'bg-primary-100 text-primary-700' : 'bg-slate-100 text-slate-500'}`}>
+        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+          disabled
+            ? 'bg-amber-50 text-amber-700 border border-amber-200'
+            : active
+              ? 'bg-primary-100 text-primary-700'
+              : 'bg-slate-100 text-slate-500'
+        }`}>
           {badge}
         </span>
       )}
