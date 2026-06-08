@@ -2206,17 +2206,35 @@ export const generateAcademicCvDocument = onCall(
     const founder = isFounderEmail(request.auth?.token?.email as string | undefined);
     const db = admin.firestore();
 
-    // Per-user, per-tool free-generation rate limit. Founder bypass for
-    // internal QA — they need to be able to spam-test the prompts.
+    // Wallet read drives both the rate-limit-exemption decision below
+    // AND the credit-cost UX on the response. We do it once here rather
+    // than inside the rate-limit branch so paying users skip the cap
+    // immediately on their first request.
+    const walletSnap = await db.collection("creditWallets").doc(uid).get();
+    const currentCredits: number = walletSnap.exists ? (walletSnap.data()?.credits ?? 0) : FREE_CREDITS_ON_SIGNUP;
+
+    // Free-preview rate limit. The cap exists to stop a brand-new
+    // free-tier user from farming Sonnet calls and never paying — NOT
+    // to throttle paying users. Three exemptions:
     //
-    // The query is wrapped in try/catch: if the composite index isn't yet
-    // built (FAILED_PRECONDITION returns code 9), we LOG and SKIP the
-    // rate-limit check rather than 500-ing the request. Skipping is the
-    // right failure mode here — losing the abuse cap temporarily is far
-    // less bad than blocking every legitimate user with an "internal
-    // error" while Firestore finishes building the index (which can take
-    // 5-30 minutes after deploy).
-    if (!founder) {
+    //   1. Founder accounts (internal QA).
+    //   2. Users who already own more credits than the signup grant —
+    //      they've paid before, so they're trusted.
+    //   3. Users with enough wallet balance right now to actually
+    //      unlock this generation. If they can afford the unlock, the
+    //      preview attempt is a buy-intent signal, not abuse. A user
+    //      with 121 credits hitting the rate limit was the bug report
+    //      that drove this change.
+    //
+    // If the composite index hasn't finished building yet
+    // (FAILED_PRECONDITION, code 9) we LOG + SKIP rather than 500.
+    // Losing the cap temporarily is far less bad than blocking every
+    // legitimate user.
+    const requiredCostForUnlock = academicCvCreditCost(mode);
+    const isPayingUser   = currentCredits > FREE_CREDITS_ON_SIGNUP;
+    const canAffordUnlock = currentCredits >= requiredCostForUnlock;
+    const shouldRateLimit = !founder && !isPayingUser && !canAffordUnlock;
+    if (shouldRateLimit) {
       const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - 24 * 60 * 60 * 1000);
       try {
         const recent = await db.collection("academicCvDocuments")
@@ -2228,14 +2246,11 @@ export const generateAcademicCvDocument = onCall(
         if (recent.size >= ACADEMIC_CV_FREE_GENERATIONS_PER_DAY) {
           throw new HttpsError(
             "resource-exhausted",
-            "You've already used your free preview for this tool in the last 24 hours. Unlock one of your existing previews or come back tomorrow.",
+            "You've already used your free preview for this tool in the last 24 hours. Top up credits or come back tomorrow.",
             { reason: "academic_cv_rate_limited", mode },
           );
         }
       } catch (err: any) {
-        // Re-throw the deliberate rate-limit HttpsError; only swallow the
-        // index-missing case. Without this guard, an index-missing query
-        // would surface to the caller as a generic "internal" 500.
         if (err instanceof HttpsError) throw err;
         const code = err?.code;
         if (code === 9 || /requires an index|FAILED_PRECONDITION/i.test(String(err?.message ?? ""))) {

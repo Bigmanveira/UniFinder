@@ -4,6 +4,7 @@ import { useAcademicCv } from "../components/cv/useAcademicCv";
 import CvDocumentIntake from "../components/cv/CvDocumentIntake";
 import CvPreviewPaywall from "../components/cv/CvPreviewPaywall";
 import CvStudioFooter from "../components/cv/CvStudioFooter";
+import GenerationLoader from "../components/cv/GenerationLoader";
 
 export default function CvStudioReviewPage() {
   const cv = useAcademicCv("review");
@@ -41,7 +42,11 @@ export default function CvStudioReviewPage() {
       </div>
 
       <main className="relative max-w-3xl mx-auto px-5 py-8 w-full flex-1 space-y-8">
-        {!cv.document && (
+        {cv.generating && (
+          <GenerationLoader mode="review" />
+        )}
+
+        {!cv.document && !cv.generating && (
           <section className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8">
             <CvDocumentIntake
               busy={cv.generating}

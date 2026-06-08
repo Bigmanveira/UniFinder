@@ -20,6 +20,7 @@ import { ArrowLeft, Wrench, AlertTriangle, RotateCw, Plus, X, Loader2 } from "lu
 import { useAcademicCv } from "../components/cv/useAcademicCv";
 import CvPreviewPaywall from "../components/cv/CvPreviewPaywall";
 import CvStudioFooter from "../components/cv/CvStudioFooter";
+import GenerationLoader from "../components/cv/GenerationLoader";
 
 interface EduEntry        { institution: string; location: string; degree: string; dates: string; gpa: string; electives: string; }
 interface AchievementEntry{ title: string; date: string; }
@@ -106,7 +107,11 @@ export default function CvStudioBuildPage() {
       </div>
 
       <main className="relative max-w-3xl mx-auto px-5 py-8 w-full flex-1 space-y-8">
-        {!cv.document && (
+        {cv.generating && (
+          <GenerationLoader mode="build" />
+        )}
+
+        {!cv.document && !cv.generating && (
           <>
             <section className="space-y-7">
               {/* ── Contact ─────────────────────────────────────────── */}
