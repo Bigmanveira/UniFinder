@@ -109,38 +109,70 @@ const BUILD_PROMPT = `${STYLE_GUIDE}
 MODE: BUILDER
 The user has answered a structured intake. The input you will receive is a JSON object with these fields (any may be empty or null):
 {
-  "fullName":        string,
-  "email":           string,
-  "phone":           string,
-  "location":        string,           // City, State/Country
-  "websiteOrOrcid":  string,           // URL or ORCID
-  "researchInterests": string,         // free-text — used to seed Research Statement
-  "education":         [ { degree, field, institution, startYear, endYear, gpa, advisor, thesis } ],
-  "researchExperience":[ { role, lab, institution, startYear, endYear, description } ],
-  "publications":      [ { type, citation } ],        // type: "journal" | "conference" | "workshop" | "preprint" | "book_chapter"
-  "presentations":     [ { title, venue, year, type } ],  // type: "talk" | "poster" | "invited"
-  "teaching":          [ { course, institution, role, term } ],   // role: "instructor" | "TA"
-  "awards":            [ { name, year, amount } ],
-  "service":           [ { role, organization, year } ],
-  "skills":            string                            // free-text
+  "fullName":     string,
+  "address":      string,
+  "email":        string,
+  "phone":        string,
+  "website":      string,
+  "objective":    string,           // 1-3 sentence professional objective
+  "education":    [ { institution, location, degree, dates, gpa, electives } ],
+  "achievements": [ { title, date } ],
+  "workExperience": [ { organization, location, role, dates, bullets: string[] } ],
+  "keySkills":    string,           // free-text, one item per line OR comma-separated
+  "leadership":   [ { organization, location, role, dates, bullets: string[] } ]
 }
 
-Produce a complete academic CV in Markdown with these sections, in this order:
+Produce a polished CV in Markdown following THIS EXACT TEMPLATE. The user has provided a specific format — match it precisely. Do NOT invent a different structure.
 
-1. **Header** — Name as an H1 (# Name). Then a single line with email · phone · location · website (separators: " · "). No "Curriculum Vitae" title.
-2. **## Research Statement** — A 60–80 word paragraph derived from researchInterests + the strongest items in researchExperience + publications. Use the candidate's voice, not third person. Reference at least one specific project / paper / method by name. Skip this section ENTIRELY if researchInterests is empty.
-3. **## Education** — List in reverse chronological order. Format: "**Degree** in Field, Institution, Year–Year." Then a sub-bullet for GPA, advisor, thesis if any are present.
-4. **## Research Experience** — Reverse chronological. Format: "**Role**, Lab name, Institution, Year–Year." Then 1–3 bullet points describing the work (use the description field as a base — TRIM filler, do NOT pad).
-5. **## Publications** — Group by type (Journal, Conference, Workshop, Preprint, Book Chapter). Within a group, reverse chronological. Format the citation cleanly using the citation field as-is, but standardize: authors, year in parens, "Title", Journal, vol(issue), pages.
-6. **## Presentations** — Mix invited talks, contributed talks, posters. Format: Title. Venue, Year. (poster|invited).
-7. **## Teaching** — Reverse chronological. Format: "Course code/name, role, Institution, term." One line per entry.
-8. **## Awards & Honors** — Reverse chronological. Format: "Award name, year. (amount, if any)."
-9. **## Service** — Reverse chronological. Format: "Role, Organization, year."
-10. **## Skills** — One line, comma-separated. Group programming / methods / languages / lab techniques as appropriate from the free-text skills field.
+# {fullName}
+{address} | {email} | {phone} | {website}
 
-If a section's input array is empty, OMIT that section entirely (do not write "(none)"). Exception: Education must always render even if empty (write "— (please add)") because a CV without it makes no sense.
+## OBJECTIVE
+{objective rewritten cleanly — keep their voice, just tighten the prose. Skip this whole section if objective is empty.}
 
-Open immediately with "# {fullName}". No preamble.`;
+## EDUCATION
+For each education entry, in REVERSE CHRONOLOGICAL ORDER:
+**{institution}**, {location}
+*{degree}* — {dates}
+{One line listing GPA / electives / honours that were provided. Skip the line if neither is filled.}
+
+(blank line between entries)
+
+## ACHIEVEMENTS/AWARDS
+- {title} — {date}
+(One bullet per achievement. Reverse chronological. Skip the section entirely if the array is empty.)
+
+## WORK EXPERIENCE
+For each work entry, in REVERSE CHRONOLOGICAL ORDER:
+**{organization}**, {location}
+*{role}* — {dates}
+- {bullet 1}
+- {bullet 2}
+- {bullet 3}
+
+(blank line between entries. Skip the section entirely if the array is empty.)
+
+## KEY SKILLS
+- {skills rendered as a bullet list — one per line. Group naturally (e.g. "Computer skills: ...", "Languages: ..."). Skip the section if keySkills is empty.}
+
+## LEADERSHIP
+For each leadership entry, in REVERSE CHRONOLOGICAL ORDER:
+**{organization}**, {location}
+*{role}* — {dates}
+- {bullet 1}
+- {bullet 2}
+
+(Skip the section entirely if the array is empty.)
+
+RULES — non-negotiable:
+- Section headers are EXACTLY: OBJECTIVE, EDUCATION, ACHIEVEMENTS/AWARDS, WORK EXPERIENCE, KEY SKILLS, LEADERSHIP. Use those exact words in ALL CAPS as H2 headings.
+- Section order is the order above. Do NOT add Publications, Presentations, Teaching, Service, or any other section even if the user has facts that would fit there — the template doesn't include them. (If they want a research-heavy CV, they should use Review & Revamp instead.)
+- Preserve every fact the user supplied. Do NOT invent dates, locations, GPAs, honours, or bullets.
+- Bullets are SHORT, factual, past tense for past roles / present tense for current ones. Don't pad. Don't apply the corporate "Action verb + object + impact" template.
+- If a field within an entry is empty, OMIT that part rather than printing "(N/A)" or similar.
+- No "Curriculum Vitae" title, no preamble, no closing.
+
+Open immediately with "# {fullName}". The contact line is a single horizontal line separated by " | " (space-pipe-space).`;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Converter. Takes a "professional" CV (industry / corporate format) and

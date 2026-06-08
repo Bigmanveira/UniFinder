@@ -4,11 +4,12 @@
 // Markdown lib (react-markdown is ~30KB gzipped) because the format is
 // known and narrow:
 //
-//   # H1               — candidate name
-//   ## H2              — section headers
+//   # H1               — candidate name (renders centred, uppercase)
+//   {contact line}     — first paragraph after H1 (renders centred, slate)
+//   ## H2              — section headers (centred ALL CAPS, hairline rule)
 //   ### H3             — sub-section headers (rare; reviewer mode)
-//   **bold**           — degree names, role titles
-//   *italics*          — venue names
+//   **bold**           — institution names, role titles
+//   *italic*           — degrees, dates
 //   - list item        — bullets within sections
 //   plain paragraph    — research statement, prose
 //
@@ -52,22 +53,47 @@ export default function CvMarkdown({ markdown, className }: { markdown: string; 
 
   let i = 0;
   let key = 0;
+  let lastWasH1 = false;        // → next paragraph is the contact line; centre it.
+
   while (i < lines.length) {
     const line = lines[i];
     if (!line.trim()) { i++; continue; }
 
     if (line.startsWith("# ")) {
-      blocks.push(<h1 key={key++} className="text-3xl font-black tracking-tight text-slate-900 mb-1">{renderInline(line.slice(2))}</h1>);
+      // Candidate name. Centred, uppercase, large — matches the standard
+      // template the Builder follows. Reviewer / Converter outputs
+      // tolerate centred names too (it's how most CVs print).
+      blocks.push(
+        <h1
+          key={key++}
+          className="text-3xl sm:text-4xl font-black tracking-[0.05em] text-slate-900 uppercase text-center mb-2"
+        >
+          {renderInline(line.slice(2))}
+        </h1>,
+      );
+      lastWasH1 = true;
       i++;
     } else if (line.startsWith("## ")) {
+      // Centred section headers with a hairline rule beneath — matches
+      // the visual style of the Word-template the Builder follows
+      // (centred ALL-CAPS title, thin separator line).
       blocks.push(
-        <h2 key={key++} className="text-base font-black tracking-wider text-slate-900 uppercase mt-6 mb-2 pb-1 border-b border-slate-200">
+        <h2
+          key={key++}
+          className="text-[15px] font-black tracking-[0.18em] text-slate-900 uppercase mt-8 mb-3 pb-2 text-center border-b border-slate-300"
+        >
           {renderInline(line.slice(3))}
         </h2>,
       );
+      lastWasH1 = false;
       i++;
     } else if (line.startsWith("### ")) {
-      blocks.push(<h3 key={key++} className="text-sm font-black text-slate-900 mt-4 mb-1.5">{renderInline(line.slice(4))}</h3>);
+      blocks.push(
+        <h3 key={key++} className="text-sm font-black text-slate-900 mt-4 mb-1.5">
+          {renderInline(line.slice(4))}
+        </h3>,
+      );
+      lastWasH1 = false;
       i++;
     } else if (line.startsWith("- ") || line.startsWith("* ")) {
       // Collect contiguous list items
@@ -78,9 +104,14 @@ export default function CvMarkdown({ markdown, className }: { markdown: string; 
       }
       blocks.push(
         <ul key={key++} className="list-disc pl-5 space-y-1 my-2">
-          {items.map((item, idx) => <li key={idx} className="text-[14px] text-slate-700 leading-relaxed">{renderInline(item)}</li>)}
+          {items.map((item, idx) => (
+            <li key={idx} className="text-[14px] text-slate-700 leading-relaxed">
+              {renderInline(item)}
+            </li>
+          ))}
         </ul>,
       );
+      lastWasH1 = false;
     } else {
       // Paragraph — accumulate consecutive non-blank, non-special lines
       // into one paragraph so soft-wrapped prose renders as one block.
@@ -90,9 +121,20 @@ export default function CvMarkdown({ markdown, className }: { markdown: string; 
         para.push(lines[i]);
         i++;
       }
+      const isContactLine = lastWasH1;
       blocks.push(
-        <p key={key++} className="text-[14px] text-slate-700 leading-relaxed my-2">{renderInline(para.join(" "))}</p>,
+        <p
+          key={key++}
+          className={
+            isContactLine
+              ? "text-[13px] text-slate-600 leading-relaxed text-center mb-6"
+              : "text-[14px] text-slate-700 leading-relaxed my-2"
+          }
+        >
+          {renderInline(para.join(" "))}
+        </p>,
       );
+      lastWasH1 = false;
     }
   }
 
