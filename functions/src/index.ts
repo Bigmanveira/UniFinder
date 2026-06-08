@@ -2208,23 +2208,41 @@ export const generateAcademicCvDocument = onCall(
 
     // Per-user, per-tool free-generation rate limit. Founder bypass for
     // internal QA — they need to be able to spam-test the prompts.
+    //
+    // The query is wrapped in try/catch: if the composite index isn't yet
+    // built (FAILED_PRECONDITION returns code 9), we LOG and SKIP the
+    // rate-limit check rather than 500-ing the request. Skipping is the
+    // right failure mode here — losing the abuse cap temporarily is far
+    // less bad than blocking every legitimate user with an "internal
+    // error" while Firestore finishes building the index (which can take
+    // 5-30 minutes after deploy).
     if (!founder) {
       const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - 24 * 60 * 60 * 1000);
-      const recent = await db.collection("academicCvDocuments")
-        .where("userId", "==", uid)
-        .where("mode",   "==", mode)
-        .where("createdAt", ">", cutoff)
-        .limit(ACADEMIC_CV_FREE_GENERATIONS_PER_DAY)
-        .get();
-      if (recent.size >= ACADEMIC_CV_FREE_GENERATIONS_PER_DAY) {
-        // The user can still UNLOCK any of those recent docs by paying
-        // credits — the rate limit only stops them from generating a
-        // brand-new free preview. Surface that distinction in the message.
-        throw new HttpsError(
-          "resource-exhausted",
-          "You've already used your free preview for this tool in the last 24 hours. Unlock one of your existing previews or come back tomorrow.",
-          { reason: "academic_cv_rate_limited", mode },
-        );
+      try {
+        const recent = await db.collection("academicCvDocuments")
+          .where("userId", "==", uid)
+          .where("mode",   "==", mode)
+          .where("createdAt", ">", cutoff)
+          .limit(ACADEMIC_CV_FREE_GENERATIONS_PER_DAY)
+          .get();
+        if (recent.size >= ACADEMIC_CV_FREE_GENERATIONS_PER_DAY) {
+          throw new HttpsError(
+            "resource-exhausted",
+            "You've already used your free preview for this tool in the last 24 hours. Unlock one of your existing previews or come back tomorrow.",
+            { reason: "academic_cv_rate_limited", mode },
+          );
+        }
+      } catch (err: any) {
+        // Re-throw the deliberate rate-limit HttpsError; only swallow the
+        // index-missing case. Without this guard, an index-missing query
+        // would surface to the caller as a generic "internal" 500.
+        if (err instanceof HttpsError) throw err;
+        const code = err?.code;
+        if (code === 9 || /requires an index|FAILED_PRECONDITION/i.test(String(err?.message ?? ""))) {
+          console.warn("[academic-cv] rate-limit index missing — skipping cap until index builds", { mode, message: err?.message });
+        } else {
+          throw err;
+        }
       }
     }
 

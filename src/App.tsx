@@ -25,10 +25,12 @@ const FullReportPage     = lazy(() => import("./pages/FullReportPage"));
 const RoadmapPage        = lazy(() => import("./pages/RoadmapPage"));
 const VisaInterviewPage  = lazy(() => import("./pages/VisaInterviewPage"));
 const InterviewReportDetailPage = lazy(() => import("./pages/InterviewReportDetailPage"));
-const CvStudioPage        = lazy(() => import("./pages/CvStudioPage"));
-const CvStudioReviewPage  = lazy(() => import("./pages/CvStudioReviewPage"));
-const CvStudioBuildPage   = lazy(() => import("./pages/CvStudioBuildPage"));
-const CvStudioConvertPage = lazy(() => import("./pages/CvStudioConvertPage"));
+const CvStudioPage         = lazy(() => import("./pages/CvStudioPage"));
+const CvStudioReviewPage   = lazy(() => import("./pages/CvStudioReviewPage"));
+const CvStudioBuildPage    = lazy(() => import("./pages/CvStudioBuildPage"));
+const CvStudioConvertPage  = lazy(() => import("./pages/CvStudioConvertPage"));
+const CvStudioHistoryPage  = lazy(() => import("./pages/CvStudioHistoryPage"));
+const CvDocumentDetailPage = lazy(() => import("./pages/CvDocumentDetailPage"));
 const PrivacyPage        = lazy(() => import("./pages/PrivacyPage"));
 const TermsPage          = lazy(() => import("./pages/TermsPage"));
 const ContactPage        = lazy(() => import("./pages/ContactPage"));
@@ -130,10 +132,12 @@ function App() {
                 <Route path="/app/roadmap" element={<RoadmapPage />} />
                 <Route path="/app/visa-interview" element={<VisaInterviewPage />} />
                 <Route path="/app/interview-reports/:reportId" element={<InterviewReportDetailPage />} />
-                <Route path="/app/cv-studio"          element={<CvStudioPage />} />
-                <Route path="/app/cv-studio/review"   element={<CvStudioReviewPage />} />
-                <Route path="/app/cv-studio/build"    element={<CvStudioBuildPage />} />
-                <Route path="/app/cv-studio/convert"  element={<CvStudioConvertPage />} />
+                <Route path="/app/cv-studio"                    element={<CvStudioPage />} />
+                <Route path="/app/cv-studio/review"             element={<CvStudioReviewPage />} />
+                <Route path="/app/cv-studio/build"              element={<CvStudioBuildPage />} />
+                <Route path="/app/cv-studio/convert"            element={<CvStudioConvertPage />} />
+                <Route path="/app/cv-studio/history"            element={<CvStudioHistoryPage />} />
+                <Route path="/app/cv-studio/document/:documentId" element={<CvDocumentDetailPage />} />
               </Route>
             </Route>
           </Routes>

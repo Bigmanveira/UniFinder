@@ -38,6 +38,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import Anthropic from "@anthropic-ai/sdk";
+import mammoth from "mammoth";
 
 const MODEL = "claude-sonnet-4-5";
 
@@ -315,14 +316,53 @@ export interface CvExtractionResult {
   errorMessage?: string;
 }
 
+// MIME types we accept for CV upload. Three extraction paths:
+//   - PDF + images: Claude vision (handles scanned + native digital both)
+//   - .docx (modern Word): mammoth.extractRawText (zero AI cost, fast,
+//     and lossless for text content — Word docs are zipped XML so we
+//     don't need OCR)
+//   - .doc (legacy binary Word): NOT supported; mammoth refuses. The
+//     extractor returns a clear error and the frontend nudges the user
+//     to re-save as .docx or paste the text.
+const DOCX_MEDIA = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+const LEGACY_DOC_MEDIA = "application/msword";
+
 export async function extractCvText(args: {
   apiKey:    string;
   /** Base64-encoded file data, no `data:` prefix. */
   fileBase64: string;
-  /** MIME type — application/pdf, image/jpeg, image/png, image/webp. */
+  /** MIME type — application/pdf, image/*, .docx. */
   mediaType:  string;
 }): Promise<CvExtractionResult> {
   const { apiKey, fileBase64, mediaType } = args;
+
+  // Word .docx path — handled locally by mammoth. No AI call needed, so
+  // we skip the apiKey check for this branch.
+  if (mediaType === DOCX_MEDIA) {
+    try {
+      const buffer = Buffer.from(fileBase64, "base64");
+      const result = await mammoth.extractRawText({ buffer });
+      const text = (result.value ?? "").trim();
+      if (!text) {
+        return { text: "", status: "failed", errorMessage: "Word document had no readable text." };
+      }
+      return { text, status: "completed" };
+    } catch (err: any) {
+      console.error("[academicCv] mammoth (.docx) error:", err?.message);
+      return { text: "", status: "failed", errorMessage: err?.message ?? "Could not read Word document." };
+    }
+  }
+
+  // Friendly nudge for the legacy .doc binary format — mammoth refuses
+  // it and Claude vision doesn't handle Word at all.
+  if (mediaType === LEGACY_DOC_MEDIA) {
+    return {
+      text: "",
+      status: "failed",
+      errorMessage: "Older .doc files aren't supported. Open in Word, save as .docx (or PDF), then try again.",
+    };
+  }
+
   if (!apiKey) {
     return { text: "", status: "failed", errorMessage: "Missing API key." };
   }
@@ -333,7 +373,7 @@ export async function extractCvText(args: {
     "image/jpeg", "image/png", "image/webp", "image/gif",
   ]);
   if (!SUPPORTED.has(mediaType)) {
-    return { text: "", status: "failed", errorMessage: `Unsupported file type: ${mediaType}` };
+    return { text: "", status: "failed", errorMessage: `Unsupported file type: ${mediaType}. Use PDF, .docx, or an image.` };
   }
 
   try {

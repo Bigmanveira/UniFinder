@@ -1,21 +1,32 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// CvDocumentIntake — the PDF-upload-OR-paste-text input used by the Reviewer
-// and Converter flows. (Builder uses a structured form instead, so it has
-// its own intake.)
+// CvDocumentIntake — PDF / Word / image upload OR paste-text. Used by the
+// Reviewer + Converter flows (Builder uses a structured form instead).
 //
-// File handling: we read the PDF as a base64 string in the browser and ship
-// it to the backend's generateAcademicCvDocument callable. The backend's
-// extractCvText() runs Claude vision over the PDF to produce raw text,
-// which then feeds the generator. Browser-side OCR was considered + ruled
-// out — pdfjs is heavy (~400KB), scanned-PDF support is shaky, and we
-// already have Claude vision capacity warm.
+// File handling:
+//   - PDFs + images → Claude vision (server side)
+//   - .docx          → mammoth.extractRawText (server side; no AI cost)
+//   - .doc (legacy)  → refused with a clear "save as .docx" message
+//
+// We read the file as base64 in the browser and ship to the
+// generateAcademicCvDocument callable, which calls extractCvText().
+// Browser-side PDF.js was considered and ruled out (heavy, scanned-PDF
+// support is shaky, and Claude vision capacity is already warm).
+//
+// Drag-and-drop: the upload zone accepts dropped files in addition to
+// click-to-pick. dragenter / dragleave / dragover / drop all wired,
+// with a `dragOver` state to highlight the drop target.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useRef, useState } from "react";
 import { FileUp, Loader2, AlertTriangle, X, Type, FileText } from "lucide-react";
 
 const MAX_FILE_MB = 10;
-const ACCEPT_TYPES = "application/pdf,image/jpeg,image/png,image/webp";
+const ACCEPT_TYPES =
+  "application/pdf," +
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document," +
+  "application/msword," +
+  "image/jpeg,image/png,image/webp";
+const ACCEPT_HUMAN = "PDF, Word (.docx), JPG, PNG, or WebP";
 
 type Mode = "upload" | "paste";
 
@@ -34,6 +45,7 @@ export default function CvDocumentIntake({
   const [pasteText, setPasteText] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = (f: File | null) => {
@@ -44,7 +56,38 @@ export default function CvDocumentIntake({
       setFile(null);
       return;
     }
+    // Belt-and-braces type check. Browsers occasionally report a generic
+    // `application/octet-stream` for files dragged off the desktop; we
+    // fall back to extension matching so a legitimate .docx still works.
+    const looksOK =
+      ["application/pdf",
+       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+       "application/msword",
+       "image/jpeg", "image/png", "image/webp"].includes(f.type) ||
+      /\.(pdf|docx|doc|jpe?g|png|webp)$/i.test(f.name);
+    if (!looksOK) {
+      setError(`Unsupported file type. Use ${ACCEPT_HUMAN}.`);
+      return;
+    }
     setFile(f);
+  };
+
+  const onDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!dragOver) setDragOver(true);
+  };
+  const onDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+  };
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOver(false);
+    const dropped = e.dataTransfer?.files?.[0];
+    if (dropped) handleFile(dropped);
   };
 
   const handleSubmit = async () => {
@@ -59,12 +102,11 @@ export default function CvDocumentIntake({
       return;
     }
     if (!file) {
-      setError("Pick a PDF or image of your CV, or switch to paste-text.");
+      setError("Pick a PDF, Word doc, or image — or drag one onto the dashed area. You can also switch to paste-text.");
       return;
     }
     try {
       // FileReader → DataURL → strip the `data:...;base64,` prefix.
-      // Spread the work into a Promise so the spinner state is live.
       const base64 = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload  = () => {
@@ -76,7 +118,19 @@ export default function CvDocumentIntake({
         reader.onerror = () => reject(new Error("Could not read file"));
         reader.readAsDataURL(file);
       });
-      onSubmit({ fileBase64: base64, fileMediaType: file.type || "application/pdf" });
+      // Some browsers report empty / octet-stream — pick the right MIME
+      // from the file extension so the server-side extractor branches
+      // correctly. mammoth needs the precise docx media type.
+      let mediaType = file.type;
+      if (!mediaType || mediaType === "application/octet-stream") {
+        if (/\.docx$/i.test(file.name)) mediaType = "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        else if (/\.doc$/i.test(file.name)) mediaType = "application/msword";
+        else if (/\.pdf$/i.test(file.name)) mediaType = "application/pdf";
+        else if (/\.jpe?g$/i.test(file.name)) mediaType = "image/jpeg";
+        else if (/\.png$/i.test(file.name))   mediaType = "image/png";
+        else if (/\.webp$/i.test(file.name))  mediaType = "image/webp";
+      }
+      onSubmit({ fileBase64: base64, fileMediaType: mediaType });
     } catch (err: any) {
       setError(err?.message ?? "Could not read the file. Try paste-text instead.");
     }
@@ -120,13 +174,26 @@ export default function CvDocumentIntake({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="w-full border-2 border-dashed border-slate-300 hover:border-slate-400 hover:bg-slate-50 rounded-3xl px-6 py-10 text-center transition-colors"
+              onDragEnter={onDragOver}
+              onDragOver={onDragOver}
+              onDragLeave={onDragLeave}
+              onDrop={onDrop}
+              className={`w-full border-2 border-dashed rounded-3xl px-6 py-10 text-center transition-all ${
+                dragOver
+                  ? "border-blue-500 bg-blue-50/60 ring-2 ring-blue-100 scale-[1.005]"
+                  : "border-slate-300 hover:border-slate-400 hover:bg-slate-50"
+              }`}
             >
-              <div className="w-12 h-12 mx-auto rounded-2xl bg-slate-100 text-slate-600 flex items-center justify-center mb-3">
-                <FileUp size={20} />
+              <div className={`w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-3 transition-colors ${
+                dragOver ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600"
+              }`}>
+                <FileUp size={22} />
               </div>
-              <p className="text-sm font-bold text-slate-900 mb-1">Click to pick a CV file</p>
-              <p className="text-xs text-slate-500">PDF, JPG, PNG, or WebP. Max {MAX_FILE_MB}MB.</p>
+              <p className="text-sm font-bold text-slate-900 mb-1">
+                {dragOver ? "Drop your file here" : "Drag and drop your CV here"}
+              </p>
+              <p className="text-xs text-slate-500 mb-2">or click to pick a file</p>
+              <p className="text-[11px] text-slate-400">{ACCEPT_HUMAN} · Max {MAX_FILE_MB}MB</p>
             </button>
           ) : (
             <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3">
