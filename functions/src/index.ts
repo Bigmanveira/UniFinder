@@ -1207,12 +1207,18 @@ async function loadLatestDocument(args: {
 }
 
 /**
- * Milliseconds since the interview proper started (i.e. since the first
- * randomized question fired). Returns 0 if the session is still in the
- * documents phase. Backed by `session.interviewStartedAt`.
+ * Milliseconds since the interview proper started. Primary signal is
+ * `session.interviewStartedAt` (set in the doc handler when the user
+ * transitions out of the documents phase). Falls back to `session.startedAt`
+ * (set on session creation) when interviewStartedAt is missing — that
+ * happens whenever Claude's stage transition skips "introduction" and
+ * jumps straight to e.g. "study_plan", which the previous narrow set
+ * condition didn't catch. Without this fallback, elapsedSinceInterviewStart
+ * could return 0 forever and the preview's 3-minute cap would never fire,
+ * letting a 2-credit user run the full 5-minute Claude budget.
  */
 function elapsedSinceInterviewStart(session: any): number {
-  const ts = session?.interviewStartedAt;
+  const ts = session?.interviewStartedAt ?? session?.startedAt ?? session?.createdAt;
   if (!ts) return 0;
   // Firestore Timestamp has toMillis(); also accept raw numbers / Dates.
   if (typeof ts.toMillis === "function") return Date.now() - ts.toMillis();
@@ -1938,10 +1944,13 @@ export const recordVisaInterviewDocument = onCall(
     if (questionCountIncrement) {
       updates.questionCount = admin.firestore.FieldValue.increment(questionCountIncrement);
     }
-    // Stamp the start time when transitioning into the interview proper
-    // (the random first question fires here). Used downstream to enforce
-    // the 5-minute cap.
-    if (isInitialDoc && isInIntroPhase && nextStage === "introduction" && !session.interviewStartedAt) {
+    // Stamp the start time when transitioning out of the documents phase
+    // into the interview proper. Used downstream to enforce the duration
+    // cap. Previous condition required nextStage === "introduction" which
+    // missed the case where Claude jumps straight to "study_plan" or
+    // similar — leaving interviewStartedAt unset and the cap dormant.
+    // Any non-documents stage marks the start of the interview proper.
+    if (isInitialDoc && isInIntroPhase && nextStage !== "documents" && !session.interviewStartedAt) {
       updates.interviewStartedAt = now;
     }
     if (nextRequiresUpload === "i20")             updates["documentsRequested.i20"]   = true;

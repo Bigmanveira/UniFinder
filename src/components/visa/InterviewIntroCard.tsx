@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ShieldAlert, ArrowRight, Loader2, Sparkles, Check, Video, Mic, AlertTriangle, RotateCw, HeartPulse } from "lucide-react";
+import { ShieldAlert, ArrowRight, Loader2, Sparkles, Check, Video, Mic, AlertTriangle, RotateCw } from "lucide-react";
 
 const DISCLAIMER =
   "This is a simulated F-1 visa interview for practice only. It is not legal advice, " +
@@ -156,20 +156,6 @@ export default function InterviewIntroCard({
           </p>
         </div>
       </button>
-
-      {/* Persecution-topic disclosure — non-blocking notice that warns the
-          user that the AI will ask the two new safety questions consulars
-          now put to every applicant. Better the user reads this here than
-          gets ambushed mid-interview. */}
-      <div className="bg-slate-100 border border-slate-200 rounded-2xl px-4 py-3.5 text-[12.5px] text-slate-700 leading-relaxed flex items-start gap-2.5">
-        <HeartPulse size={15} className="mt-0.5 text-slate-500 flex-shrink-0" />
-        <div>
-          <p className="font-bold text-slate-900 mb-0.5">A note on the safety questions</p>
-          <p>
-            U.S. consular officers now ask every applicant two questions about whether you've experienced or fear harm in your home country. Anna will ask these too — answer naturally. This is a practice space, not an adjudication.
-          </p>
-        </div>
-      </div>
 
       {/* Disclaimer */}
       <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3.5 text-[12.5px] text-amber-900 leading-relaxed flex items-start gap-2.5">

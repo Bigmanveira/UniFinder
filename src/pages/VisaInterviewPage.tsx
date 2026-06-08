@@ -476,6 +476,28 @@ export default function VisaInterviewPage() {
           onMicRetry={handleMicRetry}
           onEnd={endInterview}
         />
+
+        {/* Preview / cooldown / capacity modals MUST render in this branch
+            too — the previous build only rendered them in the intro/report
+            JSX block, so when a preview session ended (or the user clicked
+            End mid-interview), endInterview's setPreviewEndOpen(true) fired
+            but no modal was in the tree to receive it. Result: the user
+            was stuck on a frozen-feeling interview screen. Both modals
+            are fixed-position overlays so they sit above FullScreenInterview's
+            z-40 backdrop. */}
+        <PreviewEndModal
+          open={previewEndOpen}
+          onClose={() => { setPreviewEndOpen(false); navigate("/app"); }}
+        />
+        <PreviewCooldownModal
+          open={previewCooldownOpen}
+          onClose={() => { setPreviewCooldownOpen(false); navigate("/app"); }}
+        />
+        <AtCapacityModal
+          open={atCapacityOpen}
+          onClose={() => setAtCapacityOpen(false)}
+        />
+
         {/* Document upload modal sits at the page level so it overlays the
             full-screen interview without any z-index gymnastics. */}
         {user && pendingUpload && (
