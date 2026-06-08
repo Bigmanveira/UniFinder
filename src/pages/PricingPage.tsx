@@ -309,12 +309,12 @@ export default function PricingPage() {
             <CreditSpend
               cost="1 credit"
               title="Unlock a match report"
-              body="Generates your full AI shortlist + roadmap. Target schools are visible right away."
+              body="Generates your full AI shortlist + roadmap. Reach schools are visible right away."
             />
             <CreditSpend
               cost="5 credits"
               title="Reveal a category"
-              body="Unlocks Reach or Safety schools inside an existing report. Optional — only if you want the wider list."
+              body="Unlocks Target or Safety schools inside an existing report. Optional — only if you want the wider list."
             />
             <CreditSpend
               cost="15 credits"

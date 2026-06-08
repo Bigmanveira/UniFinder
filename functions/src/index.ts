@@ -1015,13 +1015,14 @@ export const unlockMatchReport = onCall(
         bucketReach:          bucketed.reach,
         bucketTarget:         bucketed.target,
         bucketSafety:         bucketed.safety,
-        // Per-bucket reveal gating. Target opens by default after the
-        // initial 1-credit unlock (it's the most actionable cohort).
-        // Reach + Safety stay locked behind revealMatchReportBucket
+        // Per-bucket reveal gating. Reach opens by default after the
+        // initial 1-credit unlock — it's the aspirational cohort users
+        // are most curious about and the strongest hook to come back.
+        // Target + Safety stay locked behind revealMatchReportBucket
         // (5 credits each). Older reports (pre-feature) lack this
         // field — frontend treats missing as "all unlocked" so legacy
         // unlocks aren't retroactively re-gated.
-        unlockedBuckets:      { target: true, reach: false, safety: false },
+        unlockedBuckets:      { reach: true, target: false, safety: false },
         normalisedField,
         normalisedLevel,
         programGateEnforced:  canEnforceGate,
@@ -1240,9 +1241,9 @@ async function logAiRun(args: {
 }
 
 // ── revealMatchReportBucket ──────────────────────────────────────────────────
-// Pay-per-reveal: after the initial 1-credit unlock opens the Target
+// Pay-per-reveal: after the initial 1-credit unlock opens the Reach
 // bucket, users spend REVEAL_BUCKET_CREDIT_COST (5) per additional
-// bucket (Reach or Safety). Atomic transaction so a parallel spend
+// bucket (Target or Safety). Atomic transaction so a parallel spend
 // can't race the wallet out of order.
 //
 // Idempotency: if the requested bucket is already unlocked on this
@@ -1262,15 +1263,15 @@ export const revealMatchReportBucket = onCall(
     if (!uid) throw new HttpsError("unauthenticated", "Sign in to reveal more schools.");
 
     const reportId = String(request.data?.reportId ?? "").trim();
-    const bucket   = String(request.data?.bucket ?? "").trim() as "reach" | "safety";
+    const bucket   = String(request.data?.bucket ?? "").trim() as "target" | "safety";
     if (!reportId) {
       throw new HttpsError("invalid-argument", "Missing reportId.");
     }
-    if (bucket !== "reach" && bucket !== "safety") {
-      // Target is free with the initial unlock; we don't accept it
+    if (bucket !== "target" && bucket !== "safety") {
+      // Reach is free with the initial unlock; we don't accept it
       // as an explicit reveal target. Front-end won't surface a
-      // "Reveal Target" button — this is the backstop.
-      throw new HttpsError("invalid-argument", "Bucket must be 'reach' or 'safety'.");
+      // "Reveal Reach" button — this is the backstop.
+      throw new HttpsError("invalid-argument", "Bucket must be 'target' or 'safety'.");
     }
 
     const db        = admin.firestore();
