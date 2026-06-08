@@ -1,21 +1,36 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { ShieldAlert, ArrowRight, Loader2, Sparkles, Check, Video, Mic, AlertTriangle } from "lucide-react";
+import { ShieldAlert, ArrowRight, Loader2, Sparkles, Check, Video, Mic, AlertTriangle, RotateCw, HeartPulse } from "lucide-react";
 
 const DISCLAIMER =
   "This is a simulated F-1 visa interview for practice only. It is not legal advice, " +
   "not an official U.S. government service, and does not guarantee visa approval. " +
   "Final decisions are made by U.S. consular officers.";
 
+const VISA_INTERVIEW_PAID_COST = 15;
+
 export default function InterviewIntroCard({
-  onStart, starting, speechSupported,
+  onStart, starting, speechSupported, walletCredits, isFounder,
 }: {
-  onStart: (accepted: boolean) => Promise<void>;
+  onStart: (accepted: boolean, isReturningApplicant: boolean) => Promise<void>;
   starting: boolean;
   speechSupported: boolean;
+  /** Live wallet balance — drives the CTA copy (free preview vs paid).
+   *  null = still loading; treat as "unknown, default to paid copy". */
+  walletCredits: number | null;
+  isFounder: boolean;
 }) {
   const [accepted, setAccepted] = useState(false);
+  const [isReturningApplicant, setIsReturningApplicant] = useState(false);
   const canStart = accepted && !starting && speechSupported;
+
+  // Mode the user is about to land in. Founders always paid. Anyone else
+  // with < 15 credits gets the free 3-min preview. The backend re-derives
+  // this from the wallet at start time — this client-side decision is
+  // just for the CTA copy. Mismatch is impossible: if the wallet drops
+  // between this render and the start click, the backend will route to
+  // preview correctly regardless of what the button said.
+  const willBePreview = !isFounder && walletCredits !== null && walletCredits < VISA_INTERVIEW_PAID_COST;
 
   return (
     <motion.div
@@ -72,6 +87,22 @@ export default function InterviewIntroCard({
         </div>
       </div>
 
+      {/* Preview-mode banner — appears only when the user is going into a
+          free 3-minute preview because they don't have 15 credits yet.
+          Sets the expectation BEFORE they start so the cut-off at 3 minutes
+          isn't a surprise. */}
+      {willBePreview && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3.5 text-[13px] text-emerald-900 leading-relaxed flex items-start gap-2.5">
+          <Sparkles size={16} className="mt-0.5 text-emerald-700 flex-shrink-0" />
+          <div>
+            <p className="font-bold mb-0.5">Free 3-minute preview</p>
+            <p className="text-emerald-800">
+              You don't have enough credits for a full mock yet, so you're getting a free 3-minute taste of the live interview. Anna will close at the 3-minute mark; top up 15 credits to run a full mock and get your scored feedback report.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Setup checklist — only when supported */}
       {speechSupported ? (
         <div className="bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3.5 text-[13px] text-blue-900 leading-relaxed">
@@ -91,6 +122,54 @@ export default function InterviewIntroCard({
           </div>
         </div>
       )}
+
+      {/* Returning-applicant checkbox. When ticked, the AI is informed and
+          asks "What has changed since your last interview?" early in the
+          flow — same probe a real consular officer uses on repeat
+          applicants. Wrapped in a button for a single tap target. */}
+      <button
+        type="button"
+        onClick={() => setIsReturningApplicant((v) => !v)}
+        aria-pressed={isReturningApplicant}
+        className={[
+          "w-full text-left flex items-start gap-3 px-4 py-3.5 rounded-2xl border-2 transition-all cursor-pointer select-none",
+          isReturningApplicant
+            ? "bg-amber-50 border-amber-500 ring-1 ring-amber-200"
+            : "bg-white border-slate-200 hover:border-slate-300",
+        ].join(" ")}
+      >
+        <span
+          className={[
+            "w-5 h-5 rounded-md flex-shrink-0 mt-0.5 flex items-center justify-center transition-colors border-2",
+            isReturningApplicant ? "bg-amber-500 border-amber-500 text-white" : "bg-white border-slate-300",
+          ].join(" ")}
+          aria-hidden
+        >
+          {isReturningApplicant && <Check size={12} className="stroke-[3]" />}
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className="text-[13.5px] font-bold text-slate-900 mb-0.5 inline-flex items-center gap-1.5">
+            <RotateCw size={13} className="text-amber-600" /> I'm a returning applicant
+          </p>
+          <p className="text-[12.5px] text-slate-600 leading-relaxed">
+            I've applied for an F-1 visa before and was denied or had to reapply. Anna will ask what's changed since then.
+          </p>
+        </div>
+      </button>
+
+      {/* Persecution-topic disclosure — non-blocking notice that warns the
+          user that the AI will ask the two new safety questions consulars
+          now put to every applicant. Better the user reads this here than
+          gets ambushed mid-interview. */}
+      <div className="bg-slate-100 border border-slate-200 rounded-2xl px-4 py-3.5 text-[12.5px] text-slate-700 leading-relaxed flex items-start gap-2.5">
+        <HeartPulse size={15} className="mt-0.5 text-slate-500 flex-shrink-0" />
+        <div>
+          <p className="font-bold text-slate-900 mb-0.5">A note on the safety questions</p>
+          <p>
+            U.S. consular officers now ask every applicant two questions about whether you've experienced or fear harm in your home country. Anna will ask these too — answer naturally. This is a practice space, not an adjudication.
+          </p>
+        </div>
+      </div>
 
       {/* Disclaimer */}
       <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3.5 text-[12.5px] text-amber-900 leading-relaxed flex items-start gap-2.5">
@@ -130,11 +209,16 @@ export default function InterviewIntroCard({
       </button>
 
       <button
-        onClick={() => canStart && onStart(accepted)}
+        onClick={() => canStart && onStart(accepted, isReturningApplicant)}
         disabled={!canStart}
         className="flex items-center justify-center gap-2 w-full bg-slate-900 hover:bg-slate-800 text-white text-base font-semibold py-4 rounded-2xl transition-all active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-slate-900/20"
       >
-        {starting ? <Loader2 size={16} className="animate-spin" /> : <>Start the interview · 15 credits <ArrowRight size={16} /></>}
+        {starting
+          ? <Loader2 size={16} className="animate-spin" />
+          : willBePreview
+            ? <>Start free 3-minute preview <ArrowRight size={16} /></>
+            : <>Start the interview · 15 credits <ArrowRight size={16} /></>
+        }
       </button>
     </motion.div>
   );

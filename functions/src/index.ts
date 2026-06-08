@@ -223,6 +223,23 @@ const FREE_CREDITS_ON_SIGNUP   = 2;
 // new revenue funnel.
 const REVEAL_BUCKET_CREDIT_COST = 5;
 
+// Visa interview preview: free 3-minute taste of the live avatar so
+// users without 15 credits still experience the USP and convert
+// because the credit ask now buys a known-good experience rather than
+// a black-box "is it worth $5?" gamble. Guardrails:
+//   - Hard 3-minute server-side cap (enforced in generateOfficerTurn
+//     via maxDurationSec — client trust would let someone open devtools
+//     and stretch the session).
+//   - 7-day per-user cooldown so a single account can't burn HeyGen
+//     minutes on repeated previews.
+//   - No credits charged. No scored report. Paid 15-credit session is
+//     the only path to the report.
+//   - Founder accounts skip the preview path entirely (they always
+//     get the full paid flow with no charge).
+const VISA_PREVIEW_DURATION_SEC = 180;
+const VISA_PAID_DURATION_SEC    = 300;
+const VISA_PREVIEW_COOLDOWN_DAYS = 7;
+
 // HeyGen plan-side concurrent-session cap. The base plan allows 3
 // simultaneous LiveKit rooms; anything beyond that hits HTTP 429.
 // We enforce the cap on our side BEFORE charging credits so a user
@@ -1364,14 +1381,52 @@ export const startVisaInterviewSession = onCall(
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in to start a practice interview");
 
-    const { mode, disclaimerAccepted, clientRequestId } = request.data ?? {};
+    const { mode, disclaimerAccepted, clientRequestId, isReturningApplicant } = request.data ?? {};
     if (disclaimerAccepted !== true) {
       throw new HttpsError("failed-precondition", "Disclaimer must be accepted");
     }
     const interviewMode: "text" | "voice" | "avatar" =
       mode === "voice" || mode === "avatar" ? mode : "text";
+    const returningApplicant = isReturningApplicant === true;
 
     const db = admin.firestore();
+    const founder = isFounderEmail(request.auth?.token?.email as string | undefined);
+
+    // Auto-detect preview vs paid mode based on wallet balance. Users
+    // with ≥15 credits get the full paid 5-min interview + scored
+    // report. Users with < 15 credits get a free 3-min preview gated
+    // by a 7-day cooldown so they can experience the live avatar
+    // before topping up. Founders always get paid mode (the cooldown
+    // would block their internal QA otherwise; their bypass writes a
+    // zero-amount ledger row).
+    const walletPeek = await db.collection("creditWallets").doc(uid).get();
+    const currentCredits = walletPeek.exists ? (walletPeek.data()?.credits ?? 0) : FREE_CREDITS_ON_SIGNUP;
+    const wantsPreview = !founder && currentCredits < VISA_INTERVIEW_CREDIT_COST;
+
+    // 7-day preview cooldown — protects HeyGen minutes from a single
+    // account burning previews on loop. Founders bypass the cooldown
+    // (they're on the paid path anyway). Failure to enforce here =
+    // a user could refresh and start a new preview every 3 minutes,
+    // running our HeyGen bill on someone who'll never convert.
+    if (wantsPreview) {
+      const cooldownMs = VISA_PREVIEW_COOLDOWN_DAYS * 24 * 60 * 60 * 1000;
+      const cutoff = admin.firestore.Timestamp.fromMillis(Date.now() - cooldownMs);
+      const recentPreview = await db.collection("visaInterviewSessions")
+        .where("userId", "==", uid)
+        .where("kind", "==", "preview")
+        .where("createdAt", ">", cutoff)
+        .limit(1)
+        .get();
+      if (!recentPreview.empty) {
+        throw new HttpsError(
+          "resource-exhausted",
+          `You've already used your free preview interview in the last ${VISA_PREVIEW_COOLDOWN_DAYS} days. Top up 15 credits to start a full mock interview with a scored report.`,
+          { reason: "preview_cooldown_active" },
+        );
+      }
+    }
+    const sessionKind: "preview" | "paid" = wantsPreview ? "preview" : "paid";
+    const durationSec = wantsPreview ? VISA_PREVIEW_DURATION_SEC : VISA_PAID_DURATION_SEC;
 
     // Idempotency (optional). A network blip / callable retry must not
     // charge the user 15 credits twice. If the client passes a stable
@@ -1387,11 +1442,16 @@ export const startVisaInterviewSession = onCall(
       if (!existing.empty) {
         const existingSessionId = existing.docs[0].data()?.sessionId as string | undefined;
         if (existingSessionId) {
+          // Replay path covers paid sessions only (the type filter above
+          // is "visa_interview_start"). Preview sessions don't pay so a
+          // duplicate call just creates two free sessions — harmless.
           return {
             sessionId:              existingSessionId,
             firstMessage:           VISA_INTERVIEW_GREETING,
             requiresDocumentUpload: "ds160_confirmation" as const,
             mode:                   interviewMode,
+            kind:                   "paid" as const,
+            durationSec:            VISA_PAID_DURATION_SEC,
             disclaimer:             VISA_DISCLAIMER,
             creditsUsed:            VISA_INTERVIEW_CREDIT_COST,
             idempotentReplay:       true,
@@ -1429,8 +1489,7 @@ export const startVisaInterviewSession = onCall(
     const firstMsgRef = db.collection("visaInterviewMessages").doc();
     const now = admin.firestore.FieldValue.serverTimestamp();
 
-    // Atomic: deduct credit + create session + create first officer message + log usage
-    const founder = isFounderEmail(request.auth?.token?.email as string | undefined);
+    // Atomic: deduct credit (paid mode only) + create session + create first officer message + log usage
     await db.runTransaction(async (tx) => {
       const wallet = await tx.get(walletRef);
       let credits: number;
@@ -1440,13 +1499,18 @@ export const startVisaInterviewSession = onCall(
       } else {
         credits = wallet.data()?.credits ?? 0;
       }
-      // Founder bypass — internal product testing can run unlimited
-      // visa interviews. Wallet stays untouched; the ledger entry
-      // below still records the action with a zero amount + a
-      // founder-specific type so the audit shows what happened
-      // without it polluting paid-usage analytics.
-      if (!founder) {
+      // Three branches for credit handling:
+      //   1. Founder → bypass deduction, write zero-amount ledger row
+      //   2. Preview → free, no wallet touch, no ledger row (or zero one
+      //      for analytics — see below)
+      //   3. Paid → standard 15-credit deduction
+      // Preview already passed the cooldown check above, so we know
+      // it's not abuse. The "Insufficient credits" hard error can no
+      // longer fire — that case routes into preview mode instead.
+      if (!founder && sessionKind === "paid") {
         if (credits < VISA_INTERVIEW_CREDIT_COST) {
+          // Should never hit — auto-detect routes to preview when credits
+          // are low. Belt-and-braces only.
           throw new HttpsError("resource-exhausted", "Insufficient credits");
         }
         tx.update(walletRef, { credits: credits - VISA_INTERVIEW_CREDIT_COST, updatedAt: now });
@@ -1456,6 +1520,9 @@ export const startVisaInterviewSession = onCall(
         userId:               uid,
         visaType:             "F1",
         status:               "active",
+        kind:                 sessionKind,         // "preview" | "paid"
+        previewDurationSec:   durationSec,         // server-enforced cap consulted by generateOfficerTurn
+        isReturningApplicant: returningApplicant,  // routes "what has changed?" prompt addition
         mode:                 interviewMode,
         avatarProvider:       interviewMode === "avatar" ? "heygen_liveavatar" : "none",
         currentStage:         "documents",
@@ -1463,7 +1530,7 @@ export const startVisaInterviewSession = onCall(
         disclaimerAccepted:   true,
         documentsRequested:   { i20: false, ds160: true },
         documentsUploaded:    { i20: false, ds160: false },
-        creditsUsed:          VISA_INTERVIEW_CREDIT_COST,
+        creditsUsed:          sessionKind === "paid" ? VISA_INTERVIEW_CREDIT_COST : 0,
         startedAt:            now,
         createdAt:            now,
         updatedAt:            now,
@@ -1478,10 +1545,22 @@ export const startVisaInterviewSession = onCall(
         createdAt: now,
       });
 
+      // Ledger row. Preview sessions log a zero-amount row with
+      // type:"visa_interview_preview" so analytics can attribute
+      // HeyGen costs back to the preview funnel and measure preview→paid
+      // conversion. Paid sessions write the standard negative-amount
+      // deduction. Founders write a zero-amount founder_visa_interview
+      // row regardless of which path they took.
+      const ledgerType =
+        founder              ? "founder_visa_interview" :
+        sessionKind === "preview" ? "visa_interview_preview" :
+        "visa_interview_start";
+      const ledgerAmount =
+        sessionKind === "paid" && !founder ? -VISA_INTERVIEW_CREDIT_COST : 0;
       tx.set(txRef, {
         userId:    uid,
-        amount:    founder ? 0 : -VISA_INTERVIEW_CREDIT_COST,
-        type:      founder ? "founder_visa_interview" : "visa_interview_start",
+        amount:    ledgerAmount,
+        type:      ledgerType,
         sessionId: sessionRef.id,
         createdAt: now,
         ...(typeof clientRequestId === "string" && clientRequestId.length > 0
@@ -1497,9 +1576,11 @@ export const startVisaInterviewSession = onCall(
       targetType: "visaInterviewSession",
       targetId:   sessionRef.id,
       metadata:   {
-        creditsUsed:   founder ? 0 : VISA_INTERVIEW_CREDIT_COST,
-        founderBypass: founder,
-        mode:          interviewMode,
+        creditsUsed:        sessionKind === "paid" && !founder ? VISA_INTERVIEW_CREDIT_COST : 0,
+        founderBypass:      founder,
+        mode:               interviewMode,
+        kind:               sessionKind,
+        isReturningApplicant: returningApplicant,
       },
     });
 
@@ -1510,8 +1591,10 @@ export const startVisaInterviewSession = onCall(
       // avatar speaks the greeting) is open the DS-160 upload modal.
       requiresDocumentUpload: "ds160_confirmation" as const,
       mode:                   interviewMode,
+      kind:                   sessionKind,
+      durationSec:            durationSec,
       disclaimer:             VISA_DISCLAIMER,
-      creditsUsed:            VISA_INTERVIEW_CREDIT_COST,
+      creditsUsed:            sessionKind === "paid" && !founder ? VISA_INTERVIEW_CREDIT_COST : 0,
     };
   },
 );
@@ -1560,6 +1643,11 @@ export const sendVisaInterviewAnswer = onCall(
       questionCount: typeof session.questionCount === "number" ? session.questionCount : 1,
       extractedDocuments: extractedDocs,
       elapsedMs:     elapsedSinceInterviewStart(session),
+      // Preview sessions: 180s; paid sessions: 300s. Fall back to 300s for
+      // any legacy session that doesn't have previewDurationSec stamped
+      // (those pre-date this feature so they're all paid).
+      maxDurationSec: typeof session.previewDurationSec === "number" ? session.previewDurationSec : 300,
+      isReturningApplicant: session.isReturningApplicant === true,
     });
 
     // Persist officer reply
@@ -1808,6 +1896,8 @@ export const recordVisaInterviewDocument = onCall(
         questionCount: typeof session.questionCount === "number" ? session.questionCount : 1,
         extractedDocuments: Object.values(extractedDocsAfter),
         elapsedMs:     elapsedSinceInterviewStart(session),
+        maxDurationSec: typeof session.previewDurationSec === "number" ? session.previewDurationSec : 300,
+        isReturningApplicant: session.isReturningApplicant === true,
       });
       nextOfficerText = officer.text;
       // Once the interview proper has started, currentStage must NEVER revert
@@ -1904,7 +1994,22 @@ export const finishVisaInterviewSession = onCall(
     const sessionRef = db.collection("visaInterviewSessions").doc(sessionId);
     const sessionSnap = await sessionRef.get();
     if (!sessionSnap.exists)                  throw new HttpsError("not-found", "Session not found");
-    if (sessionSnap.data()?.userId !== uid)   throw new HttpsError("permission-denied", "Not your session");
+    const sessionData = sessionSnap.data() as any;
+    if (sessionData?.userId !== uid)          throw new HttpsError("permission-denied", "Not your session");
+
+    // Preview sessions don't get a scored report — that's the paid
+    // surface. Refuse explicitly with a kind-specific error code so the
+    // client can swap in the paywall modal ("Top up 15 credits to get
+    // your scored feedback") instead of showing a generic failure.
+    // Legacy sessions without a `kind` field pre-date this feature so
+    // they're treated as paid.
+    if (sessionData?.kind === "preview") {
+      throw new HttpsError(
+        "permission-denied",
+        "Scored reports are part of the full paid interview. Top up 15 credits to run a full mock and unlock your feedback.",
+        { reason: "preview_session_no_report" },
+      );
+    }
 
     // Idempotency: if a report already exists for this session, return it.
     const existing = await db.collection("visaInterviewReports")

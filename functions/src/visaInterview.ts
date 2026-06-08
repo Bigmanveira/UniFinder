@@ -38,6 +38,15 @@ YOUR ROLE
 - You are Anna. Stay in character throughout. The student already knows your name from the opening line; do NOT re-introduce yourself.
 - Ask realistic, professional F-1 visa interview questions, one at a time.
 - Cover: school choice, programme choice, funding & finances, career plans after graduation, ties to home country, prior travel & academic background, document readiness (I-20, DS-160).
+
+PERSECUTION & SAFETY (REQUIRED — ask EXACTLY ONCE per interview, before wrap-up)
+- U.S. consular officers now ask every applicant two safety questions late in the interview, regardless of country of origin. They are not warm-ups and they are not optional coverage.
+- Word them clearly and neutrally — same tone as any other interview question. Do NOT preface with sympathy, an apology, or "this might be uncomfortable." Just ask.
+- Question 1: "Have you experienced harm or mistreatment in your country of nationality or last habitual residence?"
+- Question 2: "Do you fear harm or mistreatment in returning to your country of nationality?"
+- If the student answers "no" to both, accept it and move on without probing.
+- If the student answers "yes" to either, ask ONE brief clarifying follow-up ("Could you tell me a bit more?") and then move toward closing. Do NOT cross-examine, do NOT debate, do NOT give immigration / asylum advice. Anna is conducting a practice F-1 interview, not adjudicating a protection claim.
+- Set stage to "home_ties" when asking these questions (they belong topically with home-country ties).
 - Stay concise. One short question per turn. No paragraph-long set-ups.
 - Speak in the second person ("you"), professional but neutral tone — neither warm nor hostile.
 - If the student gives a vague, evasive, or inconsistent answer, ask a polite clarifying follow-up before moving on.
@@ -164,15 +173,26 @@ export async function generateOfficerTurn(args: {
    *  cap interview length (HeyGen has a max session duration so we want to
    *  wrap up before the avatar drops). 0 / undefined = not started yet. */
   elapsedMs?: number;
+  /** Hard cap for this session. Default 300s (5 min) for paid sessions;
+   *  preview sessions pass 180s (3 min). Anything ≥ this elapsed value
+   *  short-circuits Claude and returns a wrap-up immediately. */
+  maxDurationSec?: number;
+  /** When true, Anna asks "What has changed since your last interview?"
+   *  early in the flow. Set from session.isReturningApplicant. */
+  isReturningApplicant?: boolean;
 }): Promise<OfficerTurnResult> {
-  const { apiKey, transcript, questionCount, extractedDocuments, elapsedMs = 0 } = args;
+  const {
+    apiKey, transcript, questionCount, extractedDocuments,
+    elapsedMs = 0, maxDurationSec = 300, isReturningApplicant = false,
+  } = args;
   const lastUser = [...transcript].reverse().find((t) => t.role === "student")?.text;
-  const elapsedMin = elapsedMs / 60_000;
+  const elapsedSec = elapsedMs / 1000;
 
-  // HARD CAP: if the interview has already run >= 5 minutes, force close
-  // without calling Claude. This guarantees we wrap up before HeyGen's
-  // server-side session timeout drops the avatar mid-sentence.
-  if (elapsedMin >= 5) {
+  // HARD CAP: if elapsed >= maxDurationSec, force close without calling
+  // Claude. This is the server-side enforcement that makes the preview
+  // a "preview" — without it, a client that ignored the timer could
+  // run the avatar indefinitely.
+  if (elapsedSec >= maxDurationSec) {
     return {
       text: "Thank you. That's all I need from you today.",
       stage: "wrap_up",
@@ -182,17 +202,33 @@ export async function generateOfficerTurn(args: {
     };
   }
 
-  // Hints to Claude. Time-based first, then a turn-count safety. Either
-  // pushes Anna toward closing.
+  // Hints to Claude, scaled to maxDurationSec so a 3-min preview winds
+  // down at ~2 min and closes at ~2:30, while a 5-min paid session
+  // winds down at ~3 min and closes at ~4 min.
   let wrappingHint = "";
-  if (elapsedMin >= 4) {
-    wrappingHint = "\n\nThe interview has been running 4+ minutes — close it NOW with a brief professional sign-off and set isFinalQuestion=true.";
-  } else if (elapsedMin >= 3) {
-    wrappingHint = "\n\nThe interview has been running 3+ minutes. Start winding toward closing: one or two more probing questions, then sign off with isFinalQuestion=true.";
+  const remainingSec = maxDurationSec - elapsedSec;
+  if (remainingSec <= 60) {
+    wrappingHint = `\n\nThe interview has under a minute left of its ${Math.round(maxDurationSec / 60)}-minute slot — close it NOW with a brief professional sign-off and set isFinalQuestion=true.`;
+  } else if (remainingSec <= maxDurationSec * 0.35) {
+    wrappingHint = `\n\nThe interview is in its final third (about ${Math.round(remainingSec)}s left). Start winding toward closing: one or two more probing questions, then sign off with isFinalQuestion=true.`;
   } else {
     const studentTurnsSoFar = transcript.filter((t) => t.role === "student").length;
     if (studentTurnsSoFar >= 12) {
       wrappingHint = "\n\nThe student has answered ≥12 questions — close the interview now with a brief professional sign-off and set isFinalQuestion=true.";
+    }
+  }
+
+  // Returning-applicant context. Real consular officers know when an
+  // applicant has been denied before and ask what's changed since.
+  // The client passes this flag from a checkbox on the disclaimer card.
+  let returningApplicantHint = "";
+  if (isReturningApplicant) {
+    const studentTurnsSoFar = transcript.filter((t) => t.role === "student").length;
+    // Inject the "what has changed?" probe within the first two student
+    // turns — after that the natural flow takes over and forcing it
+    // back in would feel jarring.
+    if (studentTurnsSoFar <= 2) {
+      returningApplicantHint = "\n\nNOTE: The student has indicated they have applied for an F-1 visa before and were not approved. Within your next turn or two, ask directly: \"What has changed since your last interview?\" Listen carefully to whether their funding, school choice, programme, or career plan has actually shifted, and probe any answer that sounds like it hasn't. Do not be hostile — it's a routine question.";
     }
   }
 
@@ -237,8 +273,8 @@ export async function generateOfficerTurn(args: {
       temperature: 0.4,
       system: [
         { type: "text", text: OFFICER_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
-        ...(wrappingHint || documentsContext
-          ? [{ type: "text" as const, text: wrappingHint + documentsContext }]
+        ...(wrappingHint || documentsContext || returningApplicantHint
+          ? [{ type: "text" as const, text: wrappingHint + returningApplicantHint + documentsContext }]
           : []),
       ],
       messages,

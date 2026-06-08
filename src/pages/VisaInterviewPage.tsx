@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, ShieldAlert, Loader2, AlertTriangle, Mic, MicOff, Volume2, StopCircle } from "lucide-react";
-import { collection, onSnapshot, orderBy, query, where } from "firebase/firestore";
+import { collection, doc, onSnapshot, orderBy, query, where } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { db, functions } from "../lib/firebase";
 import { useAuth } from "../hooks/useAuth";
+import { isFounderEmail } from "../lib/founders";
 import type {
   VisaDocumentType, VisaInterviewMessage, VisaInterviewReport,
 } from "../types";
@@ -44,6 +45,32 @@ export default function VisaInterviewPage() {
   // a "try again in a moment" UX, not a "you've been charged and
   // it failed" UX.
   const [atCapacityOpen, setAtCapacityOpen] = useState(false);
+
+  // Wallet credits — used to decide which CTA the intro card shows
+  // (free 3-min preview vs paid 15-credit interview). The backend
+  // re-derives this from the wallet on start so a stale client read
+  // can't trick it into a wrong-mode session.
+  const [walletCredits, setWalletCredits] = useState<number | null>(null);
+  useEffect(() => {
+    if (!user) return;
+    const unsub = onSnapshot(doc(db, "creditWallets", user.uid), (snap) => {
+      if (snap.exists()) {
+        const c = snap.data()?.credits;
+        setWalletCredits(typeof c === "number" ? c : 0);
+      } else {
+        setWalletCredits(2); // implicit signup grant
+      }
+    });
+    return () => unsub();
+  }, [user]);
+  const isFounder = isFounderEmail(user?.email);
+
+  // Session kind ("preview" | "paid") returned by startVisaInterviewSession.
+  // Drives the preview-end paywall — when a preview ends, finishVisaInterview
+  // refuses to score and we open this modal instead of the report view.
+  const [sessionKind, setSessionKind] = useState<"preview" | "paid" | null>(null);
+  const [previewEndOpen, setPreviewEndOpen] = useState(false);
+  const [previewCooldownOpen, setPreviewCooldownOpen] = useState(false);
 
   // Feedback survey — opens ~7 seconds after the report renders so
   // the user has time to actually read their score before we ask
@@ -158,7 +185,7 @@ export default function VisaInterviewPage() {
     return unsub;
   }, [user, sessionId]);
 
-  const startInterview = async (accepted: boolean) => {
+  const startInterview = async (accepted: boolean, isReturningApplicant: boolean) => {
     if (!user) { navigate("/login"); return; }
     if (!speech.isSupported) {
       setError("Voice mode requires Chrome, Edge, or Safari. This browser doesn't support speech recognition.");
@@ -195,14 +222,20 @@ export default function VisaInterviewPage() {
 
     try {
       const fn = httpsCallable(functions, "startVisaInterviewSession");
-      const res = await fn({ mode: "avatar", disclaimerAccepted: accepted });
+      const res = await fn({
+        mode: "avatar",
+        disclaimerAccepted: accepted,
+        isReturningApplicant,
+      });
       const data = res.data as {
         sessionId: string;
         firstMessage?: string;
         requiresDocumentUpload?: VisaDocumentType | null;
+        kind?: "preview" | "paid";
       };
-      console.log("[visa] session started:", data.sessionId, "firstMessage?", !!data.firstMessage, "needsDoc?", data.requiresDocumentUpload);
+      console.log("[visa] session started:", data.sessionId, "kind:", data.kind, "firstMessage?", !!data.firstMessage, "needsDoc?", data.requiresDocumentUpload);
       setSessionId(data.sessionId);
+      setSessionKind(data.kind ?? "paid");
       // Use the first officer line from the start response directly. This
       // means the avatar can begin speaking the moment the SDK is live —
       // independent of whether the Firestore snapshot has caught up yet.
@@ -226,6 +259,11 @@ export default function VisaInterviewPage() {
       const detailsReason = e?.details?.reason;
       if (detailsReason === "heygen_at_capacity") {
         setAtCapacityOpen(true);
+      } else if (detailsReason === "preview_cooldown_active") {
+        // User already used their free preview in the last 7 days.
+        // Surface a dedicated modal pointing at /pricing so they
+        // understand it's a cooldown, not a system failure.
+        setPreviewCooldownOpen(true);
       } else if (e?.code === "resource-exhausted" || /Insufficient credits/i.test(e?.message ?? "")) {
         setError("Not enough credits to start a practice interview. Top up your wallet to try again.");
       } else {
@@ -271,6 +309,17 @@ export default function VisaInterviewPage() {
     setEnding(true);
     setError("");
     speech.abort();
+
+    // Preview sessions never get a scored report — short-circuit straight
+    // to the paywall modal without hitting finishVisaInterviewSession.
+    // Saves one round-trip + avoids logging a noisy permission-denied
+    // error for the expected "preview ended" case.
+    if (sessionKind === "preview") {
+      setPreviewEndOpen(true);
+      setEnding(false);
+      return;
+    }
+
     try {
       const fn = httpsCallable(functions, "finishVisaInterviewSession", { timeout: 180_000 });
       const res = await fn({ sessionId });
@@ -278,7 +327,14 @@ export default function VisaInterviewPage() {
       setPhase("report");
     } catch (e: any) {
       console.error(e);
-      setError(e?.message ?? "Could not finish the interview. Please try again.");
+      // Belt-and-braces: if the server says this was a preview session
+      // (e.g. sessionKind state somehow drifted), open the same paywall
+      // modal rather than dumping a raw error to the user.
+      if (e?.details?.reason === "preview_session_no_report") {
+        setPreviewEndOpen(true);
+      } else {
+        setError(e?.message ?? "Could not finish the interview. Please try again.");
+      }
     } finally {
       setEnding(false);
     }
@@ -508,6 +564,16 @@ export default function VisaInterviewPage() {
           onClose={() => setAtCapacityOpen(false)}
         />
 
+        <PreviewEndModal
+          open={previewEndOpen}
+          onClose={() => { setPreviewEndOpen(false); navigate("/app"); }}
+        />
+
+        <PreviewCooldownModal
+          open={previewCooldownOpen}
+          onClose={() => { setPreviewCooldownOpen(false); navigate("/app"); }}
+        />
+
         <FeedbackSurveyModal
           open={surveyOpen}
           trigger="visa_interview"
@@ -522,6 +588,8 @@ export default function VisaInterviewPage() {
               onStart={startInterview}
               starting={starting}
               speechSupported={speech.isSupported}
+              walletCredits={walletCredits}
+              isFounder={isFounder}
             />
           </div>
         )}
@@ -802,6 +870,89 @@ function BeautifulStatusPill({ stage }: { stage: ActiveStage }) {
 // Surfaced when the HeyGen concurrent-session cap is hit. The server
 // refuses the start BEFORE deducting credits, so the user explicitly
 // hasn't lost anything. The copy mirrors the user's preferred wording.
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PreviewEndModal — shown when a free 3-minute preview session ends. Used
+// in place of the scored-report view (preview sessions never get scored).
+// Routes the user to /pricing for the 15-credit top-up that unlocks both
+// the full 5-minute interview AND the report.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function PreviewEndModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/60"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-sm w-full p-6 text-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="w-12 h-12 mx-auto mb-4 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+          <Volume2 size={22} />
+        </div>
+        <h2 className="text-lg font-black text-slate-900 mb-2">Your preview is up</h2>
+        <p className="text-sm text-slate-600 leading-relaxed mb-5">
+          You just experienced a live AI consular interview. Top up 15 credits to run a full 5-minute mock — Anna will probe deeper and you'll get your scored feedback across nine dimensions.
+        </p>
+        <Link
+          to="/pricing"
+          className="w-full inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-2xl text-sm transition-colors mb-2"
+        >
+          Top up to continue · 15 credits
+        </Link>
+        <button
+          onClick={onClose}
+          className="w-full inline-flex items-center justify-center text-xs font-bold text-slate-500 hover:text-slate-700 py-2 transition-colors"
+        >
+          Back to dashboard
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PreviewCooldownModal — surfaced when a user tries to start a free preview
+// but already used their preview within the 7-day cooldown window. Explains
+// the cooldown + offers the paid path so they're not dead-ended.
+// ─────────────────────────────────────────────────────────────────────────────
+
+function PreviewCooldownModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/60"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-sm w-full p-6 text-center"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="w-12 h-12 mx-auto mb-4 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center">
+          <ShieldAlert size={22} />
+        </div>
+        <h2 className="text-lg font-black text-slate-900 mb-2">Preview already used</h2>
+        <p className="text-sm text-slate-600 leading-relaxed mb-5">
+          You've already run your free preview in the last 7 days. Top up 15 credits to start a full 5-minute mock interview with scored feedback.
+        </p>
+        <Link
+          to="/pricing"
+          className="w-full inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-2xl text-sm transition-colors mb-2"
+        >
+          Top up · 15 credits
+        </Link>
+        <button
+          onClick={onClose}
+          className="w-full inline-flex items-center justify-center text-xs font-bold text-slate-500 hover:text-slate-700 py-2 transition-colors"
+        >
+          Back to dashboard
+        </button>
+      </div>
+    </div>
+  );
+}
 
 function AtCapacityModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   if (!open) return null;
