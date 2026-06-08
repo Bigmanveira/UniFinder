@@ -75,7 +75,7 @@ type BucketKey = "all" | "reach" | "target" | "safety";
 const BUCKETS = {
   reach: {
     title: "Reach",
-    desc:  "Selective programs where you're competitive but not guaranteed.",
+    desc:  "Highly competitive programs — admission is tough and far from guaranteed. Your profile is in range, but you'll be up against very strong applicants, so plan to strengthen your essays, recommendations, and standardised scores before applying.",
     dot:   "bg-rose-500",
     accent: "text-rose-700",
     chip:   "bg-rose-50 text-rose-700 border-rose-200",
@@ -83,7 +83,7 @@ const BUCKETS = {
   },
   target: {
     title: "Target",
-    desc:  "Realistic matches — your profile aligns with their typical admit.",
+    desc:  "Realistic matches — your academic profile lines up with the typical admitted student, so admission is genuinely within reach if you apply with a strong, polished application.",
     dot:   "bg-blue-500",
     accent: "text-blue-700",
     chip:   "bg-blue-50 text-blue-700 border-blue-200",
@@ -91,7 +91,7 @@ const BUCKETS = {
   },
   safety: {
     title: "Safety",
-    desc:  "High admission probability. Solid backups for your shortlist.",
+    desc:  "High admission probability. These are solid backups where your profile comfortably exceeds the typical admit threshold — useful insurance for your shortlist.",
     dot:   "bg-emerald-500",
     accent: "text-emerald-700",
     chip:   "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -491,7 +491,7 @@ function BucketSection({
               </span>
               <div className={`hidden sm:block flex-1 h-px bg-gradient-to-r ${meta.rule}`} aria-hidden />
             </div>
-            <p className="text-sm text-slate-600 leading-relaxed max-w-2xl">{meta.desc}</p>
+            <p className="text-base sm:text-[17px] text-slate-700 leading-relaxed max-w-2xl">{meta.desc}</p>
           </header>
         </FadeIn>
       )}
@@ -987,7 +987,7 @@ function LockedBucketCard({
           <h4 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mb-2">
             {count} {meta.title} school{count === 1 ? "" : "s"} ready to reveal
           </h4>
-          <p className="text-sm text-slate-600 max-w-md mx-auto leading-relaxed mb-6">
+          <p className="text-base sm:text-[17px] text-slate-700 max-w-lg mx-auto leading-relaxed mb-6">
             {meta.desc}
           </p>
 
