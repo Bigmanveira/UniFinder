@@ -543,7 +543,31 @@ function ChecklistRow({
               >
                 <div className="pt-2 pb-1 space-y-3">
                   <p className="text-[13px] text-slate-600 leading-relaxed">{item.description}</p>
+
+                  {/* Primary action — "Open tool" sits ABOVE the status
+                      pills as the dominant CTA so the user's eye lands
+                      there first. Solid emerald, full width on mobile,
+                      auto width on desktop, soft shadow. */}
+                  {item.toolRoute && (
+                    <Link
+                      to={item.toolRoute}
+                      className="group inline-flex items-center justify-between w-full sm:w-auto sm:min-w-[220px] gap-3 px-4 py-3 rounded-2xl text-[13px] font-bold bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-500/25 hover:shadow-lg hover:shadow-emerald-500/35 hover:-translate-y-0.5 transition-all"
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <span className="w-5 h-5 rounded-md bg-white/20 flex items-center justify-center">
+                          <ArrowRight size={12} />
+                        </span>
+                        Open this tool
+                      </span>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-white/80 group-hover:text-white transition-colors">
+                        Go &rarr;
+                      </span>
+                    </Link>
+                  )}
+
+                  {/* Secondary controls — status pills. Small, muted. */}
                   <div className="flex flex-wrap items-center gap-1.5">
+                    <p className="w-full text-[10px] font-black tracking-widest uppercase text-slate-400 mb-0.5">Mark this task as</p>
                     {(["not_started", "in_progress", "completed", "blocked", "needs_review"] as ChecklistItemStatus[]).map((s) => {
                       const m = STATUS_META[s];
                       const active = item.status === s;
@@ -562,14 +586,6 @@ function ChecklistRow({
                         </button>
                       );
                     })}
-                    {item.toolRoute && (
-                      <Link
-                        to={item.toolRoute}
-                        className="ml-auto inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 transition-colors"
-                      >
-                        Open tool <ArrowRight size={10} />
-                      </Link>
-                    )}
                   </div>
                 </div>
               </motion.div>
