@@ -80,7 +80,12 @@ export default function LoginPage() {
   const computePostLoginPath = () => {
     if (nextPath) return nextPath;
     if (shouldGoToResults()) return "/results";
-    return "/app";
+    // Default landing after sign-in is the roadmap, not the dashboard.
+    // /app/roadmap routes a first-time user to onboarding and a
+    // returning user to their personalised dashboard. Any explicit
+    // ?next= still wins (preserves intent for users who clicked
+    // "Practice F-1 Interview" or similar deep links).
+    return "/app/roadmap";
   };
 
   // Best-effort first-time bootstrap. Runs after every successful

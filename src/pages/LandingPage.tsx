@@ -90,7 +90,7 @@ export default function LandingPage() {
                     just to reach the login surface, which felt broken.
                     Compact text-xs on mobile so the pill doesn't squeeze. */}
                 <Link to="/login" className="text-xs sm:text-sm font-bold text-slate-900 hover:text-primary-600 transition-colors px-1 py-1">Log In</Link>
-                <Link to="/intake" className="bg-slate-900 text-white px-4 md:px-5 py-2 md:py-2.5 rounded-full text-sm font-bold hover:bg-slate-800 transition-transform active:scale-95 shadow-md">
+                <Link to="/signup?next=/app/roadmap" className="bg-slate-900 text-white px-4 md:px-5 py-2 md:py-2.5 rounded-full text-sm font-bold hover:bg-slate-800 transition-transform active:scale-95 shadow-md">
                   Start Free
                 </Link>
               </>
@@ -333,7 +333,7 @@ export default function LandingPage() {
               <li className="flex items-center gap-3 font-bold text-slate-300"><CheckCircle2 className="text-primary-500"/> F-1 visa interview practice = 15 credits</li>
               <li className="flex items-center gap-3 font-bold text-slate-300"><CheckCircle2 className="text-primary-500"/> Personalized application roadmap = included</li>
             </ul>
-            <Link to="/intake" className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-500 text-white font-bold px-8 py-4 rounded-full transition-colors">
+            <Link to={user ? "/app/roadmap" : "/signup?next=/app/roadmap"} className="inline-flex items-center gap-2 bg-primary-600 hover:bg-primary-500 text-white font-bold px-8 py-4 rounded-full transition-colors">
               Claim Your Free Credits <ArrowRight size={18} />
             </Link>
           </Reveal>

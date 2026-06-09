@@ -104,7 +104,11 @@ export default function SignupPage() {
   const computePostSignupPath = () => {
     if (nextPath) return nextPath;
     if (shouldGoToResults()) return "/results";
-    return "/app";
+    // Every new user lands on the roadmap first. /app/roadmap auto-
+    // redirects to /app/roadmap/onboarding if no roadmap doc exists,
+    // so brand-new signups go straight into the 6-question diagnostic.
+    // Returning users with a roadmap already see the dashboard.
+    return "/app/roadmap";
   };
 
   // Build the URL we want the magic link to bounce the user back to.
