@@ -5,9 +5,9 @@ import { db, functions } from "../lib/firebase";
 import { doc, getDoc, setDoc, updateDoc, arrayUnion, onSnapshot } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import {
-  MapPin, Globe, Heart, ArrowLeft, ArrowRight, AlertTriangle, Sparkles,
+  MapPin, Globe, Heart, ArrowLeft, ArrowRight, AlertTriangle, Wand2,
   Check, ChevronDown, ChevronUp, Lightbulb, DollarSign,
-  Star, Loader2, Target, Percent, Send, BookOpen, RefreshCw, Lock,
+  Star, Loader2, Target, Percent, Send, BookOpen, RefreshCw, Lock, Map,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { bucketizeMatches } from "../lib/matching/matchSchools";
@@ -121,7 +121,7 @@ function AiHero({ ai }: { ai: AiReportExplanation }) {
 
       <div className="relative p-7 sm:p-8">
         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-[11px] font-semibold mb-4">
-          <Sparkles size={11} className="text-amber-300" /> AI Insight
+          <Wand2 size={11} className="text-amber-300" /> AI Insight
         </span>
         <h2 className="text-2xl sm:text-[28px] font-bold tracking-tight leading-[1.15] mb-3 max-w-3xl">{ai.headline}</h2>
         <p className="text-[14px] sm:text-[15px] text-white/75 leading-relaxed max-w-2xl mb-6">{ai.summary}</p>
@@ -829,7 +829,7 @@ export default function FullReportPage() {
             <div className="absolute -bottom-12 -left-12 w-40 h-40 bg-cyan-500/15 rounded-full blur-3xl" aria-hidden />
             <div className="relative flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center text-white flex-shrink-0">
-                <Sparkles size={20} className="text-amber-300" />
+                <Map size={20} className="text-amber-300" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-[11px] font-semibold tracking-wide text-amber-300 mb-1">NEXT STAGE</p>
@@ -1007,7 +1007,7 @@ function LockedBucketCard({
                 disabled={busy}
                 className={`inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-2xl text-sm font-bold transition-colors text-white shadow-md ${theme.cta} ${theme.ctaRing} disabled:opacity-60 disabled:cursor-not-allowed`}
               >
-                {busy ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                {busy ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
                 {busy ? "Revealing…" : `Reveal ${meta.title} — free for you`}
               </button>
               <p className="text-[11px] text-slate-500 mt-2.5">

@@ -1,14 +1,14 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Mail, MessageCircleQuestion, Send, ShieldAlert, Sparkles } from "lucide-react";
+import { Mail, MessageCircleQuestion, Send, ShieldAlert, Wand2 } from "lucide-react";
 import BrandLogo from "../components/BrandLogo";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Contact — no server-side email service yet, so the form composes a mailto:
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Contact â€” no server-side email service yet, so the form composes a mailto:
 // link that opens the user's email client with subject + body pre-filled. The
 // user can always still email us directly; the form is there mostly to
 // structure the request so we get the context we need to help.
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const SUPPORT_EMAIL = "support@collegeready.io";
 
 type Topic = "match-help" | "interview-help" | "billing" | "bug" | "feedback" | "press" | "other";
@@ -61,7 +61,7 @@ export default function ContactPage() {
             Get in <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-accent-500">touch</span>
           </h1>
           <p className="text-base text-slate-500 font-medium max-w-xl mx-auto">
-            Bug report, feature idea, billing question, or just want to say hi — we read every message.
+            Bug report, feature idea, billing question, or just want to say hi â€” we read every message.
           </p>
         </div>
       </section>
@@ -127,7 +127,7 @@ export default function ContactPage() {
             </button>
 
             <p className="text-[11px] text-slate-400 text-center leading-relaxed">
-              We use your email client so the conversation lands in <em>your</em> inbox — no hidden tracking, no marketing list. If your device doesn't have an email app set up, just write to <a href={`mailto:${SUPPORT_EMAIL}`} className="text-primary-600 font-semibold hover:underline">{SUPPORT_EMAIL}</a>.
+              We use your email client so the conversation lands in <em>your</em> inbox â€” no hidden tracking, no marketing list. If your device doesn't have an email app set up, just write to <a href={`mailto:${SUPPORT_EMAIL}`} className="text-primary-600 font-semibold hover:underline">{SUPPORT_EMAIL}</a>.
             </p>
           </form>
 
@@ -136,16 +136,16 @@ export default function ContactPage() {
             <InfoCard
               icon={<MessageCircleQuestion size={20} className="text-primary-600" />}
               title="Quick answers?"
-              body="Most questions are covered in our FAQ — give it a scroll first."
+              body="Most questions are covered in our FAQ â€” give it a scroll first."
               cta={{ label: "Browse FAQ", to: "/faq" }}
             />
             <InfoCard
               icon={<ShieldAlert size={20} className="text-amber-600" />}
               title="Visa interview help"
-              body="Anna's feedback is practice only — not legal advice. For visa law questions, contact a qualified immigration attorney."
+              body="Anna's feedback is practice only â€” not legal advice. For visa law questions, contact a qualified immigration attorney."
             />
             <InfoCard
-              icon={<Sparkles size={20} className="text-emerald-600" />}
+              icon={<Wand2 size={20} className="text-emerald-600" />}
               title="Press & partnerships"
               body="Building something complementary or writing about us? Pick the 'Press / partnerships' topic and we'll get back fast."
             />
@@ -185,7 +185,7 @@ function InfoCard({
       <p className="text-[13px] text-slate-500 leading-relaxed">{body}</p>
       {cta && (
         <Link to={cta.to} className="inline-flex items-center gap-1 text-xs font-bold text-primary-600 hover:text-primary-700 mt-3">
-          {cta.label} →
+          {cta.label} â†’
         </Link>
       )}
     </div>

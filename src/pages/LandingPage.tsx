@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, CheckCircle2, Sparkles, BrainCircuit, Target, ShieldCheck, Mic, Video, ShieldAlert } from "lucide-react";
+import { ArrowRight, CheckCircle2, BadgeCheck, BarChart3, BrainCircuit, Target, ShieldCheck, Mic, Video, ShieldAlert } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import BrandLogo from "../components/BrandLogo";
 import { Reveal } from "../components/Reveal";
@@ -119,30 +119,32 @@ export default function LandingPage() {
             From school matching to applications, visa preparation, and pre-departure guidance, CollegeReady helps international students know exactly what to do next.
           </p>
 
-          <div className="flex flex-col sm:flex-row items-center gap-5 justify-center lg:justify-start">
-            {/* Primary CTA — drives into the roadmap onboarding. Signed-in
-                users skip onboarding via the in-app redirect if they already
-                have a roadmap doc. /signup?next=… preserves intent for
-                logged-out users. */}
-            <Link to={user ? "/app/roadmap" : "/signup?next=/app/roadmap/onboarding"} className="w-full sm:w-auto px-8 py-5 bg-primary-600 text-white rounded-full font-bold text-base hover:bg-primary-700 transition-transform active:scale-95 flex items-center justify-center gap-2 shadow-xl shadow-primary-500/25">
-              Start My Study Abroad Roadmap
-              <ArrowRight size={20} />
+          {/* CTA row sits separate from the trust strip so the buttons
+              keep a standard pill size on desktop. Wording shortened on
+              all viewports to match the standard-pill convention — the
+              full feature name is in the H1 above. */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 justify-center lg:justify-start mb-7">
+            <Link
+              to={user ? "/app/roadmap" : "/signup?next=/app/roadmap/onboarding"}
+              className="px-7 py-4 bg-primary-600 text-white rounded-full font-bold text-[15px] hover:bg-primary-700 transition-transform active:scale-95 inline-flex items-center justify-center gap-2 shadow-xl shadow-primary-500/25 whitespace-nowrap"
+            >
+              Start My Roadmap
+              <ArrowRight size={18} />
             </Link>
-            {/* Secondary CTA — F-1 visa interview practice. Same target as
-                the simulator section below; preserves the previous funnel
-                for visitors who came in specifically for visa practice. */}
-            <Link to={user ? "/app/visa-interview" : "/signup?next=/app/visa-interview"} className="w-full sm:w-auto px-8 py-5 bg-white border border-slate-200 text-slate-900 rounded-full font-bold text-base hover:bg-slate-50 transition-transform active:scale-95 flex items-center justify-center gap-2 shadow-md">
-              Practice F-1 Visa Interview
-              <ArrowRight size={20} />
+            <Link
+              to={user ? "/app/visa-interview" : "/signup?next=/app/visa-interview"}
+              className="px-7 py-4 bg-white border border-slate-200 text-slate-900 rounded-full font-bold text-[15px] hover:bg-slate-50 transition-transform active:scale-95 inline-flex items-center justify-center gap-2 shadow-md whitespace-nowrap"
+            >
+              Practice F-1 Interview
+              <ArrowRight size={18} />
             </Link>
+          </div>
+
+          {/* Trust strip lives on its own row — gives the avatar pile +
+              rating room to breathe on every viewport and stops the CTAs
+              from wrapping awkwardly on the desktop hero. */}
+          <div className="flex items-center gap-3 justify-center lg:justify-start">
             <div className="flex items-center gap-3">
-              {/* Inline SVG avatar pile — zero network requests, scales perfectly. */}
-              {/* Trusted-by pile. The IDs below are Unsplash portrait
-                  photos selected to show African / black faces. If any
-                  particular photo doesn't match what we want, replace the
-                  ID in the URL — the `fit=facearea` query keeps the face
-                  centred in the round crop regardless of the source
-                  composition. */}
               <div className="flex -space-x-3">
                 <AvatarPhoto src="https://images.unsplash.com/photo-1531123897727-8f129e1688ce?auto=format&fit=facearea&facepad=2.5&w=160&h=160&q=80" />
                 <AvatarPhoto src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=facearea&facepad=2.5&w=160&h=160&q=80" />
@@ -163,7 +165,7 @@ export default function LandingPage() {
         <div className="flex-1 w-full max-w-lg relative animate-fade-up-slow">
           <div className="bg-white md:bg-white/90 md:backdrop-blur-2xl border border-slate-100 md:border-white rounded-[40px] shadow-2xl shadow-slate-300/50 relative z-20 overflow-hidden">
             <div className="absolute top-4 right-4 z-10 bg-slate-900 text-white text-xs font-black tracking-widest uppercase px-4 py-2 rounded-full shadow-lg rotate-6 flex items-center gap-1">
-              <Sparkles size={14} className="text-amber-400" /> 98% Match
+              <BadgeCheck size={14} className="text-emerald-400" /> 98% Match
             </div>
 
             {/* Stock photo of Stanford's campus. The gradient overlay keeps
@@ -305,7 +307,7 @@ export default function LandingPage() {
             <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-8 max-w-lg">
               <FeaturePill icon={<Video size={18} />}    label="Live avatar"    color="text-primary-600" />
               <FeaturePill icon={<Mic size={18} />}      label="Voice answers"  color="text-emerald-600" />
-              <FeaturePill icon={<Sparkles size={18} />} label="Scored feedback" color="text-amber-500" />
+              <FeaturePill icon={<BarChart3 size={18} />} label="Scored feedback" color="text-amber-500" />
             </div>
 
             <Link to={simulatorHref} className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold px-7 py-3.5 rounded-full transition-colors shadow-xl shadow-slate-900/20">

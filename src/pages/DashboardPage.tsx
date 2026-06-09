@@ -8,7 +8,7 @@ import { doc, getDoc, onSnapshot, setDoc, updateDoc, serverTimestamp } from "fir
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "../lib/firebase";
-import { LogOut, Plus, Wallet, Bookmark, FileText, ChevronRight, User, GraduationCap, MapPin, Sparkles, Camera, Globe, Trash2, ChevronDown, ChevronUp, ArrowRight, Heart, Map, Gift, Copy, Check, Send, Mail, Home, ShieldAlert, Menu, X, Bell, Mic, KeyRound, Loader2, AlertTriangle, Compass } from "lucide-react";
+import { LogOut, Plus, Wallet, Bookmark, FileText, ChevronRight, User, GraduationCap, MapPin, BadgeCheck, Settings, Camera, Globe, Trash2, ChevronDown, ChevronUp, ArrowRight, Heart, Map, Gift, Copy, Check, Send, Mail, Home, ShieldAlert, Menu, X, Bell, Mic, KeyRound, Loader2, AlertTriangle, Compass } from "lucide-react";
 import { subscribeStudyRoadmap } from "../lib/roadmap/roadmapClient";
 import { ROADMAP_STAGES, type StudyRoadmap } from "../lib/roadmap/studyAbroad";
 import BrandLogo from "../components/BrandLogo";
@@ -838,7 +838,7 @@ function ProfileTab({ user, username, onSignOut }: { user: any, username: string
             <h2 className="text-3xl font-black text-slate-900 leading-tight mb-1">@{headerName}</h2>
             <div className="flex items-center gap-3 mt-2 flex-wrap">
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary-50 text-primary-700 text-xs font-bold tracking-widest uppercase border border-primary-100">
-                <Sparkles size={12} /> Free Plan
+                <BadgeCheck size={12} /> Free Plan
               </span>
               <span className="text-sm font-medium text-slate-500">{user?.email}</span>
               {pendingPhotoFile && (
@@ -881,7 +881,7 @@ function ProfileTab({ user, username, onSignOut }: { user: any, username: string
         {/* App Preferences Card */}
         <div className="bg-white rounded-[32px] p-6 md:p-8 shadow-sm border border-slate-100">
           <h3 className="text-sm font-black text-slate-900 mb-6 flex items-center gap-2">
-            <Sparkles size={18} className="text-primary-500" /> App Preferences
+            <Settings size={18} className="text-primary-500" /> App Preferences
           </h3>
           <div className="space-y-5">
             <div>

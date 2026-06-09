@@ -1,6 +1,6 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ChevronDown, Sparkles, MessageCircleQuestion } from "lucide-react";
+import { ChevronDown, Wand2, MessageCircleQuestion } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import BrandLogo from "../components/BrandLogo";
 
@@ -11,7 +11,7 @@ const FAQS = [
   },
   {
     question: "What are Credits and how do I use them?",
-    answer: "College Ready uses a simple pay-as-you-go credit system. 1 credit unlocks a full personalised match report — your Reach schools are visible right away. 5 credits reveal a Target or Safety category inside that report if you want the wider list (optional — Reach alone is enough for most users). 15 credits unlock a live F-1 visa interview practice session. You get 2 free credits just for signing up."
+    answer: "College Ready uses a simple pay-as-you-go credit system. 1 credit unlocks a full personalised match report â€” your Reach schools are visible right away. 5 credits reveal a Target or Safety category inside that report if you want the wider list (optional â€” Reach alone is enough for most users). 15 credits unlock a live F-1 visa interview practice session. You get 2 free credits just for signing up."
   },
   {
     question: "Does College Ready guarantee my admission?",
@@ -110,7 +110,7 @@ export default function FAQPage() {
               Our team is incredibly responsive. Start a free intake today to experience the platform, or reach out to us directly.
             </p>
             <Link to="/intake" className="inline-flex items-center gap-2 bg-primary-600 text-white px-8 py-4 rounded-2xl font-bold hover:bg-primary-500 transition-colors shadow-lg shadow-primary-600/25">
-              <Sparkles size={18} /> Start Free Match Wizard
+              <Wand2 size={18} /> Start Free Match Wizard
             </Link>
           </div>
         </div>
@@ -127,7 +127,7 @@ export default function FAQPage() {
             <a href="#" className="hover:text-primary-600 transition-colors">Contact</a>
           </div>
           <p className="text-xs font-medium text-slate-400">
-            © 2026 College Ready. Not affiliated with the U.S. Government.
+            Â© 2026 College Ready. Not affiliated with the U.S. Government.
           </p>
         </div>
       </footer>

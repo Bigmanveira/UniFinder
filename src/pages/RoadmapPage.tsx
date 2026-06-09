@@ -1,30 +1,39 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// RoadmapPage — the new personalised Study Abroad Roadmap.
+// RoadmapPage — personalised Study Abroad Roadmap.
 //
-// Replaced (2026-06-09) the prior static 7-stage educational roadmap.
-// The old `roadmapProgress/{uid}` collection is left intact in Firestore
-// for any historical data; this page no longer reads or writes that
-// collection. The legacy content module (src/lib/roadmap/content) is
-// also left in the codebase but no longer mounted.
+// Visual language redesigned 2026-06-09 around the user-supplied inspo:
+// light card-on-light background, bold contextual heading, a horizontal
+// stepper with circular check icons + numbered step badges + labels.
+// Replaces the previous dark gradient hero.
 //
-// New behaviour:
-//   - On load, read studyRoadmaps/{uid} via roadmapClient.
-//   - If no doc exists → redirect to /app/roadmap/onboarding (the
-//     6-question diagnostic).
-//   - Otherwise render: stage tracker → current-stage hero → checklist
-//     for the current stage → recommended tool → "update my stage"
-//     control → upcoming stages preview.
+// Logic changes in this pass:
+//   1. Checklist toggle is now single-click: not_started → completed.
+//      The granular "in_progress / blocked / needs_review" states are
+//      still available through the expanded controls.
+//   2. External activity reconcile on load — if the user already has a
+//      match report or visa interview report, the matching checklist
+//      items get auto-marked completed (silently, only when currently
+//      not_started).
+//   3. "Continue to <next stage>" CTA appears once all required items
+//      in the current stage are completed.
+//   4. CTAs for stages whose tool isn't built yet open a coming-soon
+//      modal instead of navigating to a dead route.
+//
+// Existing live features (auth, Firestore, credits, Paystack, match
+// reports, visa interview, admin portal) are not touched by this file.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowLeft, ArrowRight, Check, ChevronDown, Loader2,
-  Sparkles, Lock, AlertTriangle, RotateCw, Pencil,
-  CircleDot, Circle, CheckCircle2, Hourglass, Ban,
+  AlertTriangle, RotateCw, Pencil, Plus,
+  Circle, CheckCircle2, Hourglass, Ban,
+  Target, Compass, Flag, Construction,
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import {
+  reconcileFromExternalActivity,
   subscribeStudyRoadmap,
   updateChecklistItemStatus,
   updateRoadmapStage,
@@ -33,6 +42,8 @@ import {
   ROADMAP_STAGES,
   ROADMAP_STAGE_ORDER,
   LABELS,
+  getNextStage,
+  isStageRequiredComplete,
   type ChecklistItem,
   type ChecklistItemStatus,
   type CurrentProcessStatus,
@@ -53,12 +64,14 @@ export default function RoadmapPage() {
   const navigate = useNavigate();
   const [roadmap, setRoadmap]   = useState<StudyRoadmap | null | "loading">("loading");
   const [updatingItemId, setUpdatingItemId] = useState<string | null>(null);
-  const [updatingStage, setUpdatingStage]   = useState(false);
-  const [stageOpen, setStageOpen]           = useState(false);
+  const [updatingStage,  setUpdatingStage]  = useState(false);
+  const [stageOpen,      setStageOpen]      = useState(false);
   const [error, setError]                   = useState<string | null>(null);
+  const [comingSoonOpen, setComingSoonOpen] = useState<RoadmapStageId | null>(null);
 
-  // Subscribe to the user's roadmap doc. Live updates so any change
-  // (here or in another tab) reflects immediately.
+  // Live subscription. Banner + checklist + tracker all share this stream
+  // so any change (here or in another tab) reflects instantly across the
+  // entire roadmap surface.
   useEffect(() => {
     if (!user) return;
     const unsub = subscribeStudyRoadmap(
@@ -72,6 +85,21 @@ export default function RoadmapPage() {
     );
     return () => unsub();
   }, [user]);
+
+  // External-activity reconcile — runs ONCE when the page first loads
+  // a real roadmap doc. Marks d_first_match / sm_unlock / v_practice as
+  // completed if the user has already done the equivalent action
+  // elsewhere in the app.
+  const [reconciled, setReconciled] = useState(false);
+  useEffect(() => {
+    if (!user) return;
+    if (reconciled) return;
+    if (roadmap === "loading" || roadmap === null) return;
+    setReconciled(true);
+    void reconcileFromExternalActivity(user.uid).catch((err) => {
+      console.warn("[roadmap] reconcile failed (non-fatal):", err);
+    });
+  }, [user, roadmap, reconciled]);
 
   // No-doc → onboarding. Single redirect; do nothing while still
   // resolving auth or the initial Firestore read.
@@ -114,6 +142,19 @@ export default function RoadmapPage() {
     }
   };
 
+  // Coming-soon-aware CTA handler. If the target stage's tool isn't
+  // built yet, open the modal instead of navigating to a placeholder
+  // route. The caller passes the stage id so we know which "X is
+  // coming soon" copy to render.
+  const handleStageCtaClick = (stage: RoadmapStageId) => {
+    const meta = ROADMAP_STAGES[stage];
+    if (meta.comingSoon) {
+      setComingSoonOpen(stage);
+      return;
+    }
+    navigate(meta.toolRoute);
+  };
+
   if (authLoading || roadmap === "loading") {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -121,29 +162,35 @@ export default function RoadmapPage() {
       </div>
     );
   }
-  if (roadmap === null) {
-    // Effect above will redirect; render nothing in the meantime.
-    return null;
-  }
+  if (roadmap === null) return null;
 
-  return <RoadmapDashboard
-    roadmap={roadmap}
-    updatingItemId={updatingItemId}
-    updatingStage={updatingStage}
-    stageOpen={stageOpen}
-    setStageOpen={setStageOpen}
-    error={error}
-    onChecklistChange={handleChecklistChange}
-    onStageChange={handleStageChange}
-  />;
+  return (
+    <>
+      <RoadmapDashboard
+        roadmap={roadmap}
+        updatingItemId={updatingItemId}
+        updatingStage={updatingStage}
+        stageOpen={stageOpen}
+        setStageOpen={setStageOpen}
+        error={error}
+        onChecklistChange={handleChecklistChange}
+        onStageChange={handleStageChange}
+        onStageCtaClick={handleStageCtaClick}
+      />
+      <ComingSoonModal
+        stage={comingSoonOpen}
+        onClose={() => setComingSoonOpen(null)}
+      />
+    </>
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Roadmap dashboard — the meat of the new page.
+// Roadmap dashboard
 // ─────────────────────────────────────────────────────────────────────
 function RoadmapDashboard({
   roadmap, updatingItemId, updatingStage, stageOpen, setStageOpen,
-  error, onChecklistChange, onStageChange,
+  error, onChecklistChange, onStageChange, onStageCtaClick,
 }: {
   roadmap: StudyRoadmap;
   updatingItemId: string | null;
@@ -153,12 +200,12 @@ function RoadmapDashboard({
   error: string | null;
   onChecklistChange: (item: ChecklistItem, next: ChecklistItemStatus) => Promise<void>;
   onStageChange: (nextStage: RoadmapStageId, nextStatus: CurrentProcessStatus | undefined) => Promise<void>;
+  onStageCtaClick: (stage: RoadmapStageId) => void;
 }) {
   const { user } = useAuth();
   const currentMeta = ROADMAP_STAGES[roadmap.currentStage];
   const currentStageIndex = ROADMAP_STAGE_ORDER.indexOf(roadmap.currentStage);
 
-  // Items relevant to the current stage — surfaced first
   const currentItems = useMemo(
     () => roadmap.checklist.filter((it) => it.stage === roadmap.currentStage),
     [roadmap.checklist, roadmap.currentStage],
@@ -167,14 +214,27 @@ function RoadmapDashboard({
   const requiredDone   = currentItems.filter((i) => i.required && i.status === "completed").length;
   const requiredTotal  = currentItems.filter((i) => i.required).length;
 
-  // First-name from the auth user (or display name); fallback to email handle.
+  // Are all required items in this stage done? Drives the "Next stage" CTA.
+  const stageComplete = isStageRequiredComplete(roadmap.checklist, roadmap.currentStage);
+  const nextStage     = getNextStage(roadmap.currentStage);
+
   const firstName = (user?.displayName ?? user?.email?.split("@")[0] ?? "there").split(/[\s@]/)[0];
+
+  // Contextual hero heading + sub. Keeps the "You're almost there!"
+  // feel from the inspo but maps to actual progress state.
+  const heroHeadline = stageComplete && nextStage
+    ? "You're ready to advance."
+    : roadmap.progressPercentage >= 75
+      ? "You're almost there."
+      : roadmap.progressPercentage >= 25
+        ? "Making good progress."
+        : "Let's get going.";
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 antialiased flex flex-col">
       <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none" aria-hidden>
-        <div className="absolute -top-32 left-1/4 w-[560px] h-[560px] bg-gradient-to-br from-blue-300/20 via-violet-300/15 to-transparent rounded-full blur-[140px] animate-pulse" style={{ animationDuration: "9s" }} />
-        <div className="absolute top-1/2 -right-32 w-[480px] h-[480px] bg-gradient-to-br from-emerald-300/15 via-cyan-200/10 to-transparent rounded-full blur-[140px] animate-pulse" style={{ animationDuration: "11s", animationDelay: "2s" }} />
+        <div className="absolute -top-32 left-1/4 w-[560px] h-[560px] bg-gradient-to-br from-emerald-300/20 via-cyan-200/15 to-transparent rounded-full blur-[160px] animate-pulse" style={{ animationDuration: "10s" }} />
+        <div className="absolute top-1/2 -right-32 w-[480px] h-[480px] bg-gradient-to-br from-blue-300/15 via-violet-200/10 to-transparent rounded-full blur-[140px] animate-pulse" style={{ animationDuration: "12s", animationDelay: "2s" }} />
       </div>
 
       <header className="sticky top-0 z-40 border-b border-slate-200/60 bg-white/75 backdrop-blur-xl supports-[backdrop-filter]:bg-white/65">
@@ -196,65 +256,63 @@ function RoadmapDashboard({
         </div>
       </header>
 
-      <main className="relative max-w-6xl mx-auto px-5 py-8 w-full flex-1 space-y-7">
-        {/* ── Hero / welcome ─────────────────────────────────────────── */}
-        <section className="relative overflow-hidden rounded-[28px] bg-slate-950 text-white p-7 sm:p-10 shadow-xl shadow-slate-900/20">
-          <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 pointer-events-none" aria-hidden />
-          <div className={`absolute -top-32 -right-32 w-72 h-72 bg-gradient-to-br ${currentMeta.accentFrom} ${currentMeta.accentTo} opacity-30 rounded-full blur-3xl pointer-events-none`} aria-hidden />
-          <div className="absolute -bottom-32 -left-32 w-72 h-72 bg-violet-500/15 rounded-full blur-3xl pointer-events-none" aria-hidden />
-
-          <div className="relative">
-            <p className="text-[11px] font-black tracking-[0.2em] uppercase text-blue-300 mb-3">
-              Welcome back, {firstName} 👋
+      <main className="relative max-w-6xl mx-auto px-5 py-8 w-full flex-1 space-y-6">
+        {/* ── Hero card (light, inspo-style) ─────────────────────────── */}
+        <section className="bg-white rounded-[28px] border border-slate-200 shadow-[0_4px_24px_rgba(15,23,42,0.06)] overflow-hidden">
+          <div className="p-7 sm:p-9 sm:pb-7">
+            <p className="text-[11px] font-black tracking-[0.2em] uppercase text-slate-500 mb-3">
+              Welcome back, {firstName}
             </p>
-            <h2 className="text-3xl sm:text-5xl font-black tracking-tight leading-[1.05] mb-3 max-w-3xl">
-              You're in{" "}
-              <span className={`bg-gradient-to-r ${currentMeta.accentFrom} ${currentMeta.accentTo} bg-clip-text text-transparent`}>
-                {currentMeta.title}
-              </span>
-              .
+            <h2 className="text-3xl sm:text-5xl font-black text-slate-900 tracking-tight leading-[1.05] mb-3 max-w-3xl">
+              {heroHeadline}
             </h2>
-            <p className="text-[15px] sm:text-base text-white/75 leading-relaxed max-w-2xl mb-6">
-              {currentMeta.description}
+            <p className="text-[15px] sm:text-base text-slate-600 leading-relaxed max-w-2xl mb-6">
+              You're in <span className="font-bold text-slate-900">{currentMeta.title}</span>. {currentMeta.description}
             </p>
 
+            {/* CTA row */}
             <div className="flex flex-wrap items-center gap-3">
-              <Link
-                to={roadmap.recommendedTool.route}
-                className="inline-flex items-center justify-center gap-2 bg-white text-slate-900 hover:bg-slate-100 text-sm font-bold px-6 py-3 rounded-2xl transition-colors shadow-lg"
-              >
-                <Sparkles size={14} /> {roadmap.recommendedTool.label} <ArrowRight size={14} />
-              </Link>
+              {stageComplete && nextStage ? (
+                <NextStageButton
+                  current={roadmap.currentStage}
+                  next={nextStage}
+                  disabled={updatingStage}
+                  onAdvance={() => void onStageChange(nextStage, undefined)}
+                />
+              ) : (
+                <button
+                  onClick={() => onStageCtaClick(roadmap.currentStage)}
+                  className={`inline-flex items-center justify-center gap-2 text-white text-sm font-bold px-6 py-3 rounded-2xl shadow-md transition-opacity hover:opacity-95 bg-gradient-to-br ${currentMeta.accentFrom} ${currentMeta.accentTo}`}
+                >
+                  <Target size={14} /> {currentMeta.primaryCta} <ArrowRight size={14} />
+                </button>
+              )}
               <button
                 onClick={() => setStageOpen(!stageOpen)}
-                className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/20 hover:bg-white/15 text-white text-sm font-bold px-5 py-3 rounded-2xl transition-colors"
+                className="inline-flex items-center gap-2 bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 text-sm font-bold px-5 py-3 rounded-2xl transition-colors"
               >
                 <Pencil size={13} /> Update my stage
               </button>
             </div>
+          </div>
 
-            {stageOpen && (
-              <StagePicker
-                current={roadmap.currentStage}
-                currentStatus={roadmap.currentProcessStatus}
-                disabled={updatingStage}
-                onPick={onStageChange}
-                onClose={() => setStageOpen(false)}
-              />
-            )}
+          {/* Stepper — the heart of the redesign. Lives inside the same
+              hero card with a subtle gradient background. */}
+          <div className="px-7 sm:px-9 pb-7 sm:pb-9 pt-3">
+            <StageStepper currentStage={roadmap.currentStage} />
           </div>
         </section>
 
-        {/* ── Stage tracker ─────────────────────────────────────────── */}
-        <section className="bg-white rounded-3xl border border-slate-200 shadow-sm p-5 sm:p-7">
-          <div className="flex items-center justify-between mb-4">
-            <p className="text-[11px] font-black tracking-[0.18em] uppercase text-slate-500">Your journey</p>
-            <p className="text-xs text-slate-500">
-              Stage <span className="font-black text-slate-900">{currentStageIndex + 1}</span> of {ROADMAP_STAGE_ORDER.length}
-            </p>
-          </div>
-          <StageTracker currentStage={roadmap.currentStage} />
-        </section>
+        {/* ── Stage picker (collapsible) ─────────────────────────────── */}
+        {stageOpen && (
+          <StagePicker
+            current={roadmap.currentStage}
+            currentStatus={roadmap.currentProcessStatus}
+            disabled={updatingStage}
+            onPick={onStageChange}
+            onClose={() => setStageOpen(false)}
+          />
+        )}
 
         {/* ── Two-column: progress + recommended tool ───────────────── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -263,8 +321,12 @@ function RoadmapDashboard({
             requiredDone={requiredDone}
             requiredTotal={requiredTotal}
             currentStage={roadmap.currentStage}
+            currentStageIndex={currentStageIndex}
           />
-          <RecommendedToolCard roadmap={roadmap} />
+          <RecommendedToolCard
+            roadmap={roadmap}
+            onClick={() => onStageCtaClick(roadmap.currentStage)}
+          />
         </div>
 
         {error && (
@@ -282,11 +344,29 @@ function RoadmapDashboard({
           onChecklistChange={onChecklistChange}
         />
 
+        {/* ── Next-stage CTA (full-width banner when stage complete) ── */}
+        {stageComplete && nextStage && (
+          <NextStageBanner
+            current={roadmap.currentStage}
+            next={nextStage}
+            disabled={updatingStage}
+            onAdvance={() => void onStageChange(nextStage, undefined)}
+          />
+        )}
+
         {/* ── Upcoming stages preview ───────────────────────────────── */}
         <UpcomingStages currentStage={roadmap.currentStage} checklist={roadmap.checklist} />
 
+        {/* ── Tip pill (inspo footer) ───────────────────────────────── */}
+        <div className="flex justify-center pt-2">
+          <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 shadow-sm text-[12px] text-slate-700">
+            <Flag size={12} className="text-emerald-600" />
+            Tip: tick items as you go — your dashboard banner updates instantly.
+          </span>
+        </div>
+
         {/* ── Compliance disclaimer ─────────────────────────────────── */}
-        <p className="text-[11px] text-slate-400 text-center max-w-2xl mx-auto leading-relaxed pt-4">
+        <p className="text-[11px] text-slate-400 text-center max-w-2xl mx-auto leading-relaxed pt-4 pb-2">
           This roadmap is a guide. Steps and requirements vary by school, programme, and embassy. We don't guarantee any admission or visa outcome — verify every detail with your school's DSO and the US embassy in your country.
         </p>
       </main>
@@ -295,57 +375,81 @@ function RoadmapDashboard({
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Stage tracker — horizontal pipeline of stages.
+// StageStepper — inspo-styled horizontal stepper.
+// Each stage is a circle + step number + label. Connecting gradient
+// fills from left to right up to the current stage so completed stages
+// read as "green," current as "active," upcoming as muted.
 // ─────────────────────────────────────────────────────────────────────
-function StageTracker({ currentStage }: { currentStage: RoadmapStageId }) {
+function StageStepper({ currentStage }: { currentStage: RoadmapStageId }) {
   const currentIndex = ROADMAP_STAGE_ORDER.indexOf(currentStage);
+  const totalSteps = ROADMAP_STAGE_ORDER.length;
+  // Gradient fill stretches to the centre of the current step circle.
+  const fillPercent = totalSteps === 1
+    ? 100
+    : (currentIndex / (totalSteps - 1)) * 100;
+
   return (
-    <div className="overflow-x-auto -mx-2 px-2" style={{ scrollbarWidth: "none" }}>
-      <div className="inline-flex items-center gap-2 sm:gap-3 min-w-full">
+    <div className="relative">
+      {/* Track + fill (sit behind the circles) */}
+      <div className="absolute left-5 right-5 sm:left-7 sm:right-7 top-5 sm:top-6 h-1.5 rounded-full bg-slate-100 overflow-hidden pointer-events-none" aria-hidden>
+        <div
+          className="h-full bg-gradient-to-r from-emerald-500 via-emerald-500 to-emerald-400 rounded-full transition-all duration-700"
+          style={{ width: `${fillPercent}%` }}
+        />
+      </div>
+
+      <div className="relative grid grid-cols-6 gap-1 sm:gap-2">
         {ROADMAP_STAGE_ORDER.map((stageId, idx) => {
-          const meta   = ROADMAP_STAGES[stageId];
+          const meta  = ROADMAP_STAGES[stageId];
           const state: "completed" | "current" | "upcoming" =
             idx < currentIndex ? "completed" : idx === currentIndex ? "current" : "upcoming";
-          return (
-            <div key={stageId} className="flex items-center gap-2 sm:gap-3 flex-1 min-w-[180px]">
-              <div className="flex-1 min-w-0">
-                <div className={`relative rounded-2xl border-2 p-3 sm:p-4 transition-all ${
-                  state === "current"
-                    ? `bg-gradient-to-br ${meta.accentFrom} ${meta.accentTo} text-white border-transparent shadow-md`
-                    : state === "completed"
-                      ? "bg-white border-slate-300 text-slate-900"
-                      : "bg-slate-50 border-slate-200 text-slate-400"
-                }`}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`inline-flex w-6 h-6 rounded-full items-center justify-center text-[10px] font-black ${
-                      state === "current" ? "bg-white/20 text-white" :
-                      state === "completed" ? "bg-emerald-100 text-emerald-700" :
-                      "bg-slate-200 text-slate-500"
-                    }`}>
-                      {state === "completed" ? <Check size={12} className="stroke-[3]" /> : idx + 1}
-                    </span>
-                    <span className={`text-[10px] font-black tracking-widest uppercase ${
-                      state === "current" ? "text-white/80" :
-                      state === "completed" ? "text-slate-500" : "text-slate-400"
-                    }`}>
-                      {state === "completed" ? "Done" : state === "current" ? "You are here" : "Upcoming"}
-                    </span>
-                  </div>
-                  <p className={`text-sm font-black leading-tight ${
-                    state === "current" ? "text-white" :
-                    state === "completed" ? "text-slate-900" : "text-slate-500"
-                  }`}>
-                    {meta.title}
-                  </p>
-                </div>
-              </div>
-              {idx < ROADMAP_STAGE_ORDER.length - 1 && (
-                <ArrowRight size={16} className="text-slate-300 flex-shrink-0 hidden sm:block" aria-hidden />
-              )}
-            </div>
-          );
+          return <StepperNode key={stageId} meta={meta} idx={idx} state={state} />;
         })}
       </div>
+    </div>
+  );
+}
+
+function StepperNode({
+  meta, idx, state,
+}: {
+  meta: typeof ROADMAP_STAGES[RoadmapStageId];
+  idx: number;
+  state: "completed" | "current" | "upcoming";
+}) {
+  return (
+    <div className="flex flex-col items-center text-center">
+      <div
+        className={`relative w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center transition-all ${
+          state === "completed"
+            ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-500/30"
+            : state === "current"
+              ? `bg-gradient-to-br ${meta.accentFrom} ${meta.accentTo} text-white shadow-lg ring-4 ring-white`
+              : "bg-white text-slate-400 border-2 border-slate-200"
+        }`}
+      >
+        {state === "completed"
+          ? <Check size={18} className="stroke-[3]" />
+          : state === "current"
+            ? <Check size={18} className="stroke-[3]" />
+            : <Plus size={18} className="stroke-2" />
+        }
+        {state === "current" && (
+          <span className="absolute inset-[-4px] rounded-full border-2 border-white pointer-events-none" />
+        )}
+      </div>
+      <p className={`text-[10px] font-black tabular-nums mt-2 mb-0.5 ${
+        state === "upcoming" ? "text-slate-400" : "text-emerald-700"
+      }`}>
+        {idx + 1}
+      </p>
+      <p className={`text-[11px] sm:text-[12px] font-black leading-tight px-0.5 ${
+        state === "current" ? "text-slate-900" :
+        state === "completed" ? "text-slate-700" :
+        "text-slate-400"
+      }`}>
+        {meta.short}
+      </p>
     </div>
   );
 }
@@ -354,28 +458,32 @@ function StageTracker({ currentStage }: { currentStage: RoadmapStageId }) {
 // Progress card
 // ─────────────────────────────────────────────────────────────────────
 function ProgressCard({
-  progressPercentage, requiredDone, requiredTotal, currentStage,
+  progressPercentage, requiredDone, requiredTotal, currentStage, currentStageIndex,
 }: {
   progressPercentage: number;
   requiredDone: number;
   requiredTotal: number;
   currentStage: RoadmapStageId;
+  currentStageIndex: number;
 }) {
   const meta = ROADMAP_STAGES[currentStage];
+  const stageTotal = ROADMAP_STAGE_ORDER.length;
   return (
     <section className="lg:col-span-1 bg-white rounded-3xl border border-slate-200 shadow-sm p-6">
       <div className="flex items-center gap-3 mb-5">
         <div className={`w-11 h-11 rounded-2xl bg-gradient-to-br ${meta.accentFrom} ${meta.accentTo} text-white flex items-center justify-center shadow-md`}>
-          <CircleDot size={18} />
+          <Target size={18} />
         </div>
         <div>
           <p className="text-[10px] font-black tracking-widest uppercase text-slate-500">Your progress</p>
-          <p className="text-sm font-black text-slate-900">{meta.title}</p>
+          <p className="text-sm font-black text-slate-900">Stage {currentStageIndex + 1} of {stageTotal}</p>
         </div>
       </div>
-      <p className="text-4xl font-black text-slate-900 tabular-nums tracking-tight leading-none mb-3">{progressPercentage}<span className="text-2xl text-slate-400">%</span></p>
+      <p className="text-5xl font-black text-slate-900 tabular-nums tracking-tight leading-none mb-3">
+        {progressPercentage}<span className="text-2xl text-slate-400">%</span>
+      </p>
       <p className="text-xs text-slate-600 leading-relaxed mb-4">
-        {requiredDone} of {requiredTotal} required items done in this stage.
+        {requiredDone} of {requiredTotal} required items done in {meta.title}.
       </p>
       <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
         <div
@@ -388,9 +496,15 @@ function ProgressCard({
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Recommended tool card
+// Recommended tool card. Click goes through the coming-soon-aware
+// handler so stages with placeholder routes get the modal.
 // ─────────────────────────────────────────────────────────────────────
-function RecommendedToolCard({ roadmap }: { roadmap: StudyRoadmap }) {
+function RecommendedToolCard({
+  roadmap, onClick,
+}: {
+  roadmap: StudyRoadmap;
+  onClick: () => void;
+}) {
   const meta = ROADMAP_STAGES[roadmap.currentStage];
   return (
     <section className="lg:col-span-2 relative overflow-hidden bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8">
@@ -398,22 +512,29 @@ function RecommendedToolCard({ roadmap }: { roadmap: StudyRoadmap }) {
       <div className="relative">
         <div className="flex items-start gap-4 mb-5">
           <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${meta.accentFrom} ${meta.accentTo} text-white flex items-center justify-center shadow-md flex-shrink-0`}>
-            <Sparkles size={20} />
+            <Compass size={20} />
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-[10px] font-black tracking-widest uppercase text-slate-500 mb-1">Recommended next</p>
-            <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">{roadmap.recommendedTool.label}</h3>
+            <div className="flex items-start gap-2 flex-wrap">
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-tight">{roadmap.recommendedTool.label}</h3>
+              {meta.comingSoon && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black uppercase tracking-widest">
+                  <Construction size={10} /> Coming soon
+                </span>
+              )}
+            </div>
           </div>
         </div>
         <p className="text-[14px] text-slate-700 leading-relaxed mb-5">
           {roadmap.recommendedTool.description}
         </p>
-        <Link
-          to={roadmap.recommendedTool.route}
+        <button
+          onClick={onClick}
           className={`inline-flex items-center gap-2 text-sm font-bold text-white px-6 py-3 rounded-2xl bg-gradient-to-br ${meta.accentFrom} ${meta.accentTo} hover:opacity-95 shadow-md transition-opacity`}
         >
-          Open recommended tool <ArrowRight size={14} />
-        </Link>
+          {meta.comingSoon ? "Preview the tool" : "Open recommended tool"} <ArrowRight size={14} />
+        </button>
       </div>
     </section>
   );
@@ -468,34 +589,29 @@ function ChecklistRow({
   const meta = STATUS_META[item.status];
   const isCompleted = item.status === "completed";
 
+  // Single-click toggle: not_started → completed; completed → not_started.
+  // Granular states are still accessible via the expanded controls.
+  const toggle = () => onChange(isCompleted ? "not_started" : "completed");
+
   return (
     <li
       className={`bg-white rounded-2xl border shadow-sm transition-colors ${
-        isCompleted ? "border-emerald-200 bg-emerald-50/30" : "border-slate-200"
+        isCompleted ? "border-emerald-200 bg-emerald-50/40" : "border-slate-200"
       }`}
     >
       <div className="flex items-start gap-3 p-4 sm:p-5">
-        {/* Toggle button — single tap cycles not_started → in_progress → completed. Other statuses available via expanded controls. */}
         <button
           type="button"
-          onClick={() => {
-            if (item.status === "not_started")      onChange("in_progress");
-            else if (item.status === "in_progress") onChange("completed");
-            else if (item.status === "completed")   onChange("not_started");
-            else                                    onChange("not_started"); // blocked / needs_review → reset
-          }}
+          onClick={toggle}
           disabled={updating}
-          className={`w-6 h-6 rounded-md flex-shrink-0 mt-0.5 border-2 flex items-center justify-center transition-colors ${
+          className={`w-6 h-6 rounded-md flex-shrink-0 mt-0.5 border-2 flex items-center justify-center transition-all ${
             isCompleted
-              ? "bg-emerald-500 border-emerald-500 text-white"
-              : item.status === "in_progress"
-                ? "bg-blue-100 border-blue-400 text-blue-700"
-                : "bg-white border-slate-300 hover:border-slate-400"
+              ? "bg-gradient-to-br from-emerald-500 to-emerald-600 border-emerald-500 text-white"
+              : "bg-white border-slate-300 hover:border-emerald-400 hover:bg-emerald-50"
           }`}
-          aria-label={`Toggle ${item.title}`}
+          aria-label={`Mark ${item.title} ${isCompleted ? "incomplete" : "complete"}`}
         >
           {isCompleted && <Check size={14} className="stroke-[3]" />}
-          {item.status === "in_progress" && <Hourglass size={11} />}
         </button>
 
         <div className="flex-1 min-w-0">
@@ -505,7 +621,7 @@ function ChecklistRow({
               onClick={() => setExpanded((e) => !e)}
               className="text-left flex-1 min-w-0"
             >
-              <p className={`text-[14px] font-black leading-snug ${isCompleted ? "text-emerald-900" : "text-slate-900"}`}>
+              <p className={`text-[14px] font-black leading-snug ${isCompleted ? "text-emerald-900 line-through decoration-emerald-400/40" : "text-slate-900"}`}>
                 {item.title}
                 {item.required && <span className="text-rose-500 ml-1">*</span>}
               </p>
@@ -568,7 +684,72 @@ function ChecklistRow({
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Upcoming stages — collapsed preview of what's next
+// Next-stage CTA (compact, used in hero) + banner version (full-width,
+// used at the bottom of the checklist when current stage is complete).
+// ─────────────────────────────────────────────────────────────────────
+function NextStageButton({
+  current, next, disabled, onAdvance,
+}: {
+  current: RoadmapStageId;
+  next: RoadmapStageId;
+  disabled: boolean;
+  onAdvance: () => void;
+}) {
+  void current; // referenced for readability
+  const nextMeta = ROADMAP_STAGES[next];
+  return (
+    <button
+      onClick={onAdvance}
+      disabled={disabled}
+      className={`inline-flex items-center justify-center gap-2 text-white text-sm font-bold px-6 py-3 rounded-2xl shadow-md transition-opacity hover:opacity-95 disabled:opacity-60 disabled:cursor-not-allowed bg-gradient-to-br ${nextMeta.accentFrom} ${nextMeta.accentTo}`}
+    >
+      Continue to {nextMeta.title}
+      {disabled ? <Loader2 size={14} className="animate-spin" /> : <ArrowRight size={14} />}
+    </button>
+  );
+}
+
+function NextStageBanner({
+  current, next, disabled, onAdvance,
+}: {
+  current: RoadmapStageId;
+  next: RoadmapStageId;
+  disabled: boolean;
+  onAdvance: () => void;
+}) {
+  const currentMeta = ROADMAP_STAGES[current];
+  const nextMeta    = ROADMAP_STAGES[next];
+  return (
+    <section className="relative overflow-hidden bg-white rounded-3xl border-2 border-emerald-300 shadow-lg shadow-emerald-500/10 p-6 sm:p-8">
+      <div className="absolute -top-16 -right-16 w-48 h-48 rounded-full blur-3xl bg-gradient-to-br from-emerald-300 to-emerald-500 opacity-25 pointer-events-none" aria-hidden />
+      <div className="relative flex flex-col lg:flex-row items-start lg:items-center gap-5">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white flex items-center justify-center shadow-md shadow-emerald-500/40 flex-shrink-0">
+          <CheckCircle2 size={22} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] font-black tracking-[0.18em] uppercase text-emerald-700 mb-1">{currentMeta.title} complete</p>
+          <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-tight mb-1">
+            Ready for {nextMeta.title}?
+          </h3>
+          <p className="text-[13px] text-slate-700 leading-relaxed max-w-md">
+            You've ticked every required item. Advance the roadmap to start working through the next stage.
+          </p>
+        </div>
+        <button
+          onClick={onAdvance}
+          disabled={disabled}
+          className={`inline-flex items-center justify-center gap-2 text-white text-sm font-bold px-7 py-3.5 rounded-2xl shadow-md transition-opacity hover:opacity-95 disabled:opacity-60 bg-gradient-to-br ${nextMeta.accentFrom} ${nextMeta.accentTo}`}
+        >
+          {disabled ? <Loader2 size={14} className="animate-spin" /> : <Flag size={14} />}
+          Continue <ArrowRight size={14} />
+        </button>
+      </div>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Upcoming stages preview
 // ─────────────────────────────────────────────────────────────────────
 function UpcomingStages({
   currentStage, checklist,
@@ -591,10 +772,17 @@ function UpcomingStages({
             <div key={stageId} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
               <div className="flex items-start gap-3 mb-3">
                 <div className={`w-10 h-10 rounded-2xl bg-gradient-to-br ${meta.accentFrom} ${meta.accentTo} opacity-80 text-white flex items-center justify-center flex-shrink-0`}>
-                  <Lock size={16} />
+                  <Plus size={16} className="stroke-2" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Upcoming</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Upcoming</p>
+                    {meta.comingSoon && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[9px] font-black uppercase tracking-widest">
+                        Soon
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[15px] font-black text-slate-900 leading-tight">{meta.title}</p>
                 </div>
               </div>
@@ -609,7 +797,7 @@ function UpcomingStages({
 }
 
 // ─────────────────────────────────────────────────────────────────────
-// Stage picker — opens from "Update my stage" button.
+// Stage picker — slides out under the hero when user clicks "Update my stage"
 // ─────────────────────────────────────────────────────────────────────
 function StagePicker({
   current, currentStatus, disabled, onPick, onClose,
@@ -621,18 +809,21 @@ function StagePicker({
   onClose: () => void;
 }) {
   return (
-    <div className="mt-6 bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-5">
+    <section className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-7">
       <div className="flex items-center justify-between mb-4">
-        <p className="text-[11px] font-black tracking-widest uppercase text-white/80">Pick your new stage</p>
+        <div>
+          <p className="text-[10px] font-black tracking-widest uppercase text-slate-500 mb-0.5">Pick your new stage</p>
+          <h3 className="text-lg font-black text-slate-900">Where are you now?</h3>
+        </div>
         <button
           type="button"
           onClick={onClose}
-          className="text-white/60 hover:text-white text-[12px] font-bold transition-colors"
+          className="text-slate-500 hover:text-slate-900 text-[13px] font-bold transition-colors"
         >
           Cancel
         </button>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
         {ROADMAP_STAGE_ORDER.map((stageId) => {
           const meta = ROADMAP_STAGES[stageId];
           const isCurrent = stageId === current;
@@ -642,23 +833,77 @@ function StagePicker({
               type="button"
               onClick={() => onPick(stageId, undefined)}
               disabled={disabled || isCurrent}
-              className={`text-left px-4 py-3 rounded-2xl border transition-colors ${
+              className={`text-left flex items-center gap-3 px-4 py-3 rounded-2xl border-2 transition-colors ${
                 isCurrent
-                  ? "bg-white text-slate-900 border-white"
-                  : "bg-white/5 text-white border-white/15 hover:bg-white/15 hover:border-white/25"
-              } disabled:opacity-60 disabled:cursor-not-allowed`}
+                  ? "bg-emerald-50 text-emerald-900 border-emerald-300"
+                  : "bg-white text-slate-900 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+              } disabled:cursor-not-allowed`}
             >
-              <p className="text-[13px] font-black mb-0.5">{meta.title}</p>
-              <p className={`text-[11px] leading-snug ${isCurrent ? "text-slate-500" : "text-white/60"}`}>
-                {isCurrent ? "Your current stage" : meta.short}
-              </p>
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                isCurrent
+                  ? "bg-emerald-500 text-white"
+                  : `bg-gradient-to-br ${meta.accentFrom} ${meta.accentTo} text-white opacity-90`
+              }`}>
+                {isCurrent ? <Check size={14} className="stroke-[3]" /> : <span className="text-[11px] font-black">{ROADMAP_STAGE_ORDER.indexOf(stageId) + 1}</span>}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] font-black mb-0.5 truncate">{meta.title}</p>
+                <p className="text-[11px] text-slate-500 leading-snug truncate">{isCurrent ? "Your current stage" : meta.short}</p>
+              </div>
             </button>
           );
         })}
       </div>
-      <p className="text-[11px] text-white/60 mt-4 leading-relaxed">
+      <p className="text-[11px] text-slate-500 mt-4 leading-relaxed">
         Your checklist progress is preserved. Currently labelled "{LABELS.currentProcessStatus[currentStatus]}."
       </p>
+    </section>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Coming-soon modal — surfaces when the user clicks a stage CTA whose
+// tool isn't built yet (Application, Admission & I-20, Pre-Departure).
+// ─────────────────────────────────────────────────────────────────────
+function ComingSoonModal({
+  stage, onClose,
+}: {
+  stage: RoadmapStageId | null;
+  onClose: () => void;
+}) {
+  if (!stage) return null;
+  const meta = ROADMAP_STAGES[stage];
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="relative bg-white rounded-[28px] shadow-2xl border border-slate-200 max-w-md w-full overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className={`absolute -top-24 -right-24 w-64 h-64 rounded-full blur-3xl bg-gradient-to-br ${meta.accentFrom} ${meta.accentTo} opacity-30 pointer-events-none`} aria-hidden />
+        <div className="relative p-7 sm:p-9 text-center">
+          <div className={`w-16 h-16 mx-auto mb-5 rounded-2xl bg-gradient-to-br ${meta.accentFrom} ${meta.accentTo} text-white flex items-center justify-center shadow-lg`}>
+            <Construction size={26} />
+          </div>
+          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black uppercase tracking-widest mb-4">
+            <Construction size={10} /> Coming soon
+          </span>
+          <h2 className="text-2xl font-black text-slate-900 tracking-tight mb-2 leading-tight">
+            {meta.primaryCta} is on the way
+          </h2>
+          <p className="text-[14px] text-slate-600 leading-relaxed mb-6">
+            We're building a dedicated tool for the {meta.title} stage. In the meantime, work through the checklist below — we'll notify you the moment the tool ships.
+          </p>
+          <button
+            onClick={onClose}
+            className="w-full inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-2xl text-sm transition-colors"
+          >
+            Back to my roadmap
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

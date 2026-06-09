@@ -47,6 +47,10 @@ export interface RoadmapStageMeta {
   description:       string;
   primaryCta:        string;       // CTA text shown on the dashboard
   toolRoute:         string;       // where the CTA points
+  /** When true, the CTA opens a "this tool is coming soon" modal
+   *  instead of navigating. Three of the six stages currently have no
+   *  dedicated tool — they live on the roadmap until we build them. */
+  comingSoon?:       boolean;
   accentFrom:        string;       // tailwind gradient stop
   accentTo:          string;
   accentText:        string;       // text-{color}-700 for chip
@@ -90,7 +94,8 @@ export const ROADMAP_STAGES: Record<RoadmapStageId, RoadmapStageMeta> = {
     short:            "Applications",
     description:      "Get every document in order — transcripts, SOP, recommendations, CV — and submit clean applications on schedule.",
     primaryCta:       "Build my application checklist",
-    toolRoute:        "/app/roadmap",   // stays in-app; checklist lives here
+    toolRoute:        "/app/roadmap",   // no dedicated tool yet; CTA surfaces a coming-soon modal
+    comingSoon:       true,
     accentFrom:       "from-fuchsia-500",
     accentTo:         "to-pink-500",
     accentText:       "text-fuchsia-700",
@@ -105,6 +110,7 @@ export const ROADMAP_STAGES: Record<RoadmapStageId, RoadmapStageMeta> = {
     description:      "Confirm your admission, submit financial proof, and get your I-20 — the document that unlocks every later step.",
     primaryCta:       "Review my I-20 readiness",
     toolRoute:        "/app/roadmap",
+    comingSoon:       true,
     accentFrom:       "from-amber-500",
     accentTo:         "to-orange-500",
     accentText:       "text-amber-700",
@@ -133,6 +139,7 @@ export const ROADMAP_STAGES: Record<RoadmapStageId, RoadmapStageMeta> = {
     description:      "Book your flight, sort housing, prep your port-of-entry documents, and arrive ready for orientation.",
     primaryCta:       "Prepare for arrival",
     toolRoute:        "/app/roadmap",
+    comingSoon:       true,
     accentFrom:       "from-emerald-500",
     accentTo:         "to-teal-500",
     accentText:       "text-emerald-700",
@@ -488,6 +495,32 @@ export function calculateProgress(
   }
   if (total === 0) return 0;
   return Math.round((earned / total) * 100);
+}
+
+/**
+ * Returns the next stage in the canonical order, or null if the user
+ * is already on the last stage. Used by the "Continue to <next>" CTA
+ * that surfaces once the current stage's required items are done.
+ */
+export function getNextStage(stage: RoadmapStageId): RoadmapStageId | null {
+  const idx = ROADMAP_STAGE_ORDER.indexOf(stage);
+  if (idx < 0 || idx >= ROADMAP_STAGE_ORDER.length - 1) return null;
+  return ROADMAP_STAGE_ORDER[idx + 1];
+}
+
+/**
+ * Are ALL required items in the user's current stage marked completed?
+ * Drives the "Continue to next stage" CTA — we only surface it when
+ * the user has materially finished the work, not just clicked a few
+ * boxes.
+ */
+export function isStageRequiredComplete(
+  checklist: ChecklistItem[],
+  stage: RoadmapStageId,
+): boolean {
+  const required = checklist.filter((it) => it.stage === stage && it.required);
+  if (required.length === 0) return false;        // nothing to complete = never auto-advance
+  return required.every((it) => it.status === "completed");
 }
 
 // ─────────────────────────────────────────────────────────────────────

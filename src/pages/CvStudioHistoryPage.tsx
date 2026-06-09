@@ -1,8 +1,8 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// CvStudioHistoryPage — list of every CV the user has generated. Streams
+﻿// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// CvStudioHistoryPage â€” list of every CV the user has generated. Streams
 // from /academicCvDocuments via onSnapshot (rules allow user reads scoped
 // to their own userId). Each row links to the detail page.
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -10,7 +10,7 @@ import { collection, onSnapshot, orderBy, query, where, limit } from "firebase/f
 import { db } from "../lib/firebase";
 import { useAuth } from "../hooks/useAuth";
 import {
-  ArrowLeft, FileText, Wrench, RefreshCw, Lock, Sparkles,
+  ArrowLeft, FileText, Wrench, RefreshCw, Lock, Wand2,
   Loader2, ChevronRight, Inbox,
 } from "lucide-react";
 import CvStudioFooter from "../components/cv/CvStudioFooter";
@@ -31,14 +31,14 @@ const MODE_META: Record<HistoryRow["mode"], {
 }> = {
   review:  { label: "Review & revamp",          Icon: RefreshCw, accent: "from-blue-500 to-blue-700",       ring: "ring-blue-100" },
   build:   { label: "Built from scratch",       Icon: Wrench,    accent: "from-violet-500 to-violet-700",   ring: "ring-violet-100" },
-  convert: { label: "Professional → Academic",  Icon: FileText,  accent: "from-emerald-500 to-emerald-700", ring: "ring-emerald-100" },
+  convert: { label: "Professional â†’ Academic",  Icon: FileText,  accent: "from-emerald-500 to-emerald-700", ring: "ring-emerald-100" },
 };
 
 function fmtDate(d: Date | null): string {
-  if (!d) return "—";
+  if (!d) return "â€”";
   const day = d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
   const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-  return `${day} · ${time}`;
+  return `${day} Â· ${time}`;
 }
 
 export default function CvStudioHistoryPage() {
@@ -91,7 +91,7 @@ export default function CvStudioHistoryPage() {
             </Link>
             <div className="flex-1 min-w-0">
               <h1 className="text-[15px] font-bold leading-tight truncate">CV History</h1>
-              <p className="text-xs text-slate-500 truncate">Every CV you've generated — preview and unlocked</p>
+              <p className="text-xs text-slate-500 truncate">Every CV you've generated â€” preview and unlocked</p>
             </div>
           </div>
         </header>
@@ -160,7 +160,7 @@ export default function CvStudioHistoryPage() {
                           <p className="text-[15px] font-black text-slate-900 truncate">{meta.label}</p>
                           {row.unlocked ? (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black uppercase tracking-widest">
-                              <Sparkles size={9} /> Unlocked
+                              <Wand2 size={9} /> Unlocked
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-black uppercase tracking-widest">
@@ -169,7 +169,7 @@ export default function CvStudioHistoryPage() {
                           )}
                         </div>
                         <p className="text-xs text-slate-500 truncate">
-                          {fmtDate(row.createdAt)}{row.unlocked ? "" : ` · ${row.creditCost} credits to unlock`}
+                          {fmtDate(row.createdAt)}{row.unlocked ? "" : ` Â· ${row.creditCost} credits to unlock`}
                         </p>
                       </div>
                       <ChevronRight size={16} className="text-slate-400 group-hover:text-slate-700 transition-colors flex-shrink-0" />

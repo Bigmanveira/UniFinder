@@ -1,6 +1,6 @@
-import { Link, useNavigate } from "react-router-dom";
+﻿import { Link, useNavigate } from "react-router-dom";
 import {
-  Lock, ArrowRight, Sparkles, AlertTriangle, Info,
+  Lock, ArrowRight, Wand2, AlertTriangle, Info,
   MapPin, Star, ChevronRight, Send,
 } from "lucide-react";
 import BrandLogo from "../components/BrandLogo";
@@ -25,12 +25,12 @@ type GateState = "enforced" | "no-eligible" | "not-enforced";
 type BucketKey = "all" | "reach" | "target" | "safety";
 
 const STUDY_TIPS = [
-  "Most U.S. graduate programs review applications on a rolling basis — the earlier you apply, the better your funding odds.",
+  "Most U.S. graduate programs review applications on a rolling basis â€” the earlier you apply, the better your funding odds.",
   "F-1 student visas require an I-20 form, which the school issues only after you accept the offer.",
   "Many doctoral programs fully fund admitted students with tuition waivers, stipends, and health insurance.",
   "WES is the most widely accepted credential evaluator for international transcripts.",
   "A strong Statement of Purpose names specific faculty and research labs you want to work with.",
-  "GRE policies vary — some programs have made it optional, others still require it. Check each program directly.",
+  "GRE policies vary â€” some programs have made it optional, others still require it. Check each program directly.",
   "TOEFL/IELTS waivers are often available if your prior degree was taught in English.",
   "Out-of-state tuition can be waived through teaching or research assistantships at most public colleges.",
 ];
@@ -46,11 +46,11 @@ function progressFor(s: number) { return Math.min(95, 100 - 100 * Math.exp(-s / 
 
 const BUCKETS = {
   reach:  { title: "Reach",  desc: "Selective programs where you're competitive but not guaranteed.", dot: "bg-rose-500" },
-  target: { title: "Target", desc: "Realistic matches — your profile aligns with their typical admit.", dot: "bg-blue-500" },
+  target: { title: "Target", desc: "Realistic matches â€” your profile aligns with their typical admit.", dot: "bg-blue-500" },
   safety: { title: "Safety", desc: "High admission probability. Solid backups for your shortlist.",     dot: "bg-emerald-500" },
 } as const;
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function LockedPreviewPage() {
   const [profile, setProfile] = useState<StudentProfile | null>(null);
   const [bucketed, setBucketed] = useState<ReturnType<typeof bucketizeMatches> | null>(null);
@@ -82,7 +82,7 @@ export default function LockedPreviewPage() {
         // Deterministic matcher is now ONLY used as a hard-filter
         // pre-pass: community-college exclusion, theology-incompat
         // exclusion, and program-gate enforcement. Its scoring and
-        // ranking are NOT shown to the user — all matches come from
+        // ranking are NOT shown to the user â€” all matches come from
         // the AI ranker.
         const computedMatches = getDeterministicMatches(schools, parsed, gate.eligibleUnitIds);
         const recommended = computedMatches.filter(
@@ -101,7 +101,7 @@ export default function LockedPreviewPage() {
           return;
         }
 
-        // Call the AI ranker. No deterministic fallback display — if AI
+        // Call the AI ranker. No deterministic fallback display â€” if AI
         // fails, we surface a clear error so the user can retry, rather
         // than showing them a different list of schools than what they'd
         // unlock.
@@ -187,7 +187,7 @@ export default function LockedPreviewPage() {
     setUnlocking(true);
     setUnlockError("");
     try {
-      // Send the AI-ranked top-10 — the same schools the user saw in the
+      // Send the AI-ranked top-10 â€” the same schools the user saw in the
       // preview. The server preserves these buckets (no re-ranking) so
       // the unlocked report renders identical schools to the preview.
       const matchesToUnlock = bucketed.top10;
@@ -206,10 +206,10 @@ export default function LockedPreviewPage() {
     } finally { setUnlocking(false); }
   };
 
-  if (loading) return <PageLoader label="Sit tight while we find your top matches…" />;
+  if (loading) return <PageLoader label="Sit tight while we find your top matchesâ€¦" />;
 
   // AI ranker failed and there's nothing to show. No deterministic
-  // fallback — surface a clear error with a retry path.
+  // fallback â€” surface a clear error with a retry path.
   if (aiError) return <MatchErrorScreen message={aiError} onRetry={() => window.location.reload()} />;
 
   const top10Count = bucketed?.top10.length ?? 0;
@@ -227,7 +227,7 @@ export default function LockedPreviewPage() {
       <div className="pointer-events-none absolute top-[-80px] right-[-120px] w-[420px] h-[420px] bg-blue-200/40 rounded-full blur-[120px]" aria-hidden />
       <div className="pointer-events-none absolute top-[180px] left-[-100px] w-[360px] h-[360px] bg-cyan-200/30 rounded-full blur-[120px]" aria-hidden />
 
-      {/* Header — logo + avatar */}
+      {/* Header â€” logo + avatar */}
       <header className="relative px-5 py-5 max-w-6xl mx-auto flex items-center justify-between">
         <BrandLogo size="sm" />
         {user ? (
@@ -240,12 +240,12 @@ export default function LockedPreviewPage() {
       </header>
 
       <main className="relative max-w-6xl mx-auto px-5">
-        {/* Hero greeting — bold, big, with emoji */}
+        {/* Hero greeting â€” bold, big, with emoji */}
         <FadeIn as="section" className="pt-4 pb-7">
           <h1 className="text-[34px] sm:text-5xl font-bold tracking-tight leading-[1.05] text-slate-900">
             {programGate === "no-eligible"
               ? "No verified programs found"
-              : <>Your top {top10Count} matches <span className="inline-block ml-1">🎯</span></>}
+              : <>Your top {top10Count} matches <span className="inline-block ml-1">ðŸŽ¯</span></>}
           </h1>
           <p className="text-base text-slate-500 mt-2 max-w-xl">
             {programGate === "no-eligible"
@@ -323,7 +323,7 @@ export default function LockedPreviewPage() {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function PageLoader({ label }: { label: string }) {
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-6">
@@ -331,10 +331,10 @@ function PageLoader({ label }: { label: string }) {
         <div className="relative w-16 h-16 mx-auto mb-5">
           <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
           <div className="absolute inset-0 rounded-full border-4 border-t-primary-600 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
-          <Sparkles size={20} className="absolute inset-0 m-auto text-primary-600" />
+          <Wand2 size={20} className="absolute inset-0 m-auto text-primary-600" />
         </div>
         <p className="text-base font-semibold text-slate-900 mb-1">{label}</p>
-        <p className="text-xs text-slate-500">This usually takes 10–20 seconds.</p>
+        <p className="text-xs text-slate-500">This usually takes 10â€“20 seconds.</p>
       </div>
     </div>
   );
@@ -378,7 +378,7 @@ function FilterPill({ label, count, active, onClick }: {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function BucketSection({ bucket, matches, showHeader }: {
   bucket: keyof typeof BUCKETS;
   matches: SchoolMatch[];
@@ -413,10 +413,10 @@ function BucketSection({ bucket, matches, showHeader }: {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Image-only "place" card matching the Mount-Fuji card from the reference.
 // Locked: school name is a frosted blur, lock icon top-right.
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function PlaceCard({ match }: { match: SchoolMatch }) {
   return (
     <div className="relative aspect-[3/4] rounded-[28px] overflow-hidden group cursor-not-allowed shadow-[0_4px_24px_rgba(15,23,42,0.08)] hover:shadow-[0_12px_40px_rgba(15,23,42,0.16)] transition-shadow">
@@ -451,10 +451,10 @@ function PlaceCard({ match }: { match: SchoolMatch }) {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Sticky unlock dock — full width on mobile, max-w-xl on desktop
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// Sticky unlock dock â€” full width on mobile, max-w-xl on desktop
 // During unlock: morphs into staged progress + tip card
-// ─────────────────────────────────────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function UnlockDock({
   user, unlocking, unlockError, unlockElapsed, tip, onUnlock,
 }: {
@@ -484,12 +484,12 @@ function UnlockDock({
               {unlockError && <UnlockErrorBanner kind={unlockError} />}
               <button onClick={onUnlock}
                 className="flex items-center justify-center gap-2 w-full bg-slate-900 hover:bg-slate-800 text-white text-base font-semibold py-4 rounded-2xl transition-all active:scale-[0.99]">
-                {user ? <>Unlock report · 1 credit <Send size={15} /></>
+                {user ? <>Unlock report Â· 1 credit <Send size={15} /></>
                       : <>Create free account <ArrowRight size={15} /></>}
               </button>
               {!user && (
                 <p className="mt-3 text-center text-[11px] text-slate-500">
-                  Includes 2 free credits · Save schools · No card required
+                  Includes 2 free credits Â· Save schools Â· No card required
                 </p>
               )}
             </div>
@@ -499,7 +499,7 @@ function UnlockDock({
 
       {/* POPUP OVERLAY during unlock. Sits over the locked-schools page
           with a translucent dark backdrop so the user can still see the
-          shortlist behind it — keeps the unlock moment connected to the
+          shortlist behind it â€” keeps the unlock moment connected to the
           schools they're paying to reveal. */}
       {unlocking && (
         <motion.div
@@ -523,7 +523,7 @@ function UnlockDock({
                 <div className="absolute inset-1 rounded-full border-[3px] border-white/15" />
                 <div className="absolute inset-1 rounded-full border-[3px] border-t-blue-400 border-r-transparent border-b-transparent border-l-transparent animate-spin" style={{ animationDuration: "1.4s" }} />
                 <div className="absolute inset-0 m-auto w-10 h-10 flex items-center justify-center">
-                  <Sparkles size={26} className="text-blue-300" />
+                  <Wand2 size={26} className="text-blue-300" />
                 </div>
               </div>
 
@@ -546,7 +546,7 @@ function UnlockDock({
                     {stageLabel}
                   </motion.p>
                 </AnimatePresence>
-                <p className="text-[10px] text-blue-200/60 mt-0.5 tabular-nums">{unlockElapsed}s elapsed · usually 30–60s</p>
+                <p className="text-[10px] text-blue-200/60 mt-0.5 tabular-nums">{unlockElapsed}s elapsed Â· usually 30â€“60s</p>
               </div>
 
               {/* Progress bar */}
@@ -562,7 +562,7 @@ function UnlockDock({
               {/* Did you know card */}
               <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-left min-h-[96px]">
                 <div className="flex items-center gap-1.5 mb-1.5">
-                  <Sparkles size={11} className="text-amber-300" />
+                  <Wand2 size={11} className="text-amber-300" />
                   <p className="text-[10px] font-bold tracking-widest text-amber-200 uppercase">Did you know</p>
                 </div>
                 <AnimatePresence mode="wait">
@@ -595,7 +595,7 @@ function UnlockErrorBanner({ kind }: { kind: string }) {
   if (kind === "no_eligible_programs")
     return (
       <div className="mb-3 bg-amber-50 border border-amber-200 px-3.5 py-2.5 rounded-xl text-xs font-medium text-amber-800">
-        No verified programs for this field/level yet — no credit deducted.
+        No verified programs for this field/level yet â€” no credit deducted.
       </div>
     );
   return (

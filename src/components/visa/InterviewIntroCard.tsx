@@ -1,6 +1,6 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { motion } from "framer-motion";
-import { ShieldAlert, ArrowRight, Loader2, Sparkles, Check, Video, Mic, AlertTriangle, RotateCw } from "lucide-react";
+import { ShieldAlert, ArrowRight, Loader2, Wand2, Check, Video, Mic, AlertTriangle, RotateCw } from "lucide-react";
 
 const DISCLAIMER =
   "This is a simulated F-1 visa interview for practice only. It is not legal advice, " +
@@ -15,7 +15,7 @@ export default function InterviewIntroCard({
   onStart: (accepted: boolean, isReturningApplicant: boolean) => Promise<void>;
   starting: boolean;
   speechSupported: boolean;
-  /** Live wallet balance — drives the CTA copy (free preview vs paid).
+  /** Live wallet balance â€” drives the CTA copy (free preview vs paid).
    *  null = still loading; treat as "unknown, default to paid copy". */
   walletCredits: number | null;
   isFounder: boolean;
@@ -26,7 +26,7 @@ export default function InterviewIntroCard({
 
   // Mode the user is about to land in. Founders always paid. Anyone else
   // with < 15 credits gets the free 3-min preview. The backend re-derives
-  // this from the wallet at start time — this client-side decision is
+  // this from the wallet at start time â€” this client-side decision is
   // just for the CTA copy. Mismatch is impossible: if the wallet drops
   // between this render and the start click, the backend will route to
   // preview correctly regardless of what the button said.
@@ -37,7 +37,7 @@ export default function InterviewIntroCard({
       initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
       className="space-y-5"
     >
-      {/* Hero card — matches the dashboard F-1 CTA visual language */}
+      {/* Hero card â€” matches the dashboard F-1 CTA visual language */}
       <div className="relative overflow-hidden rounded-3xl bg-slate-950 text-white p-7 sm:p-9 shadow-xl shadow-slate-950/30">
         <div className="absolute inset-0 bg-gradient-to-br from-blue-900 via-slate-900 to-slate-950" aria-hidden />
         <div className="absolute -top-20 -right-20 w-64 h-64 bg-blue-500/20 rounded-full blur-3xl pointer-events-none" aria-hidden />
@@ -53,7 +53,7 @@ export default function InterviewIntroCard({
 
         <div className="relative pt-6 sm:pt-2">
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5 sm:gap-6">
-            {/* Anna avatar — same breathing animation as dashboard CTA */}
+            {/* Anna avatar â€” same breathing animation as dashboard CTA */}
             <div className="relative flex-shrink-0">
               <div className="absolute inset-0 rounded-full bg-primary-500/30 animate-ping" style={{ animationDuration: "2.5s" }} aria-hidden />
               <div className="relative w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-primary-400 via-primary-500 to-accent-500 ring-2 ring-white/20 shadow-2xl overflow-hidden">
@@ -82,18 +82,18 @@ export default function InterviewIntroCard({
           <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-7">
             <DarkPill icon={<Video size={16} />}    label="Live avatar"     />
             <DarkPill icon={<Mic size={16} />}      label="Voice answers"   />
-            <DarkPill icon={<Sparkles size={16} />} label="Scored feedback" />
+            <DarkPill icon={<Wand2 size={16} />} label="Scored feedback" />
           </div>
         </div>
       </div>
 
-      {/* Preview-mode banner — appears only when the user is going into a
+      {/* Preview-mode banner â€” appears only when the user is going into a
           free 3-minute preview because they don't have 15 credits yet.
           Sets the expectation BEFORE they start so the cut-off at 3 minutes
           isn't a surprise. */}
       {willBePreview && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3.5 text-[13px] text-emerald-900 leading-relaxed flex items-start gap-2.5">
-          <Sparkles size={16} className="mt-0.5 text-emerald-700 flex-shrink-0" />
+          <Wand2 size={16} className="mt-0.5 text-emerald-700 flex-shrink-0" />
           <div>
             <p className="font-bold mb-0.5">Free 3-minute preview</p>
             <p className="text-emerald-800">
@@ -103,13 +103,13 @@ export default function InterviewIntroCard({
         </div>
       )}
 
-      {/* Setup checklist — only when supported */}
+      {/* Setup checklist â€” only when supported */}
       {speechSupported ? (
         <div className="bg-blue-50 border border-blue-200 rounded-2xl px-4 py-3.5 text-[13px] text-blue-900 leading-relaxed">
           <p className="font-bold mb-1.5">Before you start</p>
           <ul className="space-y-1 text-[12.5px]">
             <li className="flex items-start gap-2"><Check size={14} className="text-blue-600 mt-0.5 flex-shrink-0" /> Use Chrome, Edge, Brave, or Safari on a stable connection.</li>
-            <li className="flex items-start gap-2"><Check size={14} className="text-blue-600 mt-0.5 flex-shrink-0" /> Allow microphone access when prompted — the interview is voice-only.</li>
+            <li className="flex items-start gap-2"><Check size={14} className="text-blue-600 mt-0.5 flex-shrink-0" /> Allow microphone access when prompted â€” the interview is voice-only.</li>
             <li className="flex items-start gap-2"><Check size={14} className="text-blue-600 mt-0.5 flex-shrink-0" /> Find a quiet space; the avatar takes a few seconds to wake up.</li>
           </ul>
         </div>
@@ -125,7 +125,7 @@ export default function InterviewIntroCard({
 
       {/* Returning-applicant checkbox. When ticked, the AI is informed and
           asks "What has changed since your last interview?" early in the
-          flow — same probe a real consular officer uses on repeat
+          flow â€” same probe a real consular officer uses on repeat
           applicants. Wrapped in a button for a single tap target. */}
       <button
         type="button"
@@ -160,10 +160,10 @@ export default function InterviewIntroCard({
       {/* Disclaimer */}
       <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3.5 text-[12.5px] text-amber-900 leading-relaxed flex items-start gap-2.5">
         <ShieldAlert size={16} className="mt-0.5 text-amber-700 flex-shrink-0" />
-        <p><span className="font-bold">Important —</span> {DISCLAIMER}</p>
+        <p><span className="font-bold">Important â€”</span> {DISCLAIMER}</p>
       </div>
 
-      {/* Acceptance — single tap target.
+      {/* Acceptance â€” single tap target.
           Pre-fix bug: the visible checkbox span had its own onClick AND
           was wrapped in a <label> that also toggled the hidden <input>.
           Tapping the box toggled state twice (became a no-op) while tapping
@@ -190,7 +190,7 @@ export default function InterviewIntroCard({
           {accepted && <Check size={12} className="stroke-[3]" />}
         </span>
         <span className="text-[13.5px] text-slate-700 leading-relaxed">
-          I understand this is a practice simulator only. I will answer truthfully — College Ready does not coach dishonesty, and a good practice score does not predict the real interview outcome.
+          I understand this is a practice simulator only. I will answer truthfully â€” College Ready does not coach dishonesty, and a good practice score does not predict the real interview outcome.
         </span>
       </button>
 
@@ -203,7 +203,7 @@ export default function InterviewIntroCard({
           ? <Loader2 size={16} className="animate-spin" />
           : willBePreview
             ? <>Start free 3-minute preview <ArrowRight size={16} /></>
-            : <>Start the interview · 15 credits <ArrowRight size={16} /></>
+            : <>Start the interview Â· 15 credits <ArrowRight size={16} /></>
         }
       </button>
     </motion.div>

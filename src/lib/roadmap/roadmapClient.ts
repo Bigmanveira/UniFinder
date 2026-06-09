@@ -14,8 +14,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import {
-  doc, getDoc, setDoc, updateDoc, onSnapshot,
-  serverTimestamp, type Unsubscribe,
+  collection, doc, getDoc, getDocs, query, where, limit,
+  setDoc, updateDoc, onSnapshot, serverTimestamp, type Unsubscribe,
 } from "firebase/firestore";
 import { db } from "../firebase";
 import {
@@ -194,3 +194,100 @@ export async function getOrNullRoadmap(uid: string): Promise<StudyRoadmap | null
 // Re-export the version constant so callers (e.g. the dashboard) can
 // surface a "your roadmap is from an older template" notice later.
 export { STUDY_ROADMAP_VERSION };
+
+// ─────────────────────────────────────────────────────────────────────
+// External activity reconcile
+//
+// Some checklist items have a real-world equivalent in another part of
+// the app — running a match, unlocking a match report, or completing a
+// visa interview. Rather than forcing the user to also tick the
+// checkbox manually, this helper checks the relevant collections at
+// load time and silently marks the corresponding items completed.
+//
+// Behaviour:
+//   - Only flips items that are currently "not_started". Never
+//     overwrites a deliberate "blocked", "needs_review", "in_progress",
+//     or even "completed" — the user's manual state always wins.
+//   - Returns the set of item ids that were actually updated, so the
+//     caller can decide whether to refetch / surface a "we marked X for
+//     you" toast.
+//   - Idempotent: running it twice in the same session has no effect
+//     beyond the first call's writes.
+// ─────────────────────────────────────────────────────────────────────
+
+interface ReconcileResult {
+  updatedItemIds: string[];
+}
+
+/**
+ * Mark items completed when the user has done the equivalent action
+ * elsewhere in the app. Pull checks live in this function so adding a
+ * new mapping is a one-line change.
+ */
+export async function reconcileFromExternalActivity(uid: string): Promise<ReconcileResult> {
+  const rmSnap = await getDoc(roadmapRef(uid));
+  if (!rmSnap.exists()) return { updatedItemIds: [] };
+  const rm = rmSnap.data() as import("./studyAbroad").StudyRoadmap;
+
+  // Pull the small set of facts we need. Each query is bounded by
+  // limit(1) — we only care "has the user done this at all," not how
+  // many times. Cuts the read cost to 1 doc per probe.
+  const [hasMatchReport, hasVisaReport] = await Promise.all([
+    hasAtLeastOne("matchReports", uid),
+    hasAtLeastOne("visaInterviewReports", uid),
+  ]);
+
+  // Item-id → did-the-user-do-this map. Add new mappings here only.
+  // We never include items the user might want to keep manually
+  // managing (e.g. "Submit applications" — completion of one upload
+  // doesn't mean every application is in).
+  const externalCompletions: Record<string, boolean> = {
+    // Discovery
+    d_first_match: hasMatchReport,
+    // School Matching
+    sm_unlock:     hasMatchReport,
+    // Visa Preparation
+    v_practice:    hasVisaReport,
+  };
+
+  const now = Date.now();
+  let dirty = false;
+  const updatedItemIds: string[] = [];
+  const nextChecklist = rm.checklist.map((item) => {
+    if (item.status !== "not_started") return item;       // honour manual state
+    if (!externalCompletions[item.id])  return item;       // not eligible
+    dirty = true;
+    updatedItemIds.push(item.id);
+    return {
+      ...item,
+      status:      "completed" as const,
+      completedAt: now,
+      updatedAt:   now,
+    };
+  });
+
+  if (!dirty) return { updatedItemIds: [] };
+
+  const progressPercentage = (await import("./studyAbroad")).calculateProgress(
+    nextChecklist, rm.currentStage,
+  );
+  await updateDoc(roadmapRef(uid), {
+    checklist:          nextChecklist,
+    progressPercentage,
+    updatedAt:          serverTimestamp(),
+  });
+  return { updatedItemIds };
+}
+
+async function hasAtLeastOne(collectionName: string, uid: string): Promise<boolean> {
+  try {
+    const q = query(collection(db, collectionName), where("userId", "==", uid), limit(1));
+    const snap = await getDocs(q);
+    return !snap.empty;
+  } catch (err) {
+    // Don't surface — reconcile is best-effort. If the user lacks read
+    // permission on a collection we just won't auto-complete anything.
+    console.warn(`[roadmap] reconcile probe failed for ${collectionName}:`, err);
+    return false;
+  }
+}
