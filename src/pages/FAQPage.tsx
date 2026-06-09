@@ -1,4 +1,4 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronDown, Wand2, MessageCircleQuestion } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -11,7 +11,7 @@ const FAQS = [
   },
   {
     question: "What are Credits and how do I use them?",
-    answer: "College Ready uses a simple pay-as-you-go credit system. 1 credit unlocks a full personalised match report â€” your Reach schools are visible right away. 5 credits reveal a Target or Safety category inside that report if you want the wider list (optional â€” Reach alone is enough for most users). 15 credits unlock a live F-1 visa interview practice session. You get 2 free credits just for signing up."
+    answer: "College Ready uses a simple pay-as-you-go credit system. 1 credit unlocks a full personalised match report — your Reach schools are visible right away. 5 credits reveal a Target or Safety category inside that report if you want the wider list (optional — Reach alone is enough for most users). 15 credits unlock a live F-1 visa interview practice session. You get 2 free credits just for signing up."
   },
   {
     question: "Does College Ready guarantee my admission?",

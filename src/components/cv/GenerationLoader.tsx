@@ -1,13 +1,13 @@
-﻿// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// GenerationLoader â€” full-screen-ish loader shown while the AI generates
-// a CV. The Sonnet generation takes 10â€“25 seconds and a static spinner
-// reads as "frozen" â€” so we cycle through mode-specific status lines on
+// ─────────────────────────────────────────────────────────────────────────────
+// GenerationLoader — full-screen-ish loader shown while the AI generates
+// a CV. The Sonnet generation takes 10–25 seconds and a static spinner
+// reads as "frozen" — so we cycle through mode-specific status lines on
 // a 1.6s rhythm to keep the user oriented.
 //
 // Visual treatment: animated multi-layer gradient halo around a rotating
 // sparkle, with a fade-cross transition between status lines so it feels
 // alive without screaming for attention.
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useState } from "react";
 import { Wand2 } from "lucide-react";
@@ -15,33 +15,33 @@ import { Wand2 } from "lucide-react";
 type CvMode = "review" | "build" | "convert";
 
 // Mode-specific status copy. Stages are deliberately written in the
-// present continuous ("Readingâ€¦", "Draftingâ€¦") so each line reads as
+// present continuous ("Reading…", "Drafting…") so each line reads as
 // "something is happening right now." Order roughly matches what Sonnet
 // is actually doing under the hood.
 const STATUS_LINES: Record<CvMode, string[]> = {
   review: [
-    "Reading your CVâ€¦",
-    "Mapping every sectionâ€¦",
-    "Calling out the weak phrasingâ€¦",
-    "Drafting a sharper versionâ€¦",
-    "Polishing the proseâ€¦",
-    "Adding the final flourishesâ€¦",
+    "Reading your CV…",
+    "Mapping every section…",
+    "Calling out the weak phrasing…",
+    "Drafting a sharper version…",
+    "Polishing the prose…",
+    "Adding the final flourishes…",
   ],
   build: [
-    "Gathering your factsâ€¦",
-    "Choosing the right structureâ€¦",
-    "Drafting each sectionâ€¦",
-    "Tightening the bullet pointsâ€¦",
-    "Setting the typographyâ€¦",
-    "Putting the final document togetherâ€¦",
+    "Gathering your facts…",
+    "Choosing the right structure…",
+    "Drafting each section…",
+    "Tightening the bullet points…",
+    "Setting the typography…",
+    "Putting the final document together…",
   ],
   convert: [
-    "Reading your professional CVâ€¦",
-    "Spotting the research signalsâ€¦",
-    "Stripping the corporate phrasingâ€¦",
-    "Reorganising for an academic readerâ€¦",
-    "Re-titling the sectionsâ€¦",
-    "Finishing the conversionâ€¦",
+    "Reading your professional CV…",
+    "Spotting the research signals…",
+    "Stripping the corporate phrasing…",
+    "Reorganising for an academic reader…",
+    "Re-titling the sections…",
+    "Finishing the conversion…",
   ],
 };
 
@@ -77,7 +77,7 @@ export default function GenerationLoader({ mode }: { mode: CvMode }) {
 
   return (
     <div className="relative bg-white rounded-[32px] border border-slate-200 shadow-xl shadow-slate-900/[0.04] overflow-hidden">
-      {/* Animated decorative background â€” three soft gradient blobs that
+      {/* Animated decorative background — three soft gradient blobs that
           slowly orbit the centre. Pure CSS keyframes (drift-* below)
           mean no JS animation cost. */}
       <div className="absolute inset-0 pointer-events-none" aria-hidden>
@@ -86,7 +86,7 @@ export default function GenerationLoader({ mode }: { mode: CvMode }) {
       </div>
 
       <div className="relative px-8 py-14 sm:py-16 flex flex-col items-center text-center">
-        {/* Animated sparkle â€” outer ring spins slowly, inner sparkle
+        {/* Animated sparkle — outer ring spins slowly, inner sparkle
             pulses on a different cadence so the eye keeps catching motion. */}
         <div className="relative mb-7">
           <div className={`absolute inset-[-12px] rounded-full bg-gradient-to-br ${theme.from} ${theme.to} opacity-25 blur-2xl animate-pulse`} aria-hidden />
@@ -99,7 +99,7 @@ export default function GenerationLoader({ mode }: { mode: CvMode }) {
           {stageLabel}
         </span>
 
-        {/* Status line â€” cross-fade between messages. Min height locks
+        {/* Status line — cross-fade between messages. Min height locks
             the layout so the surrounding card doesn't jump when copy
             changes length. */}
         <div className="h-12 sm:h-14 flex items-center justify-center">
@@ -113,10 +113,10 @@ export default function GenerationLoader({ mode }: { mode: CvMode }) {
         </div>
 
         <p className="text-[13px] text-slate-500 leading-relaxed max-w-md mt-4">
-          This usually takes 10â€“25 seconds. Hang tight â€” we're writing in your voice, not in chatbot.
+          This usually takes 10–25 seconds. Hang tight — we're writing in your voice, not in chatbot.
         </p>
 
-        {/* Progress dots â€” purely decorative pacing cue, advances with
+        {/* Progress dots — purely decorative pacing cue, advances with
             stageIndex so the user has a sense of "this loader knows
             where it is in the process." */}
         <div className="flex items-center gap-2 mt-7" aria-hidden>

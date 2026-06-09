@@ -1,23 +1,23 @@
-﻿// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// CvPreviewPaywall â€” the "you've seen ~30% of your CV, unlock the rest"
+// ─────────────────────────────────────────────────────────────────────────────
+// CvPreviewPaywall — the "you've seen ~30% of your CV, unlock the rest"
 // surface used by all three CV Studio flows after the AI returns the
 // generated document.
 //
 // Visual treatment:
 //   - The preview Markdown renders inside a paper-shadow document card
-//     (8.5Ã—11 feel, soft drop-shadow, off-white background) so it reads
+//     (8.5×11 feel, soft drop-shadow, off-white background) so it reads
 //     like a printed CV rather than a generic web pane.
 //   - Floating section badges around the card label what the candidate
 //     gets (Education / Work / Skills / Leadership). They're decorative
 //     anchor points + a subtle "real CV, real sections" signal.
 //   - The paywall card sits below the preview as a separate gradient-bordered
-//     surface â€” clear visual break between "what you see" and "what you
+//     surface — clear visual break between "what you see" and "what you
 //     pay to see."
 //
 // State machine:
-//   unlocked = false â†’ paper preview + paywall card with Unlock CTA
-//   unlocked = true  â†’ full paper document + copy/download bar
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+//   unlocked = false → paper preview + paywall card with Unlock CTA
+//   unlocked = true  → full paper document + copy/download bar
+// ─────────────────────────────────────────────────────────────────────────────
 
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -64,7 +64,7 @@ const MODE_THEME: Record<"review" | "build" | "convert", {
              ctaBg: "bg-emerald-600 hover:bg-emerald-700",
              ctaShadow: "shadow-emerald-500/30",
              chipBg: "bg-emerald-50", chipBorder: "border-emerald-200", chipText: "text-emerald-700",
-             label: "Professional â†’ Academic" },
+             label: "Professional → Academic" },
 };
 
 // Floating decorative section icons. Positioned around the document
@@ -147,7 +147,7 @@ export default function CvPreviewPaywall({
     URL.revokeObjectURL(url);
   };
 
-  // â”€â”€ Unlocked state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Unlocked state ────────────────────────────────────────────────
   if (unlocked && fullMarkdown) {
     return (
       <div className="space-y-5">
@@ -187,12 +187,12 @@ export default function CvPreviewPaywall({
     );
   }
 
-  // â”€â”€ Preview + paywall state â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Preview + paywall state ───────────────────────────────────────
   return (
     <div className="space-y-6">
-      {/* Decorated preview region â€” paper doc + floating section badges */}
+      {/* Decorated preview region — paper doc + floating section badges */}
       <div className="relative">
-        {/* Top-of-document tab â€” visual "draft v1" feel */}
+        {/* Top-of-document tab — visual "draft v1" feel */}
         <div className="flex items-center gap-2 mb-3 ml-1">
           <div className="flex items-center gap-1.5">
             <span className="w-2.5 h-2.5 rounded-full bg-rose-400" />
@@ -235,7 +235,7 @@ export default function CvPreviewPaywall({
         </div>
 
         <div className="relative p-8 sm:p-10 flex flex-col lg:flex-row items-center gap-7 lg:gap-10">
-          {/* Left â€” message */}
+          {/* Left — message */}
           <div className="flex-1 text-center lg:text-left">
             <span className={`inline-flex items-center gap-1.5 text-[10px] font-black tracking-[0.18em] uppercase ${theme.chipBg} ${theme.chipText} border ${theme.chipBorder} rounded-full px-2.5 py-1 mb-4`}>
               <Lock size={10} /> Locked Â· unlock to read in full
@@ -248,7 +248,7 @@ export default function CvPreviewPaywall({
             </p>
           </div>
 
-          {/* Right â€” CTA stack */}
+          {/* Right — CTA stack */}
           <div className="w-full lg:w-auto flex flex-col items-stretch lg:items-end gap-2">
             {isFounder ? (
               <>
@@ -258,9 +258,9 @@ export default function CvPreviewPaywall({
                   className={`inline-flex items-center justify-center gap-2 px-7 py-4 rounded-2xl text-sm font-bold text-white shadow-lg ${theme.ctaBg} ${theme.ctaShadow} transition-colors disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap`}
                 >
                   {busy ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
-                  {busy ? "Unlockingâ€¦" : "Unlock â€” free for you"}
+                  {busy ? "Unlocking…" : "Unlock — free for you"}
                 </button>
-                <p className="text-[11px] text-slate-500 text-center lg:text-right">Founder account â€” no credits charged.</p>
+                <p className="text-[11px] text-slate-500 text-center lg:text-right">Founder account — no credits charged.</p>
               </>
             ) : canAfford ? (
               <>
@@ -270,7 +270,7 @@ export default function CvPreviewPaywall({
                   className={`inline-flex items-center justify-center gap-2 px-7 py-4 rounded-2xl text-sm font-bold text-white shadow-lg ${theme.ctaBg} ${theme.ctaShadow} transition-colors disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap`}
                 >
                   {busy ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
-                  {busy ? "Unlockingâ€¦" : `Unlock â€” ${creditCost} credits`}
+                  {busy ? "Unlocking…" : `Unlock — ${creditCost} credits`}
                 </button>
                 <p className="text-[11px] text-slate-500 text-center lg:text-right">
                   You have {walletCredits} Â· {(walletCredits ?? 0) - creditCost} left after
@@ -299,7 +299,7 @@ export default function CvPreviewPaywall({
         )}
       </div>
 
-      {/* Reassurance row â€” three quick benefits to push the unlock decision */}
+      {/* Reassurance row — three quick benefits to push the unlock decision */}
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <ReassureChip icon={<ScrollText size={14} />} label="Every section" />
         <ReassureChip icon={<Wrench size={14} />}     label="Editable Markdown" />
@@ -309,7 +309,7 @@ export default function CvPreviewPaywall({
   );
 }
 
-// â”€â”€ Paper document container â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Paper document container ─────────────────────────────────────────
 // A soft drop-shadow + subtle inset highlight makes the markdown read
 // like a printed page rather than a content area. The padding mirrors
 // standard letter-page margins.

@@ -1,8 +1,8 @@
-﻿// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// CvStudioHistoryPage â€” list of every CV the user has generated. Streams
+// ─────────────────────────────────────────────────────────────────────────────
+// CvStudioHistoryPage — list of every CV the user has generated. Streams
 // from /academicCvDocuments via onSnapshot (rules allow user reads scoped
 // to their own userId). Each row links to the detail page.
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
@@ -31,11 +31,11 @@ const MODE_META: Record<HistoryRow["mode"], {
 }> = {
   review:  { label: "Review & revamp",          Icon: RefreshCw, accent: "from-blue-500 to-blue-700",       ring: "ring-blue-100" },
   build:   { label: "Built from scratch",       Icon: Wrench,    accent: "from-violet-500 to-violet-700",   ring: "ring-violet-100" },
-  convert: { label: "Professional â†’ Academic",  Icon: FileText,  accent: "from-emerald-500 to-emerald-700", ring: "ring-emerald-100" },
+  convert: { label: "Professional → Academic",  Icon: FileText,  accent: "from-emerald-500 to-emerald-700", ring: "ring-emerald-100" },
 };
 
 function fmtDate(d: Date | null): string {
-  if (!d) return "â€”";
+  if (!d) return "—";
   const day = d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
   const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
   return `${day} Â· ${time}`;
@@ -91,7 +91,7 @@ export default function CvStudioHistoryPage() {
             </Link>
             <div className="flex-1 min-w-0">
               <h1 className="text-[15px] font-bold leading-tight truncate">CV History</h1>
-              <p className="text-xs text-slate-500 truncate">Every CV you've generated â€” preview and unlocked</p>
+              <p className="text-xs text-slate-500 truncate">Every CV you've generated — preview and unlocked</p>
             </div>
           </div>
         </header>

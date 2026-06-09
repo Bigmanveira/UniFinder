@@ -1,4 +1,4 @@
-﻿import { motion } from "framer-motion";
+import { motion } from "framer-motion";
 import { Award, AlertTriangle, Wand2, RotateCcw, ArrowLeft, Lightbulb, Check } from "lucide-react";
 import type { VisaInterviewReport } from "../../types";
 
@@ -44,7 +44,7 @@ export default function InterviewReportView({ report, onRetry, onBack }: Props) 
       initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
       className="space-y-6"
     >
-      {/* Hero â€” overall + meta scores */}
+      {/* Hero — overall + meta scores */}
       <section className="bg-slate-950 text-white rounded-3xl p-7 sm:p-8 relative overflow-hidden">
         <div className="absolute -top-24 -right-24 w-72 h-72 bg-blue-500/15 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -80,7 +80,7 @@ export default function InterviewReportView({ report, onRetry, onBack }: Props) 
           </div>
         </div>
 
-        {/* Sub-scores grid â€” show "score / 100" so the user reads each as a
+        {/* Sub-scores grid — show "score / 100" so the user reads each as a
             fraction, not an opaque number. The dimmer "/100" suffix keeps
             the headline number prominent while making the scale obvious. */}
         <div className="relative mt-6 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
@@ -124,7 +124,7 @@ export default function InterviewReportView({ report, onRetry, onBack }: Props) 
           <ul className="space-y-1.5">
             {report.redFlagsToImprove.map((s, i) => (
               <li key={i} className="text-sm text-amber-900 flex items-start gap-2 leading-relaxed">
-                <span className="mt-0.5 text-amber-700">â€¢</span>{s}
+                <span className="mt-0.5 text-amber-700">•</span>{s}
               </li>
             ))}
           </ul>
@@ -205,7 +205,7 @@ function FeedbackList({
       <ul className="space-y-1.5">
         {items.map((s, i) => (
           <li key={i} className="text-[13px] flex items-start gap-2 leading-relaxed">
-            <span className="mt-1 opacity-70">â€¢</span>{s}
+            <span className="mt-1 opacity-70">•</span>{s}
           </li>
         ))}
       </ul>
