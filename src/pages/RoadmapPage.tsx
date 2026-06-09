@@ -185,8 +185,18 @@ function Dashboard({
   const nextStage      = getNextStage(roadmap.currentStage);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 antialiased">
-      <header className="sticky top-0 z-40 border-b border-slate-200/60 bg-white/85 backdrop-blur-xl">
+    <div className="relative min-h-screen text-slate-900 antialiased overflow-hidden bg-gradient-to-b from-slate-100 via-slate-50 to-white">
+      {/* Decorative neutral gradients — slate/stone tones only. No AI
+          rainbow. Sit behind everything; pointer-events disabled. The
+          gradient delivers depth without making the page feel like a
+          chatbot. */}
+      <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none" aria-hidden>
+        <div className="absolute -top-40 -right-40 w-[640px] h-[640px] rounded-full blur-[160px] bg-gradient-to-br from-slate-300/35 via-slate-200/15 to-transparent" />
+        <div className="absolute top-1/3 -left-40 w-[520px] h-[520px] rounded-full blur-[160px] bg-gradient-to-br from-stone-200/40 via-slate-100/20 to-transparent" />
+        <div className="absolute -bottom-40 right-1/4 w-[560px] h-[560px] rounded-full blur-[160px] bg-gradient-to-tr from-slate-200/30 via-white/0 to-transparent" />
+      </div>
+
+      <header className="sticky top-0 z-40 border-b border-slate-200/50 bg-white/70 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60">
         <div className="max-w-3xl mx-auto px-5 h-14 flex items-center gap-3">
           <Link to="/app" className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 transition-colors" aria-label="Back to dashboard">
             <ArrowLeft size={15} />
@@ -303,8 +313,11 @@ function Hero({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      className="space-y-5"
+      className="relative space-y-5 px-6 sm:px-8 py-7 sm:py-9 rounded-3xl border border-slate-200/70 bg-gradient-to-br from-white via-slate-50/40 to-stone-50/60 shadow-[0_1px_3px_rgba(15,23,42,0.04)] overflow-hidden"
     >
+      {/* Soft emerald wash anchored to the upper-right of the hero so
+          the eye reads "progress" without the whole card being green. */}
+      <div className="pointer-events-none absolute -top-20 -right-20 w-72 h-72 rounded-full blur-3xl bg-gradient-to-br from-emerald-100/60 to-transparent" aria-hidden />
       <div className="flex items-center gap-2">
         <p className="text-[11px] font-black tracking-[0.18em] uppercase text-emerald-700">
           Stage {stageIndex + 1} of 6
@@ -370,7 +383,7 @@ function Stepper({ currentStage }: { currentStage: RoadmapStageId }) {
     : (currentIndex / (totalSteps - 1)) * 100;
 
   return (
-    <section className="bg-white rounded-3xl border border-slate-200 px-5 py-7 sm:px-7">
+    <section className="bg-gradient-to-br from-white via-white to-slate-50/70 rounded-3xl border border-slate-200/80 shadow-[0_1px_3px_rgba(15,23,42,0.04)] px-5 py-7 sm:px-7">
       <div className="relative">
         {/* Track + animated fill */}
         <div className="absolute left-[14px] right-[14px] sm:left-[18px] sm:right-[18px] top-[14px] sm:top-[18px] h-[3px] rounded-full bg-slate-200 overflow-hidden pointer-events-none" aria-hidden>
@@ -440,7 +453,7 @@ function Checklist({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3, ease: "easeOut", delay: 0.05 }}
-      className="bg-white rounded-3xl border border-slate-200 overflow-hidden"
+      className="bg-gradient-to-br from-white via-white to-slate-50/70 rounded-3xl border border-slate-200/80 shadow-[0_1px_3px_rgba(15,23,42,0.04)] overflow-hidden"
     >
       <div className="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-baseline justify-between">
         <h3 className="text-[15px] font-black text-slate-900">Your checklist</h3>
@@ -635,7 +648,7 @@ function StagePicker({
   onClose: () => void;
 }) {
   return (
-    <section className="bg-white rounded-3xl border border-slate-200 p-5 sm:p-6">
+    <section className="bg-gradient-to-br from-white via-white to-slate-50/70 rounded-3xl border border-slate-200/80 shadow-[0_1px_3px_rgba(15,23,42,0.04)] p-5 sm:p-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-[14px] font-black text-slate-900">Where are you now?</h3>
         <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-900 text-[12px] font-bold transition-colors">
