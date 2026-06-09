@@ -25,6 +25,7 @@ const FullReportPage     = lazy(() => import("./pages/FullReportPage"));
 const RoadmapPage        = lazy(() => import("./pages/RoadmapPage"));
 const VisaInterviewPage  = lazy(() => import("./pages/VisaInterviewPage"));
 const InterviewReportDetailPage = lazy(() => import("./pages/InterviewReportDetailPage"));
+const RoadmapOnboardingPage = lazy(() => import("./pages/RoadmapOnboardingPage"));
 const CvStudioPage         = lazy(() => import("./pages/CvStudioPage"));
 const CvStudioReviewPage   = lazy(() => import("./pages/CvStudioReviewPage"));
 const CvStudioBuildPage    = lazy(() => import("./pages/CvStudioBuildPage"));
@@ -130,6 +131,7 @@ function App() {
                 <Route path="/app" element={<DashboardPage />} />
                 <Route path="/app/reports/:reportId" element={<FullReportPage />} />
                 <Route path="/app/roadmap" element={<RoadmapPage />} />
+                <Route path="/app/roadmap/onboarding" element={<RoadmapOnboardingPage />} />
                 <Route path="/app/visa-interview" element={<VisaInterviewPage />} />
                 <Route path="/app/interview-reports/:reportId" element={<InterviewReportDetailPage />} />
                 <Route path="/app/cv-studio"                    element={<CvStudioPage />} />

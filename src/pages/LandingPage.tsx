@@ -107,21 +107,32 @@ export default function LandingPage() {
         <div className="flex-1 text-center lg:text-left animate-fade-up">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 text-slate-600 text-xs font-bold tracking-widest uppercase mb-8 shadow-sm">
             <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse"></span>
-            AI-Powered College Match Engine
+            Personalised Study Abroad Roadmap
           </div>
 
           <h1 className="text-5xl md:text-7xl font-black text-slate-900 tracking-tight leading-[1.05] mb-6">
-            Find the college <br className="hidden md:block"/>
-            <span className="text-transparent bg-clip-text bg-gradient-to-br from-primary-600 to-accent-500">that actually fits you.</span>
+            Your personalised <br className="hidden md:block"/>
+            <span className="text-transparent bg-clip-text bg-gradient-to-br from-primary-600 to-accent-500">roadmap to studying in the USA.</span>
           </h1>
 
           <p className="text-lg md:text-xl text-slate-500 font-medium max-w-2xl mx-auto lg:mx-0 mb-10 leading-relaxed">
-            AI-powered college matching, grounded in verified program data — plus a realistic F-1 visa interview simulator for the moment that actually decides whether you get there.
+            From school matching to applications, visa preparation, and pre-departure guidance, CollegeReady helps international students know exactly what to do next.
           </p>
 
           <div className="flex flex-col sm:flex-row items-center gap-5 justify-center lg:justify-start">
-            <Link to="/intake" className="w-full sm:w-auto px-8 py-5 bg-primary-600 text-white rounded-full font-bold text-base hover:bg-primary-700 transition-transform active:scale-95 flex items-center justify-center gap-2 shadow-xl shadow-primary-500/25">
-              Find My Matches
+            {/* Primary CTA — drives into the roadmap onboarding. Signed-in
+                users skip onboarding via the in-app redirect if they already
+                have a roadmap doc. /signup?next=… preserves intent for
+                logged-out users. */}
+            <Link to={user ? "/app/roadmap" : "/signup?next=/app/roadmap/onboarding"} className="w-full sm:w-auto px-8 py-5 bg-primary-600 text-white rounded-full font-bold text-base hover:bg-primary-700 transition-transform active:scale-95 flex items-center justify-center gap-2 shadow-xl shadow-primary-500/25">
+              Start My Study Abroad Roadmap
+              <ArrowRight size={20} />
+            </Link>
+            {/* Secondary CTA — F-1 visa interview practice. Same target as
+                the simulator section below; preserves the previous funnel
+                for visitors who came in specifically for visa practice. */}
+            <Link to={user ? "/app/visa-interview" : "/signup?next=/app/visa-interview"} className="w-full sm:w-auto px-8 py-5 bg-white border border-slate-200 text-slate-900 rounded-full font-bold text-base hover:bg-slate-50 transition-transform active:scale-95 flex items-center justify-center gap-2 shadow-md">
+              Practice F-1 Visa Interview
               <ArrowRight size={20} />
             </Link>
             <div className="flex items-center gap-3">

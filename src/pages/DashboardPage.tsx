@@ -8,7 +8,9 @@ import { doc, getDoc, onSnapshot, setDoc, updateDoc, serverTimestamp } from "fir
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "../lib/firebase";
-import { LogOut, Plus, Wallet, Bookmark, FileText, ChevronRight, User, GraduationCap, MapPin, Sparkles, Camera, Globe, Trash2, ChevronDown, ChevronUp, ArrowRight, Heart, Map, Gift, Copy, Check, Send, Mail, Home, ShieldAlert, Menu, X, Bell, Mic, KeyRound, Loader2, AlertTriangle } from "lucide-react";
+import { LogOut, Plus, Wallet, Bookmark, FileText, ChevronRight, User, GraduationCap, MapPin, Sparkles, Camera, Globe, Trash2, ChevronDown, ChevronUp, ArrowRight, Heart, Map, Gift, Copy, Check, Send, Mail, Home, ShieldAlert, Menu, X, Bell, Mic, KeyRound, Loader2, AlertTriangle, Compass } from "lucide-react";
+import { subscribeStudyRoadmap } from "../lib/roadmap/roadmapClient";
+import { ROADMAP_STAGES, type StudyRoadmap } from "../lib/roadmap/studyAbroad";
 import BrandLogo from "../components/BrandLogo";
 import { motion, AnimatePresence } from "framer-motion";
 import { collection, query, where } from "firebase/firestore";
@@ -50,6 +52,10 @@ export default function DashboardPage() {
   const [matchReports, setMatchReports] = useState<any[]>([]);
   const [interviewReports, setInterviewReports] = useState<any[]>([]);
   const [savedSchools, setSavedSchools] = useState<any[]>([]);
+  // Study Abroad Roadmap (new feature). null = user has never onboarded.
+  // Loaded flag distinguishes "still fetching" from "fetched + no doc."
+  const [studyRoadmap,       setStudyRoadmap]       = useState<StudyRoadmap | null>(null);
+  const [studyRoadmapLoaded, setStudyRoadmapLoaded] = useState(false);
   const [showAllReports, setShowAllReports] = useState(false);
   const [showAllInterviews, setShowAllInterviews] = useState(false);
   // Live user-profile doc so saved displayName + avatar reflect everywhere
@@ -123,12 +129,23 @@ export default function DashboardPage() {
       }
     });
 
+    // Study Abroad Roadmap — null while loading, then either the
+    // roadmap doc or null (= user has never onboarded). Drives the
+    // dashboard banner that nudges existing users into the new
+    // diagnostic without blocking access to anything they had before.
+    const unsubRoadmap = subscribeStudyRoadmap(
+      user.uid,
+      (rm) => { setStudyRoadmap(rm); setStudyRoadmapLoaded(true); },
+      ()   => { setStudyRoadmapLoaded(true); }, // silent — degrade to "no roadmap" UI
+    );
+
     return () => {
       unsubCredits();
       unsubReports();
       unsubInterviews();
       unsubProfile();
       unsubSaved();
+      unsubRoadmap();
     };
   }, [user]);
 
@@ -255,24 +272,29 @@ export default function DashboardPage() {
               </FadeInItem>
             </div>
 
-            {/* Roadmap CTA — shown once the user has at least one report */}
-            {matchReports.length > 0 && (
+            {/* Study Abroad Roadmap banner — three states:
+                  - still loading: render nothing (avoid flash)
+                  - no roadmap yet (existing user): "Build your roadmap" → onboarding
+                  - has roadmap: "Continue your <Stage> roadmap" with progress meter
+                The old gating on matchReports.length > 0 is gone — the roadmap is
+                the new front-door for every user, regardless of unlock history. */}
+            {studyRoadmapLoaded && !studyRoadmap && (
               <FadeIn>
                 <button
-                  onClick={() => navigate("/app/roadmap")}
-                  className="group w-full text-left bg-gradient-to-br from-slate-900 via-slate-900 to-blue-900 text-white rounded-3xl p-6 sm:p-7 relative overflow-hidden hover:shadow-xl hover:shadow-slate-900/20 transition-shadow"
+                  onClick={() => navigate("/app/roadmap/onboarding")}
+                  className="group w-full text-left bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 text-white rounded-3xl p-6 sm:p-7 relative overflow-hidden hover:shadow-xl hover:shadow-slate-900/20 transition-shadow"
                 >
-                  <div className="absolute -top-16 -right-16 w-48 h-48 bg-blue-500/20 rounded-full blur-3xl" aria-hidden />
-                  <div className="absolute -bottom-12 -left-12 w-40 h-40 bg-cyan-500/15 rounded-full blur-3xl" aria-hidden />
+                  <div className="absolute -top-16 -right-16 w-48 h-48 bg-blue-500/25 rounded-full blur-3xl" aria-hidden />
+                  <div className="absolute -bottom-12 -left-12 w-40 h-40 bg-violet-500/20 rounded-full blur-3xl" aria-hidden />
                   <div className="relative flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center text-white flex-shrink-0">
-                      <Map size={20} />
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center text-white flex-shrink-0 shadow-md">
+                      <Compass size={20} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-[11px] font-semibold tracking-wide text-amber-300 mb-1">NEXT STAGE</p>
-                      <h3 className="text-xl sm:text-2xl font-bold tracking-tight leading-tight">Your application roadmap</h3>
+                      <p className="text-[11px] font-black tracking-[0.2em] uppercase text-blue-300 mb-1">New · Personalised roadmap</p>
+                      <h3 className="text-xl sm:text-2xl font-black tracking-tight leading-tight">Build your study abroad roadmap</h3>
                       <p className="text-sm text-white/70 mt-1 leading-relaxed">
-                        7 stages, step-by-step — from funding strategy to your visa interview.
+                        Answer six quick questions and we'll show you exactly what to do next — and which CollegeReady tool to use.
                       </p>
                     </div>
                     <div className="hidden sm:flex w-10 h-10 rounded-full bg-white/10 group-hover:bg-white/20 transition-colors items-center justify-center text-white flex-shrink-0">
@@ -280,6 +302,46 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 </button>
+              </FadeIn>
+            )}
+
+            {studyRoadmap && (
+              <FadeIn>
+                {(() => {
+                  const meta = ROADMAP_STAGES[studyRoadmap.currentStage];
+                  return (
+                    <button
+                      onClick={() => navigate("/app/roadmap")}
+                      className="group w-full text-left bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 text-white rounded-3xl p-6 sm:p-7 relative overflow-hidden hover:shadow-xl hover:shadow-slate-900/20 transition-shadow"
+                    >
+                      <div className={`absolute -top-16 -right-16 w-48 h-48 bg-gradient-to-br ${meta.accentFrom} ${meta.accentTo} opacity-30 rounded-full blur-3xl`} aria-hidden />
+                      <div className="absolute -bottom-12 -left-12 w-40 h-40 bg-violet-500/15 rounded-full blur-3xl" aria-hidden />
+                      <div className="relative flex items-start gap-4">
+                        <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${meta.accentFrom} ${meta.accentTo} flex items-center justify-center text-white flex-shrink-0 shadow-md`}>
+                          <Map size={20} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-black tracking-[0.2em] uppercase text-amber-300 mb-1">You are in · {meta.title}</p>
+                          <h3 className="text-xl sm:text-2xl font-black tracking-tight leading-tight">{meta.primaryCta}</h3>
+                          <p className="text-sm text-white/70 mt-1 leading-relaxed">{meta.description}</p>
+                          {/* Progress meter */}
+                          <div className="mt-4 flex items-center gap-3">
+                            <div className="flex-1 h-1.5 bg-white/15 rounded-full overflow-hidden max-w-xs">
+                              <div
+                                className={`h-full bg-gradient-to-r ${meta.accentFrom} ${meta.accentTo} rounded-full transition-all duration-700`}
+                                style={{ width: `${Math.min(studyRoadmap.progressPercentage, 100)}%` }}
+                              />
+                            </div>
+                            <span className="text-[11px] font-black tabular-nums text-white/80">{studyRoadmap.progressPercentage}%</span>
+                          </div>
+                        </div>
+                        <div className="hidden sm:flex w-10 h-10 rounded-full bg-white/10 group-hover:bg-white/20 transition-colors items-center justify-center text-white flex-shrink-0">
+                          <ArrowRight size={16} />
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })()}
               </FadeIn>
             )}
 
