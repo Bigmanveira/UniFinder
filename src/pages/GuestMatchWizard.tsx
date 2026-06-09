@@ -395,7 +395,24 @@ export default function GuestMatchWizard() {
 
           {step < 7 && (
             <div className="mt-10 pt-6 border-t border-slate-100 flex gap-4">
-              <button onClick={() => step > 1 ? setStep(s => s - 1) : navigate(user ? "/app" : "/")} className="px-6 py-4 rounded-full font-bold text-sm bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors flex items-center gap-2">
+              <button
+                onClick={() => {
+                  // step > 1: walk back through the wizard.
+                  // step === 1: leave the wizard. We honour browser history
+                  // first so a user who came from /app/roadmap (or any other
+                  // page) lands back where they were, not on the dashboard.
+                  // If history is empty (deep link / new tab), fall back to
+                  // a sensible default — /app for signed-in users, / otherwise.
+                  if (step > 1) {
+                    setStep((s) => s - 1);
+                  } else if (typeof window !== "undefined" && window.history.length > 1) {
+                    navigate(-1);
+                  } else {
+                    navigate(user ? "/app" : "/");
+                  }
+                }}
+                className="px-6 py-4 rounded-full font-bold text-sm bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors flex items-center gap-2"
+              >
                 <ArrowLeft size={16} /> Back
               </button>
               <button onClick={handleNext} className="flex-1 px-6 py-4 rounded-full font-bold text-sm bg-slate-900 text-white hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-slate-900/10">
