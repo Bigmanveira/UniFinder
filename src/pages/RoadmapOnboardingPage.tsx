@@ -168,7 +168,7 @@ export default function RoadmapOnboardingPage() {
     switch (step) {
       case 1: return Boolean(answers.completedAcademicLevel);
       case 2: return Boolean(answers.targetAcademicLevel);
-      case 3: return Boolean(answers.currentProcessStatus);
+      case 3: return Array.isArray(answers.currentProcessStatus) && answers.currentProcessStatus.length > 0;
       case 4: return Boolean(answers.primaryNeed);
       case 5: return Boolean(answers.originCountry);
       case 6: return Boolean(answers.preferredStartTerm);
@@ -243,15 +243,21 @@ export default function RoadmapOnboardingPage() {
           />
         )}
         {step === 3 && (
-          <QuestionPanel
+          <MultiSelectPanel<Q3>
             kicker="Where you are"
             question="Where are you currently in the process?"
-            sub="Pick the closest match — you can update this anytime later."
+            sub="Tick every one that applies. We'll route you to the furthest-along stage and surface the right next steps."
             icon={<MapPin size={20} />}
             iconBg="from-fuchsia-500 to-pink-600"
             options={Q3_OPTIONS}
-            value={answers.currentProcessStatus}
-            onPick={(v) => { setAnswer("currentProcessStatus", v); }}
+            values={answers.currentProcessStatus ?? []}
+            onToggle={(v) => {
+              const current = answers.currentProcessStatus ?? [];
+              const next = current.includes(v)
+                ? current.filter((x) => x !== v)
+                : [...current, v];
+              setAnswer("currentProcessStatus", next);
+            }}
             twoColumns
           />
         )}
@@ -338,7 +344,7 @@ function isComplete(a: Partial<OnboardingAnswers>): a is OnboardingAnswers {
   return Boolean(
     a.completedAcademicLevel &&
     a.targetAcademicLevel &&
-    a.currentProcessStatus &&
+    Array.isArray(a.currentProcessStatus) && a.currentProcessStatus.length > 0 &&
     a.primaryNeed &&
     a.originCountry &&
     a.preferredStartTerm,
@@ -397,6 +403,77 @@ function QuestionPanel<T extends string>({
           );
         })}
       </div>
+    </section>
+  );
+}
+
+// ── MultiSelectPanel ──────────────────────────────────────────────────
+// Multi-select variant of QuestionPanel. Used by Step 3 so the user
+// can tick every process-status that applies (e.g. "I have admission"
+// + "I have paid SEVIS" + "I have completed DS-160"). The stage
+// assignment picks the furthest-along selection.
+function MultiSelectPanel<T extends string>({
+  kicker, question, sub, icon, iconBg, options, values, onToggle, twoColumns,
+}: {
+  kicker: string;
+  question: string;
+  sub: string;
+  icon: React.ReactNode;
+  iconBg: string;
+  options: { value: T; label: string }[];
+  values: T[];
+  onToggle: (v: T) => void;
+  twoColumns?: boolean;
+}) {
+  return (
+    <section className="bg-white rounded-3xl border border-slate-200 shadow-sm p-7 sm:p-9">
+      <div className="flex items-start gap-4 mb-7">
+        <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${iconBg} text-white flex items-center justify-center shadow-md flex-shrink-0`}>
+          {icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[10px] font-black tracking-[0.18em] uppercase text-slate-500 mb-1">{kicker}</p>
+          <div className="flex items-center gap-2 flex-wrap mb-1.5">
+            <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 leading-tight">{question}</h2>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black uppercase tracking-widest">
+              Multi-select
+            </span>
+          </div>
+          <p className="text-[13px] text-slate-600 leading-relaxed">{sub}</p>
+        </div>
+      </div>
+
+      <div className={`grid gap-2.5 ${twoColumns ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"}`}>
+        {options.map((opt) => {
+          const selected = values.includes(opt.value);
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => onToggle(opt.value)}
+              aria-pressed={selected}
+              className={`text-left flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 transition-all ${
+                selected
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white text-slate-900 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+              }`}
+            >
+              <span className={`w-5 h-5 rounded-md flex-shrink-0 flex items-center justify-center transition-colors border-2 ${
+                selected ? "bg-white border-white text-slate-900" : "bg-white border-slate-300"
+              }`} aria-hidden>
+                {selected && <Check size={12} className="stroke-[3]" />}
+              </span>
+              <span className="text-[14px] font-bold leading-snug">{opt.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <p className="text-[11px] text-slate-500 mt-4">
+        {values.length === 0
+          ? "Tick at least one."
+          : `${values.length} selected.`}
+      </p>
     </section>
   );
 }

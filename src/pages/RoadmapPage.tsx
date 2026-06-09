@@ -642,7 +642,10 @@ function StagePicker({
   current, currentStatus, disabled, onPick, onClose,
 }: {
   current: RoadmapStageId;
-  currentStatus: CurrentProcessStatus;
+  /** Legacy docs carry a single string; new docs carry an array of
+   *  every status the user ticked during onboarding. We coerce to an
+   *  array at the boundary so display + writes stay consistent. */
+  currentStatus: CurrentProcessStatus | CurrentProcessStatus[];
   disabled: boolean;
   onPick: (stage: RoadmapStageId, status: CurrentProcessStatus | undefined) => void;
   onClose: () => void;
@@ -688,7 +691,11 @@ function StagePicker({
         })}
       </div>
       <p className="text-[11px] text-slate-500 mt-4">
-        Your checklist progress is preserved. Currently labelled "{LABELS.currentProcessStatus[currentStatus]}".
+        Your checklist progress is preserved. Currently labelled "{
+          (Array.isArray(currentStatus) ? currentStatus : [currentStatus])
+            .map((s) => LABELS.currentProcessStatus[s])
+            .join(", ")
+        }".
       </p>
     </section>
   );

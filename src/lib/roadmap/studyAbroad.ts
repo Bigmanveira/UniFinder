@@ -307,10 +307,29 @@ export type StartTerm = "fall_2026" | "spring_2027" | "fall_2027" | "not_sure";
 export interface OnboardingAnswers {
   completedAcademicLevel: CompletedAcademicLevel;
   targetAcademicLevel:    TargetAcademicLevel;
-  currentProcessStatus:   CurrentProcessStatus;
+  /** Where the user is in the process. The diagnostic now allows
+   *  multiple selections (e.g. "have_admission" + "paid_sevis" +
+   *  "completed_ds160" — common for users mid-visa-prep). The
+   *  assigned stage is the FURTHEST ALONG of the selections.
+   *
+   *  Backward-compat note: existing roadmap docs were written before
+   *  this change and carry a single CurrentProcessStatus string.
+   *  coerceProcessStatuses() below normalises both shapes for read
+   *  paths; getStageFromOnboarding() accepts the array form. */
+  currentProcessStatus:   CurrentProcessStatus[];
   primaryNeed:            PrimaryNeed;
   originCountry:          OriginCountry;
   preferredStartTerm:     StartTerm;
+}
+
+/** Normalise legacy single-string docs into the new array shape so
+ *  every downstream consumer can assume an array. New writes are
+ *  always arrays; old docs may have a string. */
+export function coerceProcessStatuses(
+  value: CurrentProcessStatus | CurrentProcessStatus[] | undefined | null,
+): CurrentProcessStatus[] {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
 }
 
 // Stage assignment map. Lifted straight from the spec.
@@ -334,22 +353,39 @@ const PROCESS_TO_STAGE: Record<CurrentProcessStatus, RoadmapStageId> = {
  * Determine which stage a user belongs in based on their onboarding
  * answers. Pure function; deterministic; no side effects.
  *
- * Tiebreakers:
- *   - If currentProcessStatus is "received_i20" AND primaryNeed is
- *     visa-related, advance to visa_preparation. The spec calls this
- *     out explicitly.
- *   - If primaryNeed is "not_sure", trust currentProcessStatus alone.
+ * Multi-select handling: each selected currentProcessStatus value
+ * maps to a roadmap stage. We assign the user to the FURTHEST ALONG
+ * of those stages — that's where they actually need to focus.
+ *
+ * Tiebreakers (apply if ANY selected status matches):
+ *   - "received_i20"  + primaryNeed = visa-related → visa_preparation
+ *   - "have_admission" + primaryNeed = visa-related → visa_preparation
+ *   - primaryNeed = "not_sure" → trust the statuses alone.
  */
 export function getStageFromOnboarding(answers: OnboardingAnswers): RoadmapStageId {
-  const baseStage = PROCESS_TO_STAGE[answers.currentProcessStatus];
+  const statuses = coerceProcessStatuses(answers.currentProcessStatus);
+  if (statuses.length === 0) return "discovery"; // defensive
 
-  if (answers.currentProcessStatus === "received_i20" && answers.primaryNeed === "visa_interview_preparation") {
+  // Find the most advanced stage across all selections.
+  let bestIndex = -1;
+  let bestStage: RoadmapStageId = "discovery";
+  for (const status of statuses) {
+    const stage = PROCESS_TO_STAGE[status];
+    const idx = ROADMAP_STAGE_ORDER.indexOf(stage);
+    if (idx > bestIndex) {
+      bestIndex = idx;
+      bestStage = stage;
+    }
+  }
+
+  // Visa-interest override — if the user has an I-20 or admission AND
+  // they say visa interview prep is what they need most, jump straight
+  // to Visa Preparation regardless of the natural mapping.
+  const needsVisaPrep = answers.primaryNeed === "visa_interview_preparation";
+  if (needsVisaPrep && (statuses.includes("received_i20") || statuses.includes("have_admission"))) {
     return "visa_preparation";
   }
-  if (answers.currentProcessStatus === "have_admission" && answers.primaryNeed === "visa_interview_preparation") {
-    return "visa_preparation";
-  }
-  return baseStage;
+  return bestStage;
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -364,7 +400,10 @@ export interface StudyRoadmap {
   originCountry:          OriginCountry;
   completedAcademicLevel: CompletedAcademicLevel;
   targetAcademicLevel:    TargetAcademicLevel;
-  currentProcessStatus:   CurrentProcessStatus;
+  /** Always an array on new writes; may be a legacy single-string on
+   *  pre-multi-select docs. Use coerceProcessStatuses() to normalise
+   *  before display. */
+  currentProcessStatus:   CurrentProcessStatus | CurrentProcessStatus[];
   primaryNeed:            PrimaryNeed;
   preferredStartTerm:     StartTerm;
   currentStage:           RoadmapStageId;
