@@ -603,41 +603,45 @@ export default function DashboardPage() {
               role="dialog"
               aria-modal="true"
             >
-              <div className="flex items-center justify-between p-5 border-b border-slate-100">
-                <BrandLogo size="md" />
+              {/* Compact header — small brand + close button. Padding
+                  shrunk from p-5 to px-4 py-3 to save vertical room. */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+                <BrandLogo size="sm" />
                 <button
                   onClick={() => setMobileNavOpen(false)}
-                  className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700"
+                  className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700"
                   aria-label="Close menu"
                 >
-                  <X size={18} />
+                  <X size={16} />
                 </button>
               </div>
 
-              <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto">
-                <DesktopNavItem icon={<Home size={18} />}        label="Home"               active={activeTab === "matches"} onClick={() => { setActiveTab("matches"); setMobileNavOpen(false); }} badge={matchReports.length} />
-                <DesktopNavItem icon={<Bookmark size={18} />}    label="Saved Schools"      active={activeTab === "saved"}   onClick={() => { setActiveTab("saved");   setMobileNavOpen(false); }} badge={savedSchools.length} />
-                <DesktopNavItem icon={<Map size={18} />}         label="Roadmap"            active={false} onClick={() => { navigate("/app/roadmap");        setMobileNavOpen(false); }} />
-                <DesktopNavItem icon={<ShieldAlert size={18} />} label="Live interview practice" active={false} onClick={() => { navigate("/app/visa-interview"); setMobileNavOpen(false); }} />
-                <DesktopNavItem icon={<FileText size={18} />}    label="Academic CV Studio"     active={false} onClick={() => {}} badge="SOON" disabled />
-                <DesktopNavItem icon={<Mic size={18} />}         label="Interview history"  active={activeTab === "interviews"} onClick={() => { setActiveTab("interviews"); setMobileNavOpen(false); }} badge={interviewReports.length} />
-                <DesktopNavItem icon={<Wallet size={18} />}      label="Credits & Billing"  active={activeTab === "billing"} onClick={() => { setActiveTab("billing"); setMobileNavOpen(false); }} />
-                <DesktopNavItem icon={<User size={18} />}        label="Profile"            active={activeTab === "profile"} onClick={() => { setActiveTab("profile"); setMobileNavOpen(false); }} />
+              {/* Nav — compact spacing + smaller icons so all 8 items
+                  fit on a single phone screen without scrolling. */}
+              <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
+                <DesktopNavItem compact icon={<Home size={16} />}        label="Home"                    active={activeTab === "matches"}     onClick={() => { setActiveTab("matches");    setMobileNavOpen(false); }} badge={matchReports.length} />
+                <DesktopNavItem compact icon={<Bookmark size={16} />}    label="Saved Schools"           active={activeTab === "saved"}       onClick={() => { setActiveTab("saved");      setMobileNavOpen(false); }} badge={savedSchools.length} />
+                <DesktopNavItem compact icon={<Map size={16} />}         label="Roadmap"                 active={false}                       onClick={() => { navigate("/app/roadmap");        setMobileNavOpen(false); }} />
+                <DesktopNavItem compact icon={<ShieldAlert size={16} />} label="Live interview practice" active={false}                       onClick={() => { navigate("/app/visa-interview"); setMobileNavOpen(false); }} />
+                <DesktopNavItem compact icon={<FileText size={16} />}    label="Academic CV Studio"      active={false}                       onClick={() => {}} badge="SOON" disabled />
+                <DesktopNavItem compact icon={<Mic size={16} />}         label="Interview history"       active={activeTab === "interviews"}  onClick={() => { setActiveTab("interviews"); setMobileNavOpen(false); }} badge={interviewReports.length} />
+                <DesktopNavItem compact icon={<Wallet size={16} />}      label="Credits & Billing"       active={activeTab === "billing"}     onClick={() => { setActiveTab("billing");    setMobileNavOpen(false); }} />
+                <DesktopNavItem compact icon={<User size={16} />}        label="Profile"                 active={activeTab === "profile"}     onClick={() => { setActiveTab("profile");    setMobileNavOpen(false); }} />
               </nav>
 
-              <div className="p-4 border-t border-slate-100 space-y-3">
+              {/* Footer block — dropped the "Logged in as" card (the
+                  small @username row in the BrandLogo area + the
+                  sign-out button already telegraph identity). Stays
+                  compact so the whole drawer fits. */}
+              <div className="px-3 py-3 border-t border-slate-100 space-y-2">
                 <button
                   onClick={() => { navigate("/intake"); setMobileNavOpen(false); }}
-                  className="w-full inline-flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white font-bold text-sm py-3.5 rounded-2xl transition-colors active:scale-[0.99] shadow-lg shadow-primary-600/20"
+                  className="w-full inline-flex items-center justify-center gap-2 bg-primary-600 hover:bg-primary-700 text-white font-bold text-sm py-2.5 rounded-2xl transition-colors active:scale-[0.99] shadow-lg shadow-primary-600/20"
                 >
-                  <Plus size={16} /> Find my schools
+                  <Plus size={14} /> Find my schools
                 </button>
-                <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Logged in as</p>
-                  <p className="text-sm font-bold text-slate-900 truncate">@{username}</p>
-                </div>
-                <button onClick={handleSignOut} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-rose-500 hover:bg-rose-50 font-bold text-sm transition-colors">
-                  <LogOut size={16} /> Sign Out
+                <button onClick={handleSignOut} className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl text-rose-500 hover:bg-rose-50 font-bold text-xs transition-colors">
+                  <LogOut size={14} /> Sign Out · @{username}
                 </button>
               </div>
             </motion.aside>
@@ -1218,13 +1222,20 @@ function BillingTab({ credits, userId, isFounder }: { credits: number; userId: s
   );
 }
 
-function DesktopNavItem({ icon, label, active, onClick, badge, disabled }: { icon: React.ReactNode, label: string, active: boolean, onClick: () => void, badge?: string | number, disabled?: boolean }) {
+function DesktopNavItem({ icon, label, active, onClick, badge, disabled, compact }: { icon: React.ReactNode, label: string, active: boolean, onClick: () => void, badge?: string | number, disabled?: boolean, compact?: boolean }) {
+  // `compact` is set by the mobile drawer so 8 nav items + the header
+  // + the bottom CTA + sign-out all fit in a single phone viewport
+  // without scrolling. Desktop sidebar uses the default sizing.
+  const padding   = compact ? "px-3 py-2"     : "px-4 py-3.5";
+  const radius    = compact ? "rounded-2xl"   : "rounded-[20px]";
+  const gap       = compact ? "gap-2.5"       : "gap-3";
+  const badgeText = compact ? "text-[9px]"    : "text-[10px]";
   return (
     <button
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
       aria-disabled={disabled}
-      className={`w-full flex items-center justify-between px-4 py-3.5 rounded-[20px] font-bold text-sm transition-all ${
+      className={`w-full flex items-center justify-between ${padding} ${radius} font-bold text-sm transition-all ${
         disabled
           ? 'text-slate-400 cursor-not-allowed border border-transparent'
           : active
@@ -1232,14 +1243,14 @@ function DesktopNavItem({ icon, label, active, onClick, badge, disabled }: { ico
             : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 border border-transparent'
       }`}
     >
-      <div className="flex items-center gap-3">
+      <div className={`flex items-center ${gap}`}>
         <div className={`${disabled ? 'text-slate-300' : active ? 'text-primary-600' : 'text-slate-400'}`}>
           {icon}
         </div>
         {label}
       </div>
       {badge !== undefined && (
-        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+        <span className={`px-2 py-0.5 rounded-full ${badgeText} font-black ${
           disabled
             ? 'bg-amber-50 text-amber-700 border border-amber-200'
             : active
