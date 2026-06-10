@@ -18,7 +18,7 @@
 
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { signInWithPopup, GoogleAuthProvider } from "firebase/auth";
+import { signInWithPopup, getAdditionalUserInfo, GoogleAuthProvider } from "firebase/auth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { auth, googleProvider, db, functions } from "../lib/firebase";
@@ -35,6 +35,7 @@ import {
   stashPendingCredential,
   tryLinkPendingCredential,
 } from "../lib/accountLinking";
+import { getPostAuthPath, getRequestedPostAuthPath } from "../lib/postAuthRouting";
 
 // Same key the LoginPage reads. Pinned here so a rename in one place
 // doesn't silently break the round-trip.
@@ -101,26 +102,22 @@ export default function SignupPage() {
     return Date.now() < parseInt(expires, 10);
   };
 
-  const computePostSignupPath = () => {
-    if (nextPath) return nextPath;
-    if (shouldGoToResults()) return "/results";
-    // Every new user lands on the roadmap first. /app/roadmap auto-
-    // redirects to /app/roadmap/onboarding if no roadmap doc exists,
-    // so brand-new signups go straight into the 6-question diagnostic.
-    // Returning users with a roadmap already see the dashboard.
-    return "/app/roadmap";
-  };
+  const computePostSignupPath = (isNewUser: boolean) => getPostAuthPath({
+    nextPath,
+    hasGuestResults: shouldGoToResults(),
+    isNewUser,
+  });
 
   // Build the URL we want the magic link to bounce the user back to.
-  // We embed the post-signup destination as a `next` param so LoginPage
-  // (which catches the link return) knows where to ultimately land
-  // them. The protected-route round-trip ensures auth state is in
-  // place before we attempt to navigate.
+  // Only explicit destinations are embedded as `next`. For the normal
+  // signup path, LoginPage uses Firebase's isNewUser result to choose
+  // roadmap for a new account or dashboard for a returning account.
   const buildReturnUrl = (): string => {
-    const dest = computePostSignupPath();
+    const dest = getRequestedPostAuthPath(nextPath, shouldGoToResults());
     const params = new URLSearchParams();
-    params.set("next", dest);
-    return `${window.location.origin}/login?${params.toString()}`;
+    if (dest) params.set("next", dest);
+    const query = params.toString();
+    return `${window.location.origin}/login${query ? `?${query}` : ""}`;
   };
 
   // Stash the referral code (if the user typed one) before we hit the
@@ -163,6 +160,7 @@ export default function SignupPage() {
     try {
       persistReferralCode();
       const userCredential = await signInWithPopup(auth, googleProvider);
+      const additionalInfo = getAdditionalUserInfo(userCredential);
 
       // Account linking — if a previous email-link attempt got blocked
       // because a Google account already existed, the email-link
@@ -189,7 +187,7 @@ export default function SignupPage() {
       }
 
       await applyReferralIfPresent();
-      navigate(computePostSignupPath());
+      navigate(computePostSignupPath(additionalInfo?.isNewUser === true));
     } catch (err: any) {
       // Mirror LoginPage: existing account via email-link → stash the
       // Google credential and send the user a sign-in link. When they
@@ -202,10 +200,11 @@ export default function SignupPage() {
         if (linkEmail && pendingCred) {
           stashPendingCredential(pendingCred, linkEmail);
           try {
-            const dest = computePostSignupPath();
+            const dest = getRequestedPostAuthPath(nextPath, shouldGoToResults());
             const params = new URLSearchParams();
-            params.set("next", dest);
-            const returnUrl = `${window.location.origin}/login?${params.toString()}`;
+            if (dest) params.set("next", dest);
+            const query = params.toString();
+            const returnUrl = `${window.location.origin}/login${query ? `?${query}` : ""}`;
             const fn = httpsCallable<
               { email: string; returnUrl: string; intent: "signup" | "signin" },
               { ok: boolean }

@@ -44,6 +44,7 @@ import {
   stashPendingEmailLink,
   tryLinkPendingCredential,
 } from "../lib/accountLinking";
+import { getPostAuthPath, getRequestedPostAuthPath } from "../lib/postAuthRouting";
 
 const EMAIL_LS_KEY = "userApp:emailForSignIn";
 
@@ -77,16 +78,16 @@ export default function LoginPage() {
     return Date.now() < parseInt(expires, 10);
   };
 
-  const computePostLoginPath = () => {
-    if (nextPath) return nextPath;
-    if (shouldGoToResults()) return "/results";
-    // Default landing after sign-in is the roadmap, not the dashboard.
-    // /app/roadmap routes a first-time user to onboarding and a
-    // returning user to their personalised dashboard. Any explicit
-    // ?next= still wins (preserves intent for users who clicked
-    // "Practice F-1 Interview" or similar deep links).
-    return "/app/roadmap";
-  };
+  const computePostLoginPath = (isNewUser: boolean) => getPostAuthPath({
+    nextPath,
+    hasGuestResults: shouldGoToResults(),
+    isNewUser,
+  });
+
+  const requestedPostLoginPath = () => getRequestedPostAuthPath(
+    nextPath,
+    shouldGoToResults(),
+  );
 
   // Best-effort first-time bootstrap. Runs after every successful
   // auth (magic link OR Google). For an existing user with a /users
@@ -183,7 +184,8 @@ export default function LoginPage() {
 
         await bootstrapUser(credential.user.uid, credential.user.email);
         await applyReferralIfPresent();
-        navigate(computePostLoginPath());
+        const additionalInfo = getAdditionalUserInfo(credential);
+        navigate(computePostLoginPath(additionalInfo?.isNewUser === true));
       } catch (err: any) {
         // Mirror case of the Google flow: an account exists for this
         // email via Google. Stash the email-link credential and walk
@@ -212,10 +214,11 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
     try {
-      const dest = computePostLoginPath();
+      const dest = requestedPostLoginPath();
       const params = new URLSearchParams();
-      params.set("next", dest);
-      const returnUrl = `${window.location.origin}/login?${params.toString()}`;
+      if (dest) params.set("next", dest);
+      const query = params.toString();
+      const returnUrl = `${window.location.origin}/login${query ? `?${query}` : ""}`;
 
       const fn = httpsCallable<
         { email: string; returnUrl: string; intent: "signup" | "signin" },
@@ -262,7 +265,7 @@ export default function LoginPage() {
         await bootstrapUser(userCredential.user.uid, userCredential.user.email);
       }
       await applyReferralIfPresent();
-      navigate(computePostLoginPath());
+      navigate(computePostLoginPath(additionalInfo?.isNewUser === true));
     } catch (err: any) {
       // Account-linking branch: an account already exists for this email
       // via a DIFFERENT method (email-link). We can't sign in with
@@ -280,10 +283,11 @@ export default function LoginPage() {
         if (email && pendingCred) {
           stashPendingCredential(pendingCred, email);
           try {
-            const dest = computePostLoginPath();
+            const dest = requestedPostLoginPath();
             const params = new URLSearchParams();
-            params.set("next", dest);
-            const returnUrl = `${window.location.origin}/login?${params.toString()}`;
+            if (dest) params.set("next", dest);
+            const query = params.toString();
+            const returnUrl = `${window.location.origin}/login${query ? `?${query}` : ""}`;
             const fn = httpsCallable<
               { email: string; returnUrl: string; intent: "signup" | "signin" },
               { ok: boolean }
