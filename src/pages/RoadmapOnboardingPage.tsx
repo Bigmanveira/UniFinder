@@ -1,27 +1,23 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// RoadmapOnboardingPage — 6-question diagnostic that produces the user's
-// personalised study-abroad roadmap. The questions, options, and
-// stage-assignment logic all come from src/lib/roadmap/studyAbroad.ts;
-// this file is purely the UI + the write call.
+// RoadmapOnboardingPage — 6-question diagnostic.
 //
-// Behaviour:
-//   - One question per screen (less overwhelming on mobile).
-//   - Back / Next stepper with progress dots.
-//   - On submit, calls createRoadmapFromOnboarding(), then navigates
-//     the user to /app/roadmap where the new dashboard renders.
-//   - If the user already has a roadmap, we still let them re-take the
-//     diagnostic (it overwrites). The dashboard's "Update my stage"
-//     button uses a separate route so we don't accidentally wipe
-//     progress mid-flight.
+// Behaviour (P0 safe-rewrite, 2026-06-09):
+//   - First-time onboarding → createRoadmap (refuses if doc exists).
+//   - Re-running with `?update=1` → updateRoadmapDiagnostic. Preserves
+//     every checklist status, completion timestamp, and note. Surfaces
+//     a confirmation modal explaining what does/doesn't change.
+//   - The submit dispatches via upsertRoadmapFromOnboarding so the
+//     fallback never accidentally destroys data even on a stale
+//     `?update=1` URL bookmark.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { ArrowLeft, ArrowRight, Check, Loader2, MapPin, Compass } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Loader2, MapPin, Compass, ShieldCheck } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import {
-  createRoadmapFromOnboarding,
   getStudyRoadmap,
+  upsertRoadmapFromOnboarding,
 } from "../lib/roadmap/roadmapClient";
 import {
   LABELS,
@@ -109,18 +105,34 @@ export default function RoadmapOnboardingPage() {
   const [answers, setAnswers] = useState<Partial<OnboardingAnswers>>({});
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // When the user re-runs with ?update=1 and we know a roadmap exists,
+  // the submit shows a confirmation modal before writing. Tracked
+  // separately from `submitting` so the modal can show even if the
+  // initial existence-check is still resolving.
+  const [hasExistingRoadmap, setHasExistingRoadmap] = useState(false);
+  const [confirmingUpdate, setConfirmingUpdate] = useState(false);
 
-  // If a roadmap already exists and the user didn't explicitly ask to
-  // re-onboard, bounce them straight to the dashboard. Stops a stray
-  // bookmark from accidentally re-running the wizard.
+  // Resolve existence on mount.
+  //   - If a roadmap exists AND the user did NOT request an update
+  //     (?update=1), bounce them to the dashboard — stops a stray
+  //     bookmark from accidentally re-running the wizard.
+  //   - If a roadmap exists AND ?update=1, stay on the wizard but flag
+  //     hasExistingRoadmap so submit goes through the safe-update path
+  //     with a confirmation modal.
   useEffect(() => {
-    if (!user || isReonboarding) return;
+    if (!user) return;
     let cancelled = false;
     (async () => {
       try {
         const existing = await getStudyRoadmap(user.uid);
         if (cancelled) return;
-        if (existing) navigate("/app/roadmap", { replace: true });
+        if (existing) {
+          if (isReonboarding) {
+            setHasExistingRoadmap(true);
+          } else {
+            navigate("/app/roadmap", { replace: true });
+          }
+        }
       } catch {
         // Silent — if the read fails, we just show onboarding.
       }
@@ -147,17 +159,35 @@ export default function RoadmapOnboardingPage() {
       setError("Pick an answer for every question first.");
       return;
     }
+    // If we know an existing roadmap is in place, gate behind the
+    // confirmation modal. The modal calls performSubmit when the
+    // user confirms.
+    if (hasExistingRoadmap) {
+      setConfirmingUpdate(true);
+      return;
+    }
+    await performSubmit();
+  };
+
+  const performSubmit = async () => {
+    if (!user) return;
+    if (!isComplete(answers)) return;
     setSubmitting(true);
     setError(null);
+    setConfirmingUpdate(false);
     try {
-      await createRoadmapFromOnboarding({
+      // upsertRoadmapFromOnboarding internally dispatches createRoadmap
+      // (when no doc exists) or updateRoadmapDiagnostic (when one does).
+      // Either path is transactional and preserves user progress.
+      await upsertRoadmapFromOnboarding({
         uid: user.uid,
         answers: answers as OnboardingAnswers,
       });
       navigate("/app/roadmap", { replace: true });
-    } catch (err: any) {
-      console.error("[roadmap-onboarding] create failed:", err);
-      setError(err?.message ?? "Could not save your answers. Please try again.");
+    } catch (err: unknown) {
+      console.error("[roadmap-onboarding] submit failed:", err);
+      const msg = err instanceof Error ? err.message : "Could not save your answers. Please try again.";
+      setError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -331,11 +361,67 @@ export default function RoadmapOnboardingPage() {
               className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold bg-gradient-to-br from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               {submitting && <Loader2 size={14} className="animate-spin" />}
-              {submitting ? "Building your roadmap…" : "Build my roadmap"}
+              {submitting
+                ? (hasExistingRoadmap ? "Updating your answers…" : "Building your roadmap…")
+                : (hasExistingRoadmap ? "Update my answers" : "Build my roadmap")
+              }
             </button>
           )}
         </div>
       </main>
+
+      {/* Confirmation modal — only shown when re-running the diagnostic
+          on a roadmap that already exists. Spells out exactly what
+          will and will not change so the user can't accidentally
+          believe progress is being wiped. */}
+      {confirmingUpdate && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/60 backdrop-blur-sm"
+          onClick={() => setConfirmingUpdate(false)}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-md w-full p-7"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-5">
+              <ShieldCheck size={20} />
+            </div>
+            <h2 className="text-xl font-black text-slate-900 mb-2 tracking-tight">
+              Update your answers?
+            </h2>
+            <p className="text-sm text-slate-600 leading-relaxed mb-5">
+              We'll refresh the roadmap based on what you just told us. Your
+              checklist progress stays — only the diagnostic answers and
+              recommended stage change.
+            </p>
+            <ul className="text-[13px] text-slate-700 space-y-2 mb-6">
+              <li className="flex items-start gap-2">
+                <Check size={14} className="text-emerald-600 mt-0.5 flex-shrink-0" />
+                <span><span className="font-bold">Will change:</span> diagnostic answers, current stage, recommended tool, progress %</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <Check size={14} className="text-emerald-600 mt-0.5 flex-shrink-0" />
+                <span><span className="font-bold">Stays:</span> every checklist item you've ticked, your notes, and the date you started</span>
+              </li>
+            </ul>
+            <div className="flex gap-2.5">
+              <button
+                onClick={() => setConfirmingUpdate(false)}
+                className="flex-1 px-4 py-3 rounded-2xl text-sm font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => void performSubmit()}
+                disabled={submitting}
+                className="flex-1 px-4 py-3 rounded-2xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 transition-colors disabled:opacity-60"
+              >
+                {submitting ? <Loader2 size={14} className="animate-spin inline" /> : "Update my answers"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

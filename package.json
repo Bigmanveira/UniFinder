@@ -7,7 +7,11 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run --exclude '**/*.emulator.test.ts'",
+    "test:watch": "vitest --exclude '**/*.emulator.test.ts'",
+    "test:emulator": "vitest run src/lib/roadmap/firestoreRules.emulator.test.ts",
+    "verify:emulator": "node scripts/verifyEmulatorTests.cjs"
   },
   "dependencies": {
     "@google-cloud/text-to-speech": "^6.4.1",
@@ -26,6 +30,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@firebase/rules-unit-testing": "^5.0.1",
     "@types/node": "^24.12.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
@@ -38,6 +43,7 @@
     "globals": "^17.5.0",
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.58.2",
-    "vite": "^8.0.10"
+    "vite": "^8.0.10",
+    "vitest": "^4.1.8"
   }
 }

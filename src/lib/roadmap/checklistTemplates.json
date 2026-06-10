@@ -1,0 +1,61 @@
+{
+  "_comment": "SINGLE SOURCE OF TRUTH for roadmap checklist content. Read by both the app (src/lib/roadmap/studyAbroad.ts) and the migration script (scripts/roadmapMigration.cjs). Do not maintain a divergent copy in either consumer. Item ids are stable — never edit after release. Title + description CAN be edited safely; both consumers re-derive copy from this file on every read.",
+
+  "discovery": [
+    { "id": "d_profile",       "stage": "discovery", "title": "Complete academic profile",     "description": "Your level, field, GPA, test scores, and budget — the inputs every later tool needs.", "required": true,  "toolRoute": "/intake" },
+    { "id": "d_level",         "stage": "discovery", "title": "Confirm target degree level",   "description": "Bachelor's, Master's, PhD, or pathway — drives which programs you'll match against.", "required": true,  "toolRoute": "/intake" },
+    { "id": "d_field",         "stage": "discovery", "title": "Set your intended field",       "description": "Be specific (e.g. 'Economics, public policy track' beats 'Social sciences').", "required": true,  "toolRoute": "/intake" },
+    { "id": "d_budget",        "stage": "discovery", "title": "Set your funding situation",    "description": "Full funding, partial scholarship, or self-funded — affects which schools surface.", "required": true,  "toolRoute": "/intake" },
+    { "id": "d_intake_term",   "stage": "discovery", "title": "Pick a target start term",      "description": "Fall 2026, Spring 2027, or later. Most US schools have a Fall main intake.", "required": false, "toolRoute": null },
+    { "id": "d_first_match",   "stage": "discovery", "title": "Run your first match",          "description": "Hit the matching engine and see your initial shortlist — free preview costs nothing.", "required": true,  "toolRoute": "/intake" }
+  ],
+  "school_matching": [
+    { "id": "sm_review",       "stage": "school_matching", "title": "Review recommended schools",       "description": "Look through the Reach / Target / Safety buckets. Are any unrealistic? Any missing?", "required": true,  "toolRoute": "/app" },
+    { "id": "sm_save",         "stage": "school_matching", "title": "Save 5–10 preferred schools",      "description": "Use the heart icon to bookmark schools you want to dig deeper on.", "required": true,  "toolRoute": "/app" },
+    { "id": "sm_compare",      "stage": "school_matching", "title": "Compare tuition + deadlines",      "description": "Open each saved school and weigh cost, location, and admission deadlines side by side.", "required": false, "toolRoute": "/app" },
+    { "id": "sm_unlock",       "stage": "school_matching", "title": "Unlock at least one match report", "description": "1 credit. Gets you a full AI-explained report — admission likelihood, fit, application tips.", "required": true,  "toolRoute": "/app" },
+    { "id": "sm_shortlist",    "stage": "school_matching", "title": "Finalise a 6–10 school shortlist", "description": "Mix of Reach, Target, and Safety. This is what you'll actually apply to.", "required": true,  "toolRoute": "/app" }
+  ],
+  "application": [
+    { "id": "ap_passport",     "stage": "application", "title": "Make sure your passport is valid",      "description": "Most US schools want it valid through the duration of study. Confirm specifics with each school's international office.", "required": true,  "toolRoute": null },
+    { "id": "ap_transcripts",  "stage": "application", "title": "Order official transcripts",            "description": "Most schools want them sent directly from your institution — start early; it can take weeks.", "required": true,  "toolRoute": null },
+    { "id": "ap_sop",          "stage": "application", "title": "Draft your statement of purpose",       "description": "A clear, specific essay on why this program, why this school, why now.", "required": true,  "toolRoute": null },
+    { "id": "ap_cv",           "stage": "application", "title": "Prepare your CV / résumé",              "description": "Academic CVs differ from professional ones — research, publications, awards up front.", "required": true,  "toolRoute": null },
+    { "id": "ap_recs",         "stage": "application", "title": "Line up 2–3 recommenders",              "description": "Pick people who can speak to your academic / professional ability with specifics.", "required": true,  "toolRoute": null },
+    { "id": "ap_tests",        "stage": "application", "title": "Check test score requirements",         "description": "TOEFL / IELTS, GRE / GMAT, SAT — varies by program. Don't skip if a school requires it.", "required": true,  "toolRoute": null },
+    { "id": "ap_deadlines",    "stage": "application", "title": "Track every deadline",                  "description": "Per-school deadlines plus financial-aid deadlines (often earlier than admission deadlines).", "required": true,  "toolRoute": null },
+    { "id": "ap_submit",       "stage": "application", "title": "Submit applications",                   "description": "Hit submit on each application portal. Save confirmation emails.", "required": true,  "toolRoute": null }
+  ],
+  "admission_i20": [
+    { "id": "i_confirm",       "stage": "admission_i20", "title": "Confirm your admission offer",         "description": "Decide between offers — programme strength, funding, location, fit.", "required": true,  "toolRoute": null },
+    { "id": "i_accept",        "stage": "admission_i20", "title": "Accept the admission offer",            "description": "Follow your school's acceptance steps. Some require an enrolment deposit before issuing the I-20; confirm with your DSO.", "required": true,  "toolRoute": null },
+    { "id": "i_financial",     "stage": "admission_i20", "title": "Submit financial documents",           "description": "Bank statements, sponsor letters, scholarship awards — whatever the school requests.", "required": true,  "toolRoute": null },
+    { "id": "i_i20",           "stage": "admission_i20", "title": "Receive your Form I-20",                "description": "Sent by your DSO (Designated School Official) after they verify your financials.", "required": true,  "toolRoute": null },
+    { "id": "i_verify",        "stage": "admission_i20", "title": "Verify I-20 details",                  "description": "Name, date of birth, programme, start date, school address. Wrong info = delayed visa.", "required": true,  "toolRoute": null },
+    { "id": "i_costs",         "stage": "admission_i20", "title": "Review estimated cost of attendance",  "description": "Make sure your funding plan still covers the figure printed on the I-20.", "required": true,  "toolRoute": null },
+    { "id": "i_sponsor",       "stage": "admission_i20", "title": "Prepare sponsor / funding evidence",    "description": "Keep originals and copies — you'll need them at the visa interview.", "required": false, "toolRoute": null }
+  ],
+  "visa_preparation": [
+    { "id": "v_sevis",         "stage": "visa_preparation", "title": "Pay the SEVIS I-901 fee",             "description": "Pay online at fmjfee.com. Save the receipt — you'll need it at the interview.", "required": true,  "toolRoute": null },
+    { "id": "v_ds160",         "stage": "visa_preparation", "title": "Complete the DS-160",                  "description": "Online non-immigrant visa application at ceac.state.gov. Save the confirmation page.", "required": true,  "toolRoute": null },
+    { "id": "v_schedule",      "stage": "visa_preparation", "title": "Schedule your visa interview",          "description": "Through the US embassy's appointment system. Slots fill fast — book as early as possible.", "required": true,  "toolRoute": null },
+    { "id": "v_passport",      "stage": "visa_preparation", "title": "Re-check passport validity",            "description": "US visa rules often require validity 6 months past intended arrival; exceptions exist for some nationalities. Verify with the embassy.", "required": true,  "toolRoute": null },
+    { "id": "v_docs",          "stage": "visa_preparation", "title": "Assemble document folder",              "description": "I-20, DS-160 confirmation, SEVIS receipt, admission letter, financials, photos.", "required": true,  "toolRoute": null },
+    { "id": "v_admit_letter",  "stage": "visa_preparation", "title": "Print your admission letter",            "description": "Original or printed PDF. Some officers ask for it.", "required": false, "toolRoute": null },
+    { "id": "v_financials",    "stage": "visa_preparation", "title": "Prepare financial documents",            "description": "Bank statements, sponsor letters, scholarship awards, employment letters if relevant.", "required": true,  "toolRoute": null },
+    { "id": "v_sponsor_story", "stage": "visa_preparation", "title": "Prepare sponsor explanation",            "description": "Who is paying, how, and why they're willing. Practice saying it in one sentence.", "required": true,  "toolRoute": null },
+    { "id": "v_practice",      "stage": "visa_preparation", "title": "Practice with the AI visa interview",   "description": "15 credits. Run a live mock with Anna; get scored feedback across 9 dimensions.", "required": true,  "toolRoute": "/app/visa-interview" },
+    { "id": "v_review",        "stage": "visa_preparation", "title": "Review your interview feedback",         "description": "Re-read the scored report; rework whichever answer scored lowest.", "required": false, "toolRoute": "/app/visa-interview" }
+  ],
+  "pre_departure": [
+    { "id": "pd_visa",         "stage": "pre_departure", "title": "Confirm visa approval",                "description": "Make sure your passport is back with the F-1 visa stamped in it.", "required": true,  "toolRoute": null },
+    { "id": "pd_flight",       "stage": "pre_departure", "title": "Book your flight",                     "description": "F-1 students may enter the US up to 30 days before the I-20 start date; check the dates printed on your I-20.", "required": true,  "toolRoute": null },
+    { "id": "pd_housing",      "stage": "pre_departure", "title": "Arrange housing",                      "description": "On-campus, off-campus apartment, or short-term until you find permanent.", "required": true,  "toolRoute": null },
+    { "id": "pd_travel_docs",  "stage": "pre_departure", "title": "Pack travel documents",                "description": "Passport with visa, I-20, DS-160, SEVIS receipt, admission letter, school contact info.", "required": true,  "toolRoute": null },
+    { "id": "pd_poe_docs",     "stage": "pre_departure", "title": "Port-of-entry documents in carry-on",  "description": "CBP will ask. Don't pack these in checked luggage — keep them on you.", "required": true,  "toolRoute": null },
+    { "id": "pd_orientation",  "stage": "pre_departure", "title": "Plan school orientation",              "description": "Check your portal — orientation is usually mandatory and may be a few days before classes.", "required": true,  "toolRoute": null },
+    { "id": "pd_arrival_plan", "stage": "pre_departure", "title": "Plan arrival transportation",          "description": "From the airport to housing — uni shuttle, rideshare, or pickup arranged in advance.", "required": false, "toolRoute": null },
+    { "id": "pd_dso",          "stage": "pre_departure", "title": "Check in with your DSO",                "description": "Your school will tell you when and how to check in after arrival — follow their specific instructions. SEVIS reporting deadlines are typically set by your school.", "required": true,  "toolRoute": null },
+    { "id": "pd_f1_rules",     "stage": "pre_departure", "title": "Read up on basic F-1 rules",            "description": "Full-time enrolment, work restrictions, travel rules. The DSO can clarify anything.", "required": false, "toolRoute": null }
+  ]
+}

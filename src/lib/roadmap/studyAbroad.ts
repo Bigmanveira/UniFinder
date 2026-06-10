@@ -164,7 +164,39 @@ export type ChecklistItemStatus =
   | "in_progress"
   | "completed"
   | "blocked"
-  | "needs_review";
+  | "needs_review"
+  /** Seeded by the onboarding diagnostic when the user enters at an
+   *  advanced stage. Means "we believe the user has done this — they
+   *  said they're past it — but we have no verifying evidence." The UI
+   *  must render this distinctly from `completed`, and the user must
+   *  be able to confirm or correct it. Progress weighting is 0.85 (vs
+   *  1.0 for verified). Never set by automatic reconciliation or by
+   *  the user's own click — only by the diagnostic. */
+  | "assumed_complete";
+
+/** Closed-set list — every status in code MUST appear here. Used by
+ *  rule validation, migration tooling, and the UI rendering map. */
+export const CHECKLIST_STATUS_VALUES: ChecklistItemStatus[] = [
+  "not_started",
+  "in_progress",
+  "completed",
+  "blocked",
+  "needs_review",
+  "assumed_complete",
+];
+
+/** Weight assigned to each status when computing progress. Adjust here,
+ *  not at call sites, so the math is centralised + auditable. Product
+ *  signed off on these values during the P0 fix (see
+ *  PRODUCTION_READINESS.md). */
+export const STATUS_PROGRESS_WEIGHT: Record<ChecklistItemStatus, number> = {
+  not_started:       0,
+  in_progress:       0.5,
+  completed:         1.0,
+  blocked:           0,
+  needs_review:      0,
+  assumed_complete:  0.85,
+};
 
 export interface ChecklistItemTemplate {
   id:           string;          // stable; never edit after release
@@ -175,65 +207,40 @@ export interface ChecklistItemTemplate {
   toolRoute:    string | null;   // optional deep link to a CR tool
 }
 
-export const CHECKLIST_TEMPLATES: Record<RoadmapStageId, ChecklistItemTemplate[]> = {
-  discovery: [
-    { id: "d_profile",       stage: "discovery", title: "Complete academic profile",     description: "Your level, field, GPA, test scores, and budget — the inputs every later tool needs.", required: true,  toolRoute: "/intake" },
-    { id: "d_level",         stage: "discovery", title: "Confirm target degree level",   description: "Bachelor's, Master's, PhD, or pathway — drives which programs you'll match against.",     required: true,  toolRoute: "/intake" },
-    { id: "d_field",         stage: "discovery", title: "Set your intended field",       description: "Be specific (e.g. 'Economics, public policy track' beats 'Social sciences').",            required: true,  toolRoute: "/intake" },
-    { id: "d_budget",        stage: "discovery", title: "Set your funding situation",    description: "Full funding, partial scholarship, or self-funded — affects which schools surface.",     required: true,  toolRoute: "/intake" },
-    { id: "d_intake_term",   stage: "discovery", title: "Pick a target start term",      description: "Fall 2026, Spring 2027, or later. Most US schools have a Fall main intake.",              required: false, toolRoute: null },
-    { id: "d_first_match",   stage: "discovery", title: "Run your first match",          description: "Hit the matching engine and see your initial shortlist — free preview costs nothing.",  required: true,  toolRoute: "/intake" },
-  ],
-  school_matching: [
-    { id: "sm_review",       stage: "school_matching", title: "Review recommended schools",       description: "Look through the Reach / Target / Safety buckets. Are any unrealistic? Any missing?", required: true,  toolRoute: "/app" },
-    { id: "sm_save",         stage: "school_matching", title: "Save 5–10 preferred schools",      description: "Use the heart icon to bookmark schools you want to dig deeper on.",                  required: true,  toolRoute: "/app" },
-    { id: "sm_compare",      stage: "school_matching", title: "Compare tuition + deadlines",      description: "Open each saved school and weigh cost, location, and admission deadlines side by side.", required: false, toolRoute: "/app" },
-    { id: "sm_unlock",       stage: "school_matching", title: "Unlock at least one match report", description: "1 credit. Gets you a full AI-explained report — admission likelihood, fit, application tips.", required: true,  toolRoute: "/app" },
-    { id: "sm_shortlist",    stage: "school_matching", title: "Finalise a 6–10 school shortlist", description: "Mix of Reach, Target, and Safety. This is what you'll actually apply to.",            required: true,  toolRoute: "/app" },
-  ],
-  application: [
-    { id: "ap_passport",     stage: "application", title: "Make sure your passport is valid",      description: "Must be valid for at least 6 months past your intended US arrival.",                  required: true,  toolRoute: null },
-    { id: "ap_transcripts",  stage: "application", title: "Order official transcripts",            description: "Most schools want them sent directly from your institution — start early; it can take weeks.", required: true,  toolRoute: null },
-    { id: "ap_sop",          stage: "application", title: "Draft your statement of purpose",       description: "A clear, specific essay on why this program, why this school, why now.",              required: true,  toolRoute: null },
-    { id: "ap_cv",           stage: "application", title: "Prepare your CV / résumé",              description: "Academic CVs differ from professional ones — research, publications, awards up front.",   required: true,  toolRoute: null },
-    { id: "ap_recs",         stage: "application", title: "Line up 2–3 recommenders",              description: "Pick people who can speak to your academic / professional ability with specifics.",     required: true,  toolRoute: null },
-    { id: "ap_tests",        stage: "application", title: "Check test score requirements",         description: "TOEFL / IELTS, GRE / GMAT, SAT — varies by program. Don't skip if a school requires it.", required: true,  toolRoute: null },
-    { id: "ap_deadlines",    stage: "application", title: "Track every deadline",                  description: "Per-school deadlines plus financial-aid deadlines (often earlier than admission deadlines).", required: true, toolRoute: null },
-    { id: "ap_submit",       stage: "application", title: "Submit applications",                   description: "Hit submit on each application portal. Save confirmation emails.",                       required: true,  toolRoute: null },
-  ],
-  admission_i20: [
-    { id: "i_confirm",       stage: "admission_i20", title: "Confirm your admission offer",         description: "Decide between offers — programme strength, funding, location, fit.",                 required: true,  toolRoute: null },
-    { id: "i_accept",        stage: "admission_i20", title: "Accept and pay the enrolment deposit", description: "Most schools require a non-refundable deposit to release the I-20.",                  required: true,  toolRoute: null },
-    { id: "i_financial",     stage: "admission_i20", title: "Submit financial documents",           description: "Bank statements, sponsor letters, scholarship awards — whatever the school requests.", required: true,  toolRoute: null },
-    { id: "i_i20",           stage: "admission_i20", title: "Receive your Form I-20",                description: "Sent by your DSO (Designated School Official) after they verify your financials.",   required: true,  toolRoute: null },
-    { id: "i_verify",        stage: "admission_i20", title: "Verify I-20 details",                  description: "Name, date of birth, programme, start date, school address. Wrong info = delayed visa.", required: true,  toolRoute: null },
-    { id: "i_costs",         stage: "admission_i20", title: "Review estimated cost of attendance",  description: "Make sure your funding plan still covers the figure printed on the I-20.",            required: true,  toolRoute: null },
-    { id: "i_sponsor",       stage: "admission_i20", title: "Prepare sponsor / funding evidence",    description: "Keep originals and copies — you'll need them at the visa interview.",                required: false, toolRoute: null },
-  ],
-  visa_preparation: [
-    { id: "v_sevis",         stage: "visa_preparation", title: "Pay the SEVIS I-901 fee",             description: "Pay online at fmjfee.com. Save the receipt — you'll need it at the interview.",      required: true,  toolRoute: null },
-    { id: "v_ds160",         stage: "visa_preparation", title: "Complete the DS-160",                  description: "Online non-immigrant visa application at ceac.state.gov. Save the confirmation page.", required: true,  toolRoute: null },
-    { id: "v_schedule",      stage: "visa_preparation", title: "Schedule your visa interview",          description: "Through the US embassy's appointment system. Slots fill fast — book as early as possible.", required: true, toolRoute: null },
-    { id: "v_passport",      stage: "visa_preparation", title: "Re-check passport validity",            description: "Valid 6 months past intended arrival. Renew now if it's close.",                       required: true,  toolRoute: null },
-    { id: "v_docs",          stage: "visa_preparation", title: "Assemble document folder",              description: "I-20, DS-160 confirmation, SEVIS receipt, admission letter, financials, photos.",     required: true,  toolRoute: null },
-    { id: "v_admit_letter",  stage: "visa_preparation", title: "Print your admission letter",            description: "Original or printed PDF. Some officers ask for it.",                                  required: false, toolRoute: null },
-    { id: "v_financials",    stage: "visa_preparation", title: "Prepare financial documents",            description: "Bank statements, sponsor letters, scholarship awards, employment letters if relevant.", required: true,  toolRoute: null },
-    { id: "v_sponsor_story", stage: "visa_preparation", title: "Prepare sponsor explanation",            description: "Who is paying, how, and why they're willing. Practice saying it in one sentence.",    required: true,  toolRoute: null },
-    { id: "v_practice",      stage: "visa_preparation", title: "Practice with the AI visa interview",   description: "15 credits. Run a live mock with Anna; get scored feedback across 9 dimensions.",    required: true,  toolRoute: "/app/visa-interview" },
-    { id: "v_review",        stage: "visa_preparation", title: "Review your interview feedback",         description: "Re-read the scored report; rework whichever answer scored lowest.",                  required: false, toolRoute: "/app/visa-interview" },
-  ],
-  pre_departure: [
-    { id: "pd_visa",         stage: "pre_departure", title: "Confirm visa approval",                description: "Make sure your passport is back with the F-1 visa stamped in it.",                       required: true,  toolRoute: null },
-    { id: "pd_flight",       stage: "pre_departure", title: "Book your flight",                     description: "Can arrive up to 30 days before your I-20 start date — not earlier.",                    required: true,  toolRoute: null },
-    { id: "pd_housing",      stage: "pre_departure", title: "Arrange housing",                      description: "On-campus, off-campus apartment, or short-term until you find permanent.",              required: true,  toolRoute: null },
-    { id: "pd_travel_docs",  stage: "pre_departure", title: "Pack travel documents",                description: "Passport with visa, I-20, DS-160, SEVIS receipt, admission letter, school contact info.", required: true,  toolRoute: null },
-    { id: "pd_poe_docs",     stage: "pre_departure", title: "Port-of-entry documents in carry-on",  description: "CBP will ask. Don't pack these in checked luggage — keep them on you.",                 required: true,  toolRoute: null },
-    { id: "pd_orientation",  stage: "pre_departure", title: "Plan school orientation",              description: "Check your portal — orientation is usually mandatory and may be a few days before classes.", required: true,  toolRoute: null },
-    { id: "pd_arrival_plan", stage: "pre_departure", title: "Plan arrival transportation",          description: "From the airport to housing — uni shuttle, rideshare, or pickup arranged in advance.",   required: false, toolRoute: null },
-    { id: "pd_dso",          stage: "pre_departure", title: "Know your DSO check-in window",         description: "You must check in with your school's DSO within a few days of arrival.",                 required: true,  toolRoute: null },
-    { id: "pd_f1_rules",     stage: "pre_departure", title: "Read up on basic F-1 rules",            description: "Full-time enrolment, work restrictions, travel rules. The DSO can clarify anything.",   required: false, toolRoute: null },
-  ],
-};
+// Templates live in checklistTemplates.json — single source of truth
+// shared with the migration script. Don't maintain a divergent copy
+// here. The JSON is statically imported, so any drift between this
+// type and the JSON's actual shape surfaces at compile time.
+import rawTemplates from "./checklistTemplates.json";
+
+type RawTemplate = Omit<ChecklistItemTemplate, "stage"> & { stage: string };
+type RawTemplates = Record<string, RawTemplate[]> & { _comment?: string };
+
+function loadTemplates(raw: RawTemplates): Record<RoadmapStageId, ChecklistItemTemplate[]> {
+  const out = {} as Record<RoadmapStageId, ChecklistItemTemplate[]>;
+  for (const stageId of ROADMAP_STAGE_ORDER) {
+    const items = raw[stageId];
+    if (!Array.isArray(items)) {
+      throw new Error(`Missing checklist template for stage ${stageId}`);
+    }
+    out[stageId] = items.map((it) => ({
+      id:          it.id,
+      stage:       stageId,    // overrides any stage value in JSON; canonical source is the key
+      title:       it.title,
+      description: it.description,
+      required:    it.required,
+      toolRoute:   it.toolRoute,
+    }));
+  }
+  return out;
+}
+
+export const CHECKLIST_TEMPLATES: Record<RoadmapStageId, ChecklistItemTemplate[]> =
+  // The JSON literal has a `_comment` field of type string alongside the
+  // stage arrays — TS can't narrow it to RawTemplates directly. Cast
+  // through `unknown` (TS prescribes this for genuinely heterogeneous
+  // structures); loadTemplates() validates the shape at runtime.
+  loadTemplates(rawTemplates as unknown as RawTemplates);
 
 // Per-user copy of a checklist item — embedded in the studyRoadmaps doc.
 export interface ChecklistItem {
@@ -424,6 +431,18 @@ export interface StudyRoadmap {
  * Build a fresh roadmap document from onboarding answers. Idempotent +
  * pure — call any number of times with the same input, get the same
  * output (except for timestamps and per-item createdAt).
+ *
+ * Advanced-stage seeding (P0 fix, 2026-06-09):
+ *   - When the assigned stage is past Discovery, REQUIRED items in
+ *     earlier stages are seeded as `assumed_complete` rather than
+ *     `not_started`. The user told us they're past those stages; we
+ *     trust the diagnostic but mark the items distinctly so the user
+ *     can correct anything that didn't actually happen.
+ *   - Optional items in earlier stages stay `not_started` (they're
+ *     opt-in nice-to-haves, not "you must have done this to be at
+ *     stage X" prerequisites).
+ *   - Items in the current stage and beyond always start fresh as
+ *     `not_started`.
  */
 export function generateRoadmapForUser(args: {
   userId: string;
@@ -432,23 +451,31 @@ export function generateRoadmapForUser(args: {
 }): StudyRoadmap {
   const now = args.now ?? Date.now();
   const stage = getStageFromOnboarding(args.answers);
+  const currentStageIndex = ROADMAP_STAGE_ORDER.indexOf(stage);
 
-  // Build the full checklist (every stage). We surface "current stage
-  // first" in the UI but persist the whole journey so a user advancing
-  // to a later stage doesn't see an empty checklist.
   const checklist: ChecklistItem[] = ROADMAP_STAGE_ORDER.flatMap((stageId) =>
-    CHECKLIST_TEMPLATES[stageId].map((template) => ({
-      id:          template.id,
-      stage:       template.stage,
-      title:       template.title,
-      description: template.description,
-      status:      "not_started" as const,
-      required:    template.required,
-      toolRoute:   template.toolRoute,
-      completedAt: null,
-      createdAt:   now,
-      updatedAt:   now,
-    })),
+    CHECKLIST_TEMPLATES[stageId].map((template) => {
+      const itemStageIndex = ROADMAP_STAGE_ORDER.indexOf(template.stage);
+      const isEarlierStage = itemStageIndex < currentStageIndex;
+      // Required items in earlier stages → assumed_complete.
+      // Optional items in earlier stages, and ALL items in current /
+      // later stages → not_started.
+      const status: ChecklistItemStatus =
+        isEarlierStage && template.required ? "assumed_complete" : "not_started";
+      const completedAt = status === "assumed_complete" ? now : null;
+      return {
+        id:          template.id,
+        stage:       template.stage,
+        title:       template.title,
+        description: template.description,
+        status,
+        required:    template.required,
+        toolRoute:   template.toolRoute,
+        completedAt,
+        createdAt:   now,
+        updatedAt:   now,
+      };
+    }),
   );
 
   const meta = ROADMAP_STAGES[stage];
@@ -476,6 +503,211 @@ export function generateRoadmapForUser(args: {
 }
 
 /**
+ * Merge the current CHECKLIST_TEMPLATES with an existing checklist,
+ * preserving every status, note, and timestamp on items that survive.
+ *
+ * Rules (P0 #1):
+ *   - Items present in both: KEEP existing status, completedAt,
+ *     updatedAt, notes. Update title/description/required/toolRoute
+ *     from the template (copy refinements ship to existing users).
+ *   - Items in template but NOT existing: APPEND with not_started
+ *     (or assumed_complete if user is past that stage AND item is
+ *     required) and fresh timestamps.
+ *   - Items in existing but NOT in template: PRESERVE them so we
+ *     never silently destroy historical progress on a template
+ *     change. The migration script can surface these for review.
+ *
+ * Pure + deterministic. Run inside a Firestore transaction by the
+ * caller to avoid lost updates.
+ */
+export function mergeChecklistWithTemplate(args: {
+  existing: ChecklistItem[];
+  currentStage: RoadmapStageId;
+  now?: number;
+}): { merged: ChecklistItem[]; addedIds: string[]; orphanedIds: string[] } {
+  const { existing, currentStage } = args;
+  const now = args.now ?? Date.now();
+  const currentStageIndex = ROADMAP_STAGE_ORDER.indexOf(currentStage);
+
+  // Index existing items by id for O(1) lookup.
+  const byId = new Map(existing.map((it) => [it.id, it]));
+  const addedIds: string[] = [];
+  const seenIds = new Set<string>();
+
+  // Walk the template in canonical order. For each template item,
+  // either reuse the existing one (with refreshed copy) or create.
+  const fromTemplate: ChecklistItem[] = ROADMAP_STAGE_ORDER.flatMap((stageId) =>
+    CHECKLIST_TEMPLATES[stageId].map((template) => {
+      seenIds.add(template.id);
+      const existingItem = byId.get(template.id);
+      if (existingItem) {
+        // Existing item — preserve all user-mutable state, refresh copy.
+        return {
+          ...existingItem,
+          title:       template.title,
+          description: template.description,
+          required:    template.required,
+          toolRoute:   template.toolRoute,
+          // Stage is structural — if a template moved an item between
+          // stages, honour the new stage (this only happens with intentional
+          // template changes that the migration script logs).
+          stage:       template.stage,
+          // updatedAt only refreshed if the copy actually changed; keep
+          // user's last-updated otherwise.
+          updatedAt:   existingItem.updatedAt,
+        };
+      }
+      // New template item — append.
+      addedIds.push(template.id);
+      const itemStageIndex = ROADMAP_STAGE_ORDER.indexOf(template.stage);
+      const isEarlierStage = itemStageIndex < currentStageIndex;
+      const status: ChecklistItemStatus =
+        isEarlierStage && template.required ? "assumed_complete" : "not_started";
+      return {
+        id:          template.id,
+        stage:       template.stage,
+        title:       template.title,
+        description: template.description,
+        status,
+        required:    template.required,
+        toolRoute:   template.toolRoute,
+        completedAt: status === "assumed_complete" ? now : null,
+        createdAt:   now,
+        updatedAt:   now,
+      };
+    }),
+  );
+
+  // Orphans: items the user has that the template no longer defines.
+  // Preserve them; surface ids for ops audit.
+  const orphans = existing.filter((it) => !seenIds.has(it.id));
+  const orphanedIds = orphans.map((it) => it.id);
+
+  return {
+    merged: [...fromTemplate, ...orphans],
+    addedIds,
+    orphanedIds,
+  };
+}
+
+/**
+ * Promote `not_started` REQUIRED items in earlier stages to
+ * `assumed_complete` when the user advances. Pure + deterministic.
+ *
+ * Why this matters (P1 finding from CIO review): without this step,
+ * an existing user who created their roadmap at Discovery (all items
+ * not_started) and then updates their diagnostic to say they're at
+ * visa_preparation continues to show 0% — every prerequisite item
+ * stays not_started. With this step they get the same advanced-stage
+ * seeding that brand-new users get.
+ *
+ * Safety rules:
+ *   - ONLY items currently `not_started` are promoted. Manual states
+ *     (in_progress, blocked, needs_review, completed, assumed_complete)
+ *     are NEVER overwritten.
+ *   - ONLY required items in earlier stages. Optional items stay as-is
+ *     because they're opt-in nice-to-haves, not prerequisites.
+ *   - Items in the current stage or later are never touched.
+ *   - When the user moves BACKWARD (e.g. corrects themselves from
+ *     visa_preparation to school_matching), we do NOT downgrade any
+ *     existing `assumed_complete`/`completed` items. Stepping back
+ *     doesn't undo progress; the user just sees they have more to
+ *     manually verify than they used to.
+ */
+export function promoteEarlierStageRequiredItems(args: {
+  checklist: ChecklistItem[];
+  newStage: RoadmapStageId;
+  now?: number;
+}): { checklist: ChecklistItem[]; promotedItemIds: string[] } {
+  const { checklist, newStage } = args;
+  const now = args.now ?? Date.now();
+  const newStageIndex = ROADMAP_STAGE_ORDER.indexOf(newStage);
+  const promotedItemIds: string[] = [];
+  const next = checklist.map((item) => {
+    if (item.status !== "not_started") return item;
+    if (!item.required)               return item;
+    const itemStageIndex = ROADMAP_STAGE_ORDER.indexOf(item.stage);
+    if (itemStageIndex < 0 || itemStageIndex >= newStageIndex) return item;
+    promotedItemIds.push(item.id);
+    return {
+      ...item,
+      status:      "assumed_complete" as const,
+      completedAt: now,
+      updatedAt:   now,
+    };
+  });
+  return { checklist: next, promotedItemIds };
+}
+
+/**
+ * Update only the diagnostic-derived fields on an existing roadmap.
+ * Preserves the checklist + timestamps. Used by the "Update my
+ * answers" flow. The actual Firestore write happens in the client
+ * library inside a transaction.
+ *
+ * Promotion semantics (CIO P1 fixes, 2026-06-09):
+ *   - The earlier-stage required-item promotion ONLY fires when the
+ *     user's stage is strictly advancing. Same-stage and backward
+ *     diagnostic updates DO NOT touch the checklist's existing
+ *     statuses. This prevents the silent-re-assume bug where a user
+ *     who manually demoted an `assumed_complete` item to `not_started`
+ *     would have it re-promoted on any unrelated diagnostic change
+ *     (country, start term, primary need).
+ *   - Backward stage updates never downgrade existing progress (that
+ *     was already the rule — every status flip is preserved).
+ *   - The template merge ALWAYS runs (template additions are not
+ *     stage-conditional; new template items always appear).
+ */
+export function applyDiagnosticUpdate(args: {
+  existing: StudyRoadmap;
+  answers: OnboardingAnswers;
+  now?: number;
+}): StudyRoadmap {
+  const now = args.now ?? Date.now();
+  const newStage = getStageFromOnboarding(args.answers);
+  const oldStage = args.existing.currentStage;
+  const newStageIndex = ROADMAP_STAGE_ORDER.indexOf(newStage);
+  const oldStageIndex = ROADMAP_STAGE_ORDER.indexOf(oldStage);
+  const meta = ROADMAP_STAGES[newStage];
+
+  // Step 1: merge with the latest template (picks up new items added
+  // since the user's original onboarding; preserves orphans). Runs
+  // unconditionally — template additions are independent of stage moves.
+  const { merged } = mergeChecklistWithTemplate({
+    existing: args.existing.checklist,
+    currentStage: newStage,
+    now,
+  });
+  // Step 2: promote eligible earlier-stage required items ONLY when
+  // the stage strictly advances. Same-stage and backward updates leave
+  // the checklist alone.
+  const advancing = newStageIndex > oldStageIndex;
+  const { checklist: maybePromoted } = advancing
+    ? promoteEarlierStageRequiredItems({ checklist: merged, newStage, now })
+    : { checklist: merged };
+
+  return {
+    ...args.existing,
+    originCountry:          args.answers.originCountry,
+    completedAcademicLevel: args.answers.completedAcademicLevel,
+    targetAcademicLevel:    args.answers.targetAcademicLevel,
+    currentProcessStatus:   args.answers.currentProcessStatus,
+    primaryNeed:            args.answers.primaryNeed,
+    preferredStartTerm:     args.answers.preferredStartTerm,
+    currentStage:           newStage,
+    recommendedTool: {
+      label:       meta.primaryCta,
+      route:       meta.toolRoute,
+      description: meta.description,
+    },
+    checklist:              maybePromoted,
+    progressPercentage:     calculateProgress(maybePromoted, newStage),
+    updatedAt:              now,
+    // createdAt, completedOnboarding, version preserved from existing.
+  };
+}
+
+/**
  * Recommended-tool helper. Indexed by stage id so the dashboard's
  * "what should I do next" card can re-derive the CTA without
  * re-reading the whole stage table.
@@ -496,16 +728,24 @@ export function getRecommendedToolForStage(stage: RoadmapStageId): {
 /**
  * Compute the progress percentage for a checklist.
  *
- * We weight "current stage and earlier" because uncompleted items in
- * a future stage shouldn't pull the bar down — the user isn't there
- * yet. Stages BEFORE the user's current stage are treated as fully
- * complete (you don't undo progress by moving forward), unless any
- * required items in those earlier stages are explicitly marked
- * "blocked" or "needs_review".
+ * Scoring rules (centralised in STATUS_PROGRESS_WEIGHT above):
+ *   - completed         → 1.00 of the item's weight
+ *   - assumed_complete  → 0.85 (advanced-stage seeded; not verified)
+ *   - in_progress       → 0.50
+ *   - not_started       → 0.00
+ *   - blocked           → 0.00
+ *   - needs_review      → 0.00
  *
- * 100% = every required item in current-and-earlier stages is
- * completed. Optional items boost the bar slightly but can't be the
- * cause of a < 100% score on their own.
+ * Item weight: required items are worth 1.0; optional items are worth
+ * 0.5. So an optional item that's `assumed_complete` contributes
+ * 0.5 * 0.85 = 0.425 of a "point" to the user's total possible.
+ *
+ * Only items at-or-before the current stage are scored — future-stage
+ * items don't pull the bar down because the user isn't there yet.
+ *
+ * The previous implementation treated `assumed_complete` as 0 because
+ * the status didn't exist. Advanced-stage users with seeded earlier
+ * items now correctly land at a non-zero starting progress.
  */
 export function calculateProgress(
   checklist: ChecklistItem[],
@@ -514,23 +754,19 @@ export function calculateProgress(
   const currentStageIndex = ROADMAP_STAGE_ORDER.indexOf(currentStage);
   if (currentStageIndex < 0 || checklist.length === 0) return 0;
 
-  // Only score items at-or-before the user's current stage.
   const relevant = checklist.filter((item) => {
     const itemStageIndex = ROADMAP_STAGE_ORDER.indexOf(item.stage);
     return itemStageIndex >= 0 && itemStageIndex <= currentStageIndex;
   });
   if (relevant.length === 0) return 0;
 
-  // Each required item is worth 1.0; each optional item 0.5.
-  // Completed status earns the full weight; in_progress earns half;
-  // blocked / needs_review / not_started earn nothing.
   let total = 0;
   let earned = 0;
   for (const item of relevant) {
-    const weight = item.required ? 1.0 : 0.5;
-    total += weight;
-    if (item.status === "completed")   earned += weight;
-    else if (item.status === "in_progress") earned += weight * 0.5;
+    const itemWeight = item.required ? 1.0 : 0.5;
+    const statusFactor = STATUS_PROGRESS_WEIGHT[item.status] ?? 0;
+    total  += itemWeight;
+    earned += itemWeight * statusFactor;
   }
   if (total === 0) return 0;
   return Math.round((earned / total) * 100);

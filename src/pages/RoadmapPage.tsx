@@ -14,7 +14,7 @@
 // reports, visa interview, admin portal) are untouched.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -43,11 +43,15 @@ import {
 } from "../lib/roadmap/studyAbroad";
 
 const STATUS_META: Record<ChecklistItemStatus, { label: string; icon: React.ReactNode; chip: string }> = {
-  not_started:  { label: "To do",         icon: <Circle size={11} />,        chip: "bg-slate-100 text-slate-600 border-slate-200" },
-  in_progress:  { label: "In progress",   icon: <Hourglass size={11} />,     chip: "bg-blue-50 text-blue-700 border-blue-200" },
-  completed:    { label: "Done",          icon: <CheckCircle2 size={11} />,  chip: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-  blocked:      { label: "Blocked",       icon: <Ban size={11} />,           chip: "bg-rose-50 text-rose-700 border-rose-200" },
-  needs_review: { label: "Review",        icon: <AlertTriangle size={11} />, chip: "bg-amber-50 text-amber-800 border-amber-200" },
+  not_started:      { label: "To do",       icon: <Circle size={11} />,        chip: "bg-slate-100 text-slate-600 border-slate-200" },
+  in_progress:      { label: "In progress", icon: <Hourglass size={11} />,     chip: "bg-blue-50 text-blue-700 border-blue-200" },
+  completed:        { label: "Done",        icon: <CheckCircle2 size={11} />,  chip: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  blocked:          { label: "Blocked",     icon: <Ban size={11} />,           chip: "bg-rose-50 text-rose-700 border-rose-200" },
+  needs_review:     { label: "Review",      icon: <AlertTriangle size={11} />, chip: "bg-amber-50 text-amber-800 border-amber-200" },
+  // Seeded by the diagnostic on advanced-stage entry. Visually
+  // distinct from `completed` so the user knows it's an assumption
+  // they can correct. Slate-toned but with a dotted check icon.
+  assumed_complete: { label: "Assumed done", icon: <CheckCircle2 size={11} />, chip: "bg-slate-50 text-slate-700 border-slate-300 border-dashed" },
 };
 
 export default function RoadmapPage() {
@@ -74,16 +78,20 @@ export default function RoadmapPage() {
     return () => unsub();
   }, [user]);
 
-  // External-activity reconcile — runs ONCE per page load.
-  const [reconciled, setReconciled] = useState(false);
+  // External-activity reconcile — runs ONCE per page load. The
+  // useRef-gated effect avoids the "setState inside an effect" pattern
+  // (which the eslint rule disallows because it can trigger cascading
+  // renders). useRef changes don't cause renders, which is what we want.
+  const reconciledRef = useRef(false);
   useEffect(() => {
-    if (!user || reconciled) return;
+    if (!user) return;
+    if (reconciledRef.current) return;
     if (roadmap === "loading" || roadmap === null) return;
-    setReconciled(true);
+    reconciledRef.current = true;
     void reconcileFromExternalActivity(user.uid).catch((err) => {
       console.warn("[roadmap] reconcile failed (non-fatal):", err);
     });
-  }, [user, roadmap, reconciled]);
+  }, [user, roadmap]);
 
   // No-doc → onboarding.
   useEffect(() => {
@@ -97,8 +105,9 @@ export default function RoadmapPage() {
     setError(null);
     try {
       await updateChecklistItemStatus({ uid: user.uid, itemId: item.id, status: next });
-    } catch (err: any) {
-      setError(err?.message ?? "Could not update that item.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Could not update that item.";
+      setError(msg);
     } finally {
       setUpdatingItemId(null);
     }
@@ -111,8 +120,9 @@ export default function RoadmapPage() {
     try {
       await updateRoadmapStage({ uid: user.uid, newStage: nextStage, newProcessStatus: nextStatus });
       setStageOpen(false);
-    } catch (err: any) {
-      setError(err?.message ?? "Could not update your stage.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Could not update your stage.";
+      setError(msg);
     } finally {
       setUpdatingStage(false);
     }
@@ -207,8 +217,9 @@ function Dashboard({
           <Link
             to="/app/roadmap/onboarding?update=1"
             className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+            title="Refresh your diagnostic answers. Your checklist progress is preserved."
           >
-            <RotateCw size={12} /> Re-run diagnostic
+            <RotateCw size={12} /> Update my answers
           </Link>
         </div>
       </header>
@@ -485,9 +496,18 @@ function ChecklistRow({
   const [expanded, setExpanded] = useState(false);
   const meta = STATUS_META[item.status];
   const isCompleted = item.status === "completed";
+  const isAssumed   = item.status === "assumed_complete";
 
-  // Single click cycles: not_started ⇄ completed. Granular states via expand.
-  const toggle = () => onChange(isCompleted ? "not_started" : "completed");
+  // Single click semantics:
+  //   - not_started → completed (manual tick)
+  //   - completed   → not_started (manual untick)
+  //   - assumed_complete → completed (confirms the assumption was right)
+  //   Other statuses (in_progress, blocked, needs_review) only change
+  //   via the expanded controls.
+  const toggle = () => {
+    if (isCompleted)   return onChange("not_started");
+    return onChange("completed");
+  };
 
   return (
     <li className="group">
@@ -500,12 +520,19 @@ function ChecklistRow({
           className={`w-5 h-5 rounded-md flex-shrink-0 mt-0.5 border-2 flex items-center justify-center transition-colors ${
             isCompleted
               ? "bg-emerald-500 border-emerald-500 text-white"
-              : "bg-white border-slate-300 hover:border-emerald-400"
+              : isAssumed
+                ? "bg-white border-slate-400 border-dashed text-slate-600 hover:border-emerald-400"
+                : "bg-white border-slate-300 hover:border-emerald-400"
           } disabled:opacity-60`}
-          aria-label={`Mark ${item.title} ${isCompleted ? "incomplete" : "complete"}`}
+          aria-label={
+            isCompleted ? `Mark ${item.title} incomplete`
+              : isAssumed ? `Confirm ${item.title} as done`
+              : `Mark ${item.title} complete`
+          }
+          title={isAssumed ? "Click to confirm. We assumed this was done based on your diagnostic answers." : undefined}
         >
           <AnimatePresence>
-            {isCompleted && (
+            {(isCompleted || isAssumed) && (
               <motion.span
                 key="check"
                 initial={{ scale: 0, opacity: 0 }}
@@ -526,7 +553,9 @@ function ChecklistRow({
             className="text-left w-full"
           >
             <p className={`text-[14px] font-bold leading-snug transition-colors ${
-              isCompleted ? "text-slate-400 line-through decoration-slate-300" : "text-slate-900"
+              isCompleted ? "text-slate-400 line-through decoration-slate-300"
+                : isAssumed ? "text-slate-500"
+                : "text-slate-900"
             }`}>
               {item.title}
               {item.required && !isCompleted && <span className="text-emerald-600 ml-1">*</span>}
