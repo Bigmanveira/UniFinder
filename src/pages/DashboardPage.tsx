@@ -8,7 +8,7 @@ import { doc, getDoc, onSnapshot, setDoc, updateDoc, serverTimestamp } from "fir
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "../lib/firebase";
-import { LogOut, Plus, Wallet, Bookmark, FileText, ChevronRight, User, GraduationCap, MapPin, BadgeCheck, Settings, Camera, Globe, Trash2, ChevronDown, ChevronUp, ArrowRight, Heart, Map, Gift, Copy, Check, Send, Mail, Home, ShieldAlert, Menu, X, Bell, Mic, KeyRound, Loader2, AlertTriangle, Compass } from "lucide-react";
+import { LogOut, Plus, Wallet, Bookmark, FileText, ChevronRight, User, GraduationCap, MapPin, BadgeCheck, Settings, Camera, Globe, Trash2, ChevronDown, ChevronUp, ArrowRight, Heart, Map, Gift, Copy, Check, Mail, Home, ShieldAlert, Menu, X, Bell, Mic, KeyRound, Loader2, AlertTriangle, Compass } from "lucide-react";
 import { subscribeStudyRoadmap } from "../lib/roadmap/roadmapClient";
 import { ROADMAP_STAGES, type StudyRoadmap } from "../lib/roadmap/studyAbroad";
 import BrandLogo from "../components/BrandLogo";
@@ -1430,76 +1430,154 @@ function ReferralCard({ userId }: { userId: string | undefined }) {
 
   return (
     <FadeIn className="mb-8">
-      <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-7 relative overflow-hidden">
-        {/* Decorative accent */}
-        <div className="absolute -top-12 -right-12 w-40 h-40 bg-emerald-100/60 rounded-full blur-3xl pointer-events-none" aria-hidden />
+      <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-sm">
+        <div className="grid lg:grid-cols-[0.9fr_1.1fr]">
+          <div className="relative overflow-hidden border-b border-slate-200 bg-slate-50 px-6 py-7 sm:px-8 sm:py-8 lg:border-b-0 lg:border-r">
+            <div
+              className="pointer-events-none absolute inset-0 opacity-50"
+              aria-hidden
+              style={{
+                backgroundImage: "radial-gradient(circle at 1px 1px, rgb(203 213 225 / 0.7) 1px, transparent 0)",
+                backgroundSize: "22px 22px",
+              }}
+            />
 
-        <div className="relative flex items-start gap-4 mb-5">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center flex-shrink-0 shadow-md shadow-emerald-500/20">
-            <Gift size={20} />
+            <div className="relative">
+              <div className="mb-6 flex items-center justify-between gap-4">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-900 shadow-sm">
+                  <Gift size={19} strokeWidth={2.2} />
+                </div>
+                <div className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
+                  Earn 5 credits
+                </div>
+              </div>
+
+              <p className="mb-2 text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Refer a friend</p>
+              <h3 className="max-w-sm text-2xl font-black tracking-tight text-slate-950 sm:text-[28px] sm:leading-9">
+                Help a friend find their college fit.
+              </h3>
+              <p className="mt-3 max-w-md text-sm leading-6 text-slate-600">
+                Send your personal link. You’ll receive 5 free credits after their first credit purchase.
+              </p>
+
+              <div className="mt-7 flex items-center gap-3">
+                <span className="text-xs font-semibold text-slate-500">Your code</span>
+                <span className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 font-mono text-xs font-bold tracking-wider text-slate-800 shadow-sm">
+                  {code || "······"}
+                </span>
+              </div>
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-lg font-bold tracking-tight text-slate-900">Refer friends, earn credits</h3>
-            <p className="text-sm text-slate-500 leading-relaxed mt-0.5">
-              You get <span className="font-semibold text-emerald-700">5 free credits</span> the moment a friend you referred makes their first credit purchase.
+
+          <div className="px-6 py-7 sm:px-8 sm:py-8">
+            <div className="mb-5">
+              <h4 className="text-base font-bold text-slate-900">Share your invitation</h4>
+              <p className="mt-1 text-sm text-slate-500">Copy your link or send it directly.</p>
+            </div>
+
+            <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2 focus-within:border-slate-300 focus-within:ring-4 focus-within:ring-slate-100">
+              <p className="min-w-0 flex-1 truncate px-2 text-xs font-medium text-slate-600 sm:text-sm">
+                {url || "Generating your referral link…"}
+              </p>
+              <button
+                onClick={handleCopy}
+                disabled={!url}
+                className={`inline-flex flex-shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-colors ${
+                  copied
+                    ? "bg-emerald-100 text-emerald-800"
+                    : "bg-slate-900 text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                }`}
+              >
+                {copied ? <><Check size={14} /> Copied</> : <><Copy size={14} /> Copy link</>}
+              </button>
+            </div>
+
+            {shareLinks && (
+              <div className="mt-6">
+                <div className="mb-3 flex items-center gap-3">
+                  <div className="h-px flex-1 bg-slate-200" />
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">or share with</span>
+                  <div className="h-px flex-1 bg-slate-200" />
+                </div>
+                <div className="grid grid-cols-5 gap-2 sm:gap-3">
+                  <ShareButton href={shareLinks.whatsapp} label="WhatsApp" icon={<WhatsAppIcon />} brand="whatsapp" />
+                  <ShareButton href={shareLinks.facebook} label="Facebook" icon={<FacebookIcon />} brand="facebook" />
+                  <ShareButton href={shareLinks.twitter} label="X" icon={<XSocialIcon />} brand="x" />
+                  <ShareButton href={shareLinks.telegram} label="Telegram" icon={<TelegramIcon />} brand="telegram" />
+                  <ShareButton href={shareLinks.email} label="Email" icon={<Mail size={18} />} brand="email" />
+                </div>
+              </div>
+            )}
+
+            <p className="mt-5 text-xs leading-5 text-slate-400">
+              Credits are added automatically after the qualifying purchase.
             </p>
           </div>
         </div>
-
-        {/* Link row + copy button */}
-        <div className="relative flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2.5 mb-3">
-          <p className="flex-1 min-w-0 text-sm text-slate-700 font-medium truncate">{url || "Generating your link…"}</p>
-          <button
-            onClick={handleCopy}
-            disabled={!url}
-            className={`flex-shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
-              copied
-                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                : "bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
-            }`}
-          >
-            {copied ? <><Check size={12} /> Copied</> : <><Copy size={12} /> Copy</>}
-          </button>
-        </div>
-
-        {/* Social share row */}
-        {shareLinks && (
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[11px] text-slate-500 mr-1">Share:</span>
-            <ShareButton href={shareLinks.whatsapp} label="WhatsApp" emoji="💬" tone="emerald" />
-            <ShareButton href={shareLinks.twitter}  label="X / Twitter" emoji="𝕏" tone="slate" />
-            <ShareButton href={shareLinks.telegram} label="Telegram" icon={<Send size={12} />} tone="blue" />
-            <ShareButton href={shareLinks.email}    label="Email" icon={<Mail size={12} />} tone="slate" />
-          </div>
-        )}
-
-        <p className="text-[11px] text-slate-400 mt-4">
-          Your code: <span className="font-mono font-semibold text-slate-600">{code || "…"}</span>
-        </p>
-      </div>
+      </section>
     </FadeIn>
   );
 }
 
-function ShareButton({ href, label, emoji, icon, tone = "slate" }: {
-  href: string; label: string; emoji?: string; icon?: React.ReactNode;
-  tone?: "slate" | "blue" | "emerald";
+function ShareButton({ href, label, icon, brand }: {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+  brand: "whatsapp" | "facebook" | "x" | "telegram" | "email";
 }) {
-  const cls =
-    tone === "blue"    ? "bg-blue-50 text-blue-700 hover:bg-blue-100 border-blue-200"
-    : tone === "emerald" ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border-emerald-200"
-    : "bg-slate-50 text-slate-700 hover:bg-slate-100 border-slate-200";
+  const brandClasses = {
+    whatsapp: "text-[#128C7E] group-hover:border-[#25D366]/50 group-hover:bg-[#25D366]/10",
+    facebook: "text-[#1877F2] group-hover:border-[#1877F2]/40 group-hover:bg-[#1877F2]/10",
+    x: "text-slate-950 group-hover:border-slate-400 group-hover:bg-slate-100",
+    telegram: "text-[#229ED9] group-hover:border-[#229ED9]/40 group-hover:bg-[#229ED9]/10",
+    email: "text-slate-600 group-hover:border-slate-400 group-hover:bg-slate-100",
+  }[brand];
+
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold border transition-colors ${cls}`}
+      aria-label={`Share via ${label}`}
+      className="group min-w-0 text-center"
     >
-      {emoji && <span aria-hidden className="text-sm leading-none">{emoji}</span>}
-      {icon}
-      {label}
+      <span className={`mx-auto flex h-11 w-11 items-center justify-center rounded-full border border-slate-200 bg-white shadow-sm transition-colors sm:h-12 sm:w-12 ${brandClasses}`} aria-hidden>
+        {icon}
+      </span>
+      <span className="mt-2 block truncate text-[10px] font-semibold text-slate-500 sm:text-[11px]">{label}</span>
     </a>
+  );
+}
+
+function WhatsAppIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-[19px] w-[19px] fill-current" aria-hidden>
+      <path d="M12.04 2a9.84 9.84 0 0 0-8.47 14.84L2 22l5.28-1.5A9.96 9.96 0 1 0 12.04 2Zm0 17.98a8.05 8.05 0 0 1-4.1-1.12l-.3-.18-3.13.9.87-3.05-.2-.32a7.93 7.93 0 1 1 6.86 3.77Zm4.37-5.94c-.24-.12-1.42-.7-1.64-.78-.22-.08-.38-.12-.54.12-.16.24-.62.78-.76.94-.14.16-.28.18-.52.06-.24-.12-1.01-.37-1.93-1.19a7.21 7.21 0 0 1-1.34-1.66c-.14-.24-.01-.37.1-.49.11-.11.24-.28.36-.42.12-.14.16-.24.24-.4.08-.16.04-.3-.02-.42-.06-.12-.54-1.3-.74-1.78-.19-.47-.39-.41-.54-.42h-.46c-.16 0-.42.06-.64.3-.22.24-.84.82-.84 2s.86 2.32.98 2.48c.12.16 1.69 2.58 4.1 3.62.57.25 1.02.39 1.37.5.58.18 1.1.16 1.51.1.46-.07 1.42-.58 1.62-1.14.2-.56.2-1.04.14-1.14-.06-.1-.22-.16-.46-.28Z" />
+    </svg>
+  );
+}
+
+function FacebookIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-[19px] w-[19px] fill-current" aria-hidden>
+      <path d="M13.75 22v-8.18h2.75l.41-3.19h-3.16V8.6c0-.92.26-1.55 1.58-1.55H17V4.2a22.1 22.1 0 0 0-2.44-.13c-2.42 0-4.08 1.48-4.08 4.19v2.37H7.75v3.19h2.73V22h3.27Z" />
+    </svg>
+  );
+}
+
+function XSocialIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-[17px] w-[17px] fill-current" aria-hidden>
+      <path d="M18.9 2H22l-6.77 7.74L23.2 22h-6.24l-4.89-6.39L6.48 22H3.36l7.24-8.28L2.96 2H9.36l4.42 5.84L18.9 2Zm-1.1 17.84h1.72L8.42 4.05H6.58L17.8 19.84Z" />
+    </svg>
+  );
+}
+
+function TelegramIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="h-[19px] w-[19px] fill-current" aria-hidden>
+      <path d="M21.73 2.27a1.18 1.18 0 0 0-1.2-.2L2.9 8.87c-1.2.47-1.19 1.14-.22 1.44l4.52 1.41 1.74 5.45c.21.6.1.84.73.84.49 0 .7-.22.97-.48l2.17-2.1 4.51 3.33c.83.46 1.43.22 1.64-.77l2.97-14c.3-1.2-.46-1.75-1.2-1.72ZM8.24 11.4l10.48-6.61c.52-.31 1-.14.61.2l-8.65 7.8-.34 3.63-2.1-5.02Z" />
+    </svg>
   );
 }
 
