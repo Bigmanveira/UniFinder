@@ -37,6 +37,24 @@ service cloud.firestore {
       return request.auth != null && request.auth.token.admin == true;
     }
 
+    function isAccountActive(userId) {
+      return !exists(/databases/$(database)/documents/users/$(userId))
+        || !("accountStatus" in get(/databases/$(database)/documents/users/$(userId)).data)
+        || get(/databases/$(database)/documents/users/$(userId)).data.accountStatus == "active";
+    }
+
+    function isActiveOwner(userId) {
+      return request.auth != null
+        && request.auth.uid == userId
+        && isAccountActive(userId);
+    }
+
+    function isActiveResourceOwner() {
+      return request.auth != null
+        && request.auth.uid == resource.data.userId
+        && isAccountActive(request.auth.uid);
+    }
+
     // ── Public Read Data (unchanged) ───────────────────────────────────
     match /schools/{schoolId} {
       allow read: if true;
@@ -49,27 +67,38 @@ service cloud.firestore {
     // ── Protected Owner-Only Data (unchanged) ──────────────────────────
     match /users/{userId} {
       allow read: if (request.auth != null && request.auth.uid == userId) || isAdmin();
-      allow create: if request.auth != null && request.auth.uid == userId;
-      allow update: if request.auth != null && request.auth.uid == userId
-        && !("role" in request.resource.data.diff(resource.data).changedKeys());
+      allow create: if request.auth != null
+        && request.auth.uid == userId
+        && !request.resource.data.keys().hasAny([
+          "role", "accountStatus", "accountStatusReason", "accountStatusUpdatedAt",
+          "accountStatusUpdatedBy", "authDeletedAt", "authDisabled"
+        ]);
+      allow update: if isActiveOwner(userId)
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          "role", "accountStatus", "accountStatusReason", "accountStatusUpdatedAt",
+          "accountStatusUpdatedBy", "authDeletedAt", "authDisabled"
+        ]);
       allow delete: if false;
     }
     match /studentProfiles/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if isActiveOwner(userId) || isAdmin();
+      allow write: if isActiveOwner(userId);
     }
     match /creditWallets/{userId} {
-      allow read: if (request.auth != null && request.auth.uid == userId) || isAdmin();
+      allow read: if isActiveOwner(userId) || isAdmin();
       allow write: if false;
     }
     match /creditTransactions/{transactionId} {
-      allow read: if (request.auth != null && request.auth.uid == resource.data.userId) || isAdmin();
+      allow read: if (request.auth != null
+        && request.auth.uid == resource.data.userId
+        && isAccountActive(request.auth.uid)) || isAdmin();
       allow write: if false;
     }
     match /savedSchools/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isActiveOwner(userId);
     }
     match /roadmapProgress/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if isActiveOwner(userId);
     }
 
     // ##ROADMAP:BEGIN##
@@ -288,20 +317,17 @@ service cloud.firestore {
     }
 
     match /studyRoadmaps/{userId} {
-      allow read: if request.auth != null
-                  && (request.auth.uid == userId || isAdmin());
+      allow read: if isActiveOwner(userId) || isAdmin();
 
       // CREATE: shape-validated, userId must match path.
-      allow create: if request.auth != null
-                    && request.auth.uid == userId
+      allow create: if isActiveOwner(userId)
                     && request.resource.data.userId == userId
                     && isValidRoadmapShape(request.resource.data);
 
       // UPDATE: full shape re-validated. userId + createdAt immutable.
       // version cannot decrease. All previously-present keys must still
       // be present (no field deletion). Unknown fields rejected.
-      allow update: if request.auth != null
-                    && request.auth.uid == userId
+      allow update: if isActiveOwner(userId)
                     && request.resource.data.userId == resource.data.userId
                     && request.resource.data.userId == request.auth.uid
                     && request.resource.data.createdAt == resource.data.createdAt
@@ -327,13 +353,13 @@ service cloud.firestore {
 
     // ── Match reports (unchanged) ─────────────────────────────────────
     match /matchReports/{reportId} {
-      allow read: if (request.auth != null && request.auth.uid == resource.data.userId) || isAdmin();
+      allow read: if isActiveResourceOwner() || isAdmin();
       allow write: if false;
     }
 
     // ── Academic CV Studio (unchanged) ────────────────────────────────
     match /academicCvDocuments/{docId} {
-      allow read: if (request.auth != null && request.auth.uid == resource.data.userId) || isAdmin();
+      allow read: if isActiveResourceOwner() || isAdmin();
       allow write: if false;
       match /full/{full} {
         allow read, write: if false;
@@ -342,26 +368,27 @@ service cloud.firestore {
 
     // ── AI run telemetry (unchanged) ──────────────────────────────────
     match /aiRuns/{aiRunId} {
-      allow read: if (request.auth != null && request.auth.uid == resource.data.userId) || isAdmin();
+      allow read: if isActiveResourceOwner() || isAdmin();
       allow write: if false;
     }
 
     // ── F-1 Visa Interview Simulator (unchanged) ──────────────────────
     match /visaInterviewSessions/{sessionId} {
-      allow read: if (request.auth != null && request.auth.uid == resource.data.userId) || isAdmin();
+      allow read: if isActiveResourceOwner() || isAdmin();
       allow write: if false;
     }
     match /visaInterviewMessages/{messageId} {
-      allow read: if (request.auth != null && request.auth.uid == resource.data.userId) || isAdmin();
+      allow read: if isActiveResourceOwner() || isAdmin();
       allow write: if false;
     }
     match /visaInterviewReports/{reportId} {
-      allow read: if (request.auth != null && request.auth.uid == resource.data.userId) || isAdmin();
+      allow read: if isActiveResourceOwner() || isAdmin();
       allow write: if false;
     }
     match /visaInterviewDocuments/{documentId} {
-      allow read: if (request.auth != null && request.auth.uid == resource.data.userId) || isAdmin();
+      allow read: if isActiveResourceOwner() || isAdmin();
       allow create: if request.auth != null
+        && isAccountActive(request.auth.uid)
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.documentType in [
           'i20', 'ds160_confirmation',
@@ -379,7 +406,7 @@ service cloud.firestore {
       allow write: if false;
     }
     match /surveyResponses/{responseId} {
-      allow read: if (request.auth != null && request.auth.uid == resource.data.userId) || isAdmin();
+      allow read: if isActiveResourceOwner() || isAdmin();
       allow write: if false;
     }
     match /pendingReferrals/{referredUserId} {
@@ -395,7 +422,7 @@ service cloud.firestore {
       }
     }
     match /paystackPayments/{reference} {
-      allow read: if (request.auth != null && request.auth.uid == resource.data.userId) || isAdmin();
+      allow read: if isActiveResourceOwner() || isAdmin();
       allow write: if false;
     }
 
@@ -407,8 +434,10 @@ service cloud.firestore {
 
     // ── Referral codes (unchanged) ────────────────────────────────────
     match /referralCodes/{code} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null
+        && isAccountActive(request.auth.uid);
       allow create: if request.auth != null
+        && isAccountActive(request.auth.uid)
         && request.resource.data.userId == request.auth.uid;
       allow update, delete: if false;
     }

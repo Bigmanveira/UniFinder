@@ -321,6 +321,61 @@ D("studyRoadmaps Firestore rules — emulator", () => {
 // updates. Runs two parallel updateChecklistItemStatus-equivalent
 // transactions and asserts both items end up in their target state.
 // ─────────────────────────────────────────────────────────────────────
+D("account lifecycle Firestore rules — emulator", () => {
+  it("allows an active owner to use protected product data", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "users/alice"), { accountStatus: "active" });
+    });
+    const alice = testEnv.authenticatedContext("alice").firestore();
+    await assertSucceeds(setDoc(doc(alice, "studentProfiles/alice"), { country: "ghana" }));
+  });
+
+  it("lets a restricted user read only their lifecycle status document", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "users/alice"), {
+        accountStatus: "restricted",
+        accountStatusReason: "Manual review",
+      });
+      await setDoc(doc(ctx.firestore(), "studentProfiles/alice"), { country: "ghana" });
+    });
+    const alice = testEnv.authenticatedContext("alice").firestore();
+    await assertSucceeds(getDoc(doc(alice, "users/alice")));
+    await assertFails(getDoc(doc(alice, "studentProfiles/alice")));
+    await assertFails(setDoc(doc(alice, "studentProfiles/alice"), { country: "usa" }));
+  });
+
+  it("prevents a user from creating their own restricted lifecycle state", async () => {
+    const alice = testEnv.authenticatedContext("alice").firestore();
+    await assertFails(setDoc(doc(alice, "users/alice"), {
+      email: "alice@example.com",
+      accountStatus: "restricted",
+    }));
+  });
+
+  it("prevents an active user from changing server-managed lifecycle fields", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "users/alice"), {
+        email: "alice@example.com",
+        accountStatus: "active",
+      });
+    });
+    const alice = testEnv.authenticatedContext("alice").firestore();
+    await assertFails(updateDoc(doc(alice, "users/alice"), {
+      accountStatus: "restricted",
+      accountStatusReason: "self assigned",
+    }));
+  });
+
+  it("keeps restricted user data readable to an ops admin", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "users/alice"), { accountStatus: "restricted" });
+      await setDoc(doc(ctx.firestore(), "studentProfiles/alice"), { country: "ghana" });
+    });
+    const admin = testEnv.authenticatedContext("ops", { admin: true }).firestore();
+    await assertSucceeds(getDoc(doc(admin, "studentProfiles/alice")));
+  });
+});
+
 D("studyRoadmaps concurrency — emulator", () => {
   it("two parallel transactions on different items both succeed", async () => {
     const initial = {

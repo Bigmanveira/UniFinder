@@ -1,33 +1,31 @@
 rules_version = '2';
 service firebase.storage {
   match /b/{bucket}/o {
+    function isActiveOwner(uid) {
+      return request.auth != null
+        && request.auth.uid == uid
+        && (
+          !firestore.exists(/databases/(default)/documents/users/$(uid))
+          || !("accountStatus" in firestore.get(/databases/(default)/documents/users/$(uid)).data)
+          || firestore.get(/databases/(default)/documents/users/$(uid)).data.accountStatus == "active"
+        );
+    }
 
-    // Default deny everything that isn't explicitly allowed below.
     match /{allPaths=**} {
       allow read, write: if false;
     }
 
-    // Profile avatar — strictly per-user, image only, 5 MB cap.
-    // Path: users/{uid}/profile/avatar (single file, overwritten on re-upload).
     match /users/{uid}/profile/{fileName} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-      allow create, update: if request.auth != null
-        && request.auth.uid == uid
+      allow read: if isActiveOwner(uid);
+      allow create, update: if isActiveOwner(uid)
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
-      allow delete: if request.auth != null && request.auth.uid == uid;
+      allow delete: if isActiveOwner(uid);
     }
 
-    // F-1 visa interview document uploads — strictly per-user.
-    // Path format: users/{uid}/visa-interviews/{sessionId}/{docType}/{fileName}
-    //   docType is one of: i20, ds160_confirmation, bank_statement,
-    //                       employment_letter, sponsor_letter, transcript
-    //   fileName cannot contain a slash (single segment)
-    //   max 10 MB, only PDF / PNG / JPEG content types
     match /users/{uid}/visa-interviews/{sessionId}/{docType}/{fileName} {
-      allow read: if request.auth != null && request.auth.uid == uid;
-      allow create, update: if request.auth != null
-        && request.auth.uid == uid
+      allow read: if isActiveOwner(uid);
+      allow create, update: if isActiveOwner(uid)
         && docType in ["i20", "ds160_confirmation", "bank_statement",
                        "employment_letter", "sponsor_letter", "transcript"]
         && request.resource.size < 10 * 1024 * 1024
@@ -37,7 +35,7 @@ service firebase.storage {
           request.resource.contentType == "image/jpeg" ||
           request.resource.contentType == "image/jpg"
         );
-      allow delete: if request.auth != null && request.auth.uid == uid;
+      allow delete: if isActiveOwner(uid);
     }
   }
 }

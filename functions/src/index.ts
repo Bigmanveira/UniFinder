@@ -1,6 +1,7 @@
-import { onCall, onRequest, HttpsError } from "firebase-functions/v2/https";
+import { onCall, onRequest, HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { defineSecret } from "firebase-functions/params";
+import * as functionsV1 from "firebase-functions/v1";
 import * as admin from "firebase-admin";
 import { generateClaudeMatchExplanation } from "./claudeExplainMatches.js";
 import { sendWaitlistWelcome } from "./waitlistEmail.js";
@@ -99,6 +100,34 @@ const HOT_OPTS  = { maxInstances: 100, concurrency: 40, minInstances: 1 } as con
 // aiMatchSchoolsCallable, and createLiveAvatarSession — the three
 // "first impression" endpoints where a cold-start ruins UX.
 const HEAVY_HOT_OPTS = { maxInstances: 150, concurrency: 40, minInstances: 2 } as const;
+
+type UserAccountStatus = "active" | "restricted" | "deactivated" | "deleted";
+
+function readAccountStatus(data: admin.firestore.DocumentData | undefined): UserAccountStatus {
+  const value = data?.accountStatus;
+  return value === "restricted" || value === "deactivated" || value === "deleted"
+    ? value
+    : "active";
+}
+
+async function assertUserAppAccess(request: {
+  auth?: { uid?: string; token?: Record<string, unknown> } | null;
+}): Promise<void> {
+  await assertNotInMaintenance(request);
+  if (request.auth?.token?.admin === true) return;
+
+  const uid = request.auth?.uid;
+  if (!uid) return;
+
+  const snap = await admin.firestore().collection("users").doc(uid).get();
+  const status = readAccountStatus(snap.exists ? snap.data() : undefined);
+  if (status === "active") return;
+
+  const message = status === "restricted"
+    ? "Your account is currently restricted. Contact support for assistance."
+    : "Your account is currently unavailable. Contact support for assistance.";
+  throw new HttpsError("permission-denied", message);
+}
 
 // ─── Rate limiters (replace the App Check we removed 2026-05-23) ─────────
 // Per-IP, in-memory, persist on each warm Cloud Run instance. Module-scope
@@ -551,7 +580,7 @@ export const testFunction = onCall({ ...LIGHT_OPTS }, async () => {
 const REFERRAL_REWARD = 5;
 
 export const applyReferralCode = onCall({ ...LIGHT_OPTS }, async (request) => {
-  await assertNotInMaintenance(request);
+  await assertUserAppAccess(request);
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Must be logged in");
 
@@ -715,7 +744,7 @@ export const aiMatchSchoolsCallable = onCall(
     memory:         "512MiB",
   },
   async (request) => {
-    await assertNotInMaintenance(request);
+    await assertUserAppAccess(request);
     const uid = request.auth?.uid;
     void uid; // anonymous matching is allowed (used during /results preview)
 
@@ -819,7 +848,7 @@ export const unlockMatchReport = onCall(
     memory:         "512MiB",
   },
   async (request) => {
-    await assertNotInMaintenance(request);
+    await assertUserAppAccess(request);
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "User must be logged in");
 
@@ -1309,7 +1338,7 @@ async function logAiRun(args: {
 export const revealMatchReportBucket = onCall(
   { ...LIGHT_OPTS },
   async (request) => {
-    await assertNotInMaintenance(request);
+    await assertUserAppAccess(request);
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in to reveal more schools.");
 
@@ -1411,7 +1440,7 @@ export const revealMatchReportBucket = onCall(
 export const startVisaInterviewSession = onCall(
   { ...LIGHT_OPTS, secrets: [ANTHROPIC_API_KEY] },
   async (request) => {
-    await assertNotInMaintenance(request);
+    await assertUserAppAccess(request);
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in to start a practice interview");
 
@@ -1641,7 +1670,7 @@ export const startVisaInterviewSession = onCall(
 export const sendVisaInterviewAnswer = onCall(
   { ...HOT_OPTS, secrets: [ANTHROPIC_API_KEY] },
   async (request) => {
-    await assertNotInMaintenance(request);
+    await assertUserAppAccess(request);
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in to continue the interview");
 
@@ -1735,7 +1764,7 @@ export const sendVisaInterviewAnswer = onCall(
 // Returns the metadata the client needs to upload a document directly to
 // Storage. Storage rules already restrict the path to the user's own folder.
 export const requestVisaDocumentUpload = onCall({ ...LIGHT_OPTS }, async (request) => {
-  await assertNotInMaintenance(request);
+  await assertUserAppAccess(request);
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in first");
 
@@ -1774,7 +1803,7 @@ export const requestVisaDocumentUpload = onCall({ ...LIGHT_OPTS }, async (reques
 export const recordVisaInterviewDocument = onCall(
   { ...HEAVY_OPTS, secrets: [ANTHROPIC_API_KEY], timeoutSeconds: 90 },
   async (request) => {
-    await assertNotInMaintenance(request);
+    await assertUserAppAccess(request);
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in first");
 
@@ -2018,7 +2047,7 @@ export const recordVisaInterviewDocument = onCall(
 export const finishVisaInterviewSession = onCall(
   { ...HEAVY_OPTS, secrets: [ANTHROPIC_API_KEY] },
   async (request) => {
-    await assertNotInMaintenance(request);
+    await assertUserAppAccess(request);
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in first");
 
@@ -2171,7 +2200,7 @@ const ACADEMIC_CV_MODES = new Set<string>(["review", "build", "convert"]);
 export const generateAcademicCvDocument = onCall(
   { ...HEAVY_OPTS, secrets: [ANTHROPIC_API_KEY] },
   async (request) => {
-    await assertNotInMaintenance(request);
+    await assertUserAppAccess(request);
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in to use the CV Studio.");
 
@@ -2343,7 +2372,7 @@ export const generateAcademicCvDocument = onCall(
 export const unlockAcademicCvDocument = onCall(
   { ...LIGHT_OPTS },
   async (request) => {
-    await assertNotInMaintenance(request);
+    await assertUserAppAccess(request);
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in to unlock your CV.");
 
@@ -2448,7 +2477,7 @@ export const unlockAcademicCvDocument = onCall(
 export const createLiveAvatarSession = onCall(
   { ...HEAVY_HOT_OPTS, secrets: [HEYGEN_API_KEY] },
   async (request) => {
-    await assertNotInMaintenance(request);
+    await assertUserAppAccess(request);
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in first");
 
@@ -2588,6 +2617,7 @@ export const createLiveAvatarSession = onCall(
 // Marks the avatar session as ended on our side. The frontend SDK has
 // already called avatar.stopAvatar() — this is for bookkeeping.
 export const endLiveAvatarSession = onCall({ ...LIGHT_OPTS }, async (request) => {
+  await assertUserAppAccess(request);
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in first");
 
@@ -2636,7 +2666,7 @@ const MAX_TTS_CALLS_PER_SESSION = 60;
 export const generateAvatarSpeech = onCall(
   { ...HOT_OPTS, timeoutSeconds: 60 },
   async (request) => {
-    await assertNotInMaintenance(request);
+    await assertUserAppAccess(request);
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in first");
 
@@ -2695,6 +2725,7 @@ export const generateAvatarSpeech = onCall(
 // Tiny helper called by the browser when the avatar transitions from
 // "starting" → "active" (stream playing) or "active" → "failed".
 export const markAvatarStatus = onCall({ ...LIGHT_OPTS }, async (request) => {
+  await assertUserAppAccess(request);
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in first");
 
@@ -2757,7 +2788,7 @@ export const listCreditPacks = onCall({ ...LIGHT_OPTS }, async () => {
 export const createPaystackCheckout = onCall(
   { ...LIGHT_OPTS, secrets: [PAYSTACK_SECRET_KEY] },
   async (request) => {
-    await assertNotInMaintenance(request);
+    await assertUserAppAccess(request);
     const uid = request.auth?.uid;
     if (!uid)                throw new HttpsError("unauthenticated", "Sign in to buy credits");
     const userEmail = request.auth?.token?.email;
@@ -3475,6 +3506,42 @@ export const onUserCreated = onDocumentCreated(
  * Dry-run by default so the operator can see the scope before mutating
  * anything. Pass `{ dryRun: false }` to actually create wallets.
  */
+// Firebase Auth and Firestore are separate systems. Deleting a user from
+// Firebase Authentication does not remove or update /users/{uid}, so the ops
+// portal used to keep counting the deleted account forever. Preserve the
+// Firestore record for audit/support history, but mark it deleted immediately.
+export const onAuthUserDeleted = functionsV1
+  .region("us-central1")
+  .auth.user()
+  .onDelete(async (user) => {
+    const db = admin.firestore();
+    const now = admin.firestore.FieldValue.serverTimestamp();
+
+    await db.collection("users").doc(user.uid).set({
+      email:                  user.email ?? null,
+      displayName:            user.displayName ?? null,
+      photoURL:               user.photoURL ?? null,
+      accountStatus:          "deleted",
+      accountStatusReason:    "Firebase Authentication user deleted.",
+      accountStatusUpdatedAt: now,
+      accountStatusUpdatedBy: "firebase-auth-trigger",
+      authDeletedAt:          now,
+      authDisabled:           true,
+    }, { merge: true });
+
+    await db.collection("auditLogs").add({
+      actorUid:   "system",
+      actorEmail: null,
+      action:     "user_auth_deleted",
+      targetType: "user",
+      targetId:   user.uid,
+      metadata:   { email: user.email ?? null },
+      ip:         null,
+      userAgent:  null,
+      createdAt:  now,
+    });
+  });
+
 export const backfillCreditWallets = onCall(
   { ...LIGHT_OPTS, timeoutSeconds: 540 },
   async (request) => {
@@ -3992,6 +4059,7 @@ const FEEDBACK_SURVEY_TRIGGERS = new Set(["match_report", "visa_interview"]);
 export const submitFeedbackSurvey = onCall(
   { ...LIGHT_OPTS },
   async (request) => {
+    await assertUserAppAccess(request);
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in first.");
 
@@ -5305,7 +5373,225 @@ export const deleteMarketerReferralCode = onCall(
  *  page is reachable only by founders — but defence in depth on the
  *  backend keeps an analyst who pokes around in DevTools from
  *  escalating their own privileges. */
-function requireFounder(request: any): void {
+async function writeUserAccountAudit(
+  request: CallableRequest<Record<string, unknown>>,
+  action: "user_account_status_changed" | "user_auth_directory_reconciled",
+  targetId: string,
+  metadata: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await admin.firestore().collection("auditLogs").add({
+      actorUid:    request.auth!.uid,
+      actorEmail:  request.auth?.token?.email ?? null,
+      action,
+      targetType:  "user",
+      targetId,
+      metadata,
+      ip:          extractClientIp(request.rawRequest),
+      userAgent:   String(request.rawRequest?.headers?.["user-agent"] ?? "").slice(0, 240),
+      createdAt:   admin.firestore.FieldValue.serverTimestamp(),
+    });
+  } catch (err) {
+    console.warn("[user-account] audit write failed:", err);
+  }
+}
+
+export const setUserAccountStatus = onCall(
+  { ...LIGHT_OPTS },
+  async (request) => {
+    requireFounder(request);
+
+    const targetUid = String(request.data?.uid ?? "").trim();
+    const requestedStatus = String(request.data?.status ?? "").trim();
+    const reason = String(request.data?.reason ?? "").trim().slice(0, 500);
+    if (!targetUid) {
+      throw new HttpsError("invalid-argument", "uid is required.");
+    }
+    if (!["active", "restricted", "deactivated"].includes(requestedStatus)) {
+      throw new HttpsError("invalid-argument", "status must be active, restricted, or deactivated.");
+    }
+    if (requestedStatus !== "active" && reason.length < 4) {
+      throw new HttpsError("invalid-argument", "A reason of at least 4 characters is required.");
+    }
+    if (targetUid === request.auth!.uid) {
+      throw new HttpsError("failed-precondition", "You cannot change your own account status.");
+    }
+
+    let authUser: admin.auth.UserRecord;
+    try {
+      authUser = await admin.auth().getUser(targetUid);
+    } catch {
+      throw new HttpsError("not-found", "Firebase Auth user not found.");
+    }
+    if (authUser.customClaims?.admin === true) {
+      throw new HttpsError("failed-precondition", "Ops administrator accounts cannot be managed here.");
+    }
+
+    const status = requestedStatus as Exclude<UserAccountStatus, "deleted">;
+    const userRef = admin.firestore().collection("users").doc(targetUid);
+    const beforeSnap = await userRef.get();
+    const previousStatus = readAccountStatus(beforeSnap.exists ? beforeSnap.data() : undefined);
+    const previousDisabled = authUser.disabled;
+    const shouldDisable = status === "deactivated";
+
+    try {
+      if (previousDisabled !== shouldDisable) {
+        await admin.auth().updateUser(targetUid, { disabled: shouldDisable });
+      }
+
+      await userRef.set({
+        accountStatus:          status,
+        accountStatusReason:    status === "active"
+          ? admin.firestore.FieldValue.delete()
+          : reason,
+        accountStatusUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        accountStatusUpdatedBy: request.auth!.uid,
+        authDeletedAt:          admin.firestore.FieldValue.delete(),
+        authDisabled:           shouldDisable,
+      }, { merge: true });
+    } catch (err: unknown) {
+      if (previousDisabled !== shouldDisable) {
+        try {
+          await admin.auth().updateUser(targetUid, { disabled: previousDisabled });
+        } catch (rollbackErr) {
+          console.error("[user-account] auth rollback failed", { targetUid, rollbackErr });
+        }
+      }
+      throw new HttpsError(
+        "internal",
+        err instanceof Error ? err.message : "Could not update account status.",
+      );
+    }
+
+    try {
+      await admin.auth().revokeRefreshTokens(targetUid);
+    } catch (err) {
+      console.warn("[user-account] refresh-token revocation failed:", err);
+    }
+
+    await writeUserAccountAudit(request, "user_account_status_changed", targetUid, {
+      previousStatus,
+      status,
+      reason: status === "active" ? null : reason,
+      authDisabled: shouldDisable,
+    });
+
+    return {
+      ok: true as const,
+      uid: targetUid,
+      previousStatus,
+      status,
+      authDisabled: shouldDisable,
+    };
+  },
+);
+
+async function listAllAuthUsers(): Promise<Map<string, admin.auth.UserRecord>> {
+  const users = new Map<string, admin.auth.UserRecord>();
+  let pageToken: string | undefined;
+  do {
+    const page = await admin.auth().listUsers(1000, pageToken);
+    for (const user of page.users) users.set(user.uid, user);
+    pageToken = page.pageToken;
+  } while (pageToken);
+  return users;
+}
+
+export const reconcileUserAuthDirectory = onCall(
+  { ...LIGHT_OPTS, timeoutSeconds: 540 },
+  async (request) => {
+    requireFounder(request);
+    const apply = request.data?.apply === true;
+    const db = admin.firestore();
+    const [authUsers, usersSnap] = await Promise.all([
+      listAllAuthUsers(),
+      db.collection("users").get(),
+    ]);
+
+    const changes: Array<{
+      uid: string;
+      previousStatus: UserAccountStatus;
+      status: UserAccountStatus;
+      authDisabled: boolean;
+    }> = [];
+
+    for (const userDoc of usersSnap.docs) {
+      const current = readAccountStatus(userDoc.data());
+      const authUser = authUsers.get(userDoc.id);
+      let desired: UserAccountStatus = current;
+      let authDisabled = true;
+
+      if (!authUser) {
+        desired = "deleted";
+      } else {
+        authDisabled = authUser.disabled;
+        if (authUser.disabled) {
+          desired = "deactivated";
+        } else if (current === "deleted" || current === "deactivated") {
+          desired = "active";
+        }
+      }
+
+      if (desired !== current || userDoc.data().authDisabled !== authDisabled) {
+        changes.push({
+          uid: userDoc.id,
+          previousStatus: current,
+          status: desired,
+          authDisabled,
+        });
+      }
+    }
+
+    if (apply) {
+      for (let offset = 0; offset < changes.length; offset += 400) {
+        const batch = db.batch();
+        for (const change of changes.slice(offset, offset + 400)) {
+          const payload: Record<string, unknown> = {
+            accountStatus:          change.status,
+            accountStatusUpdatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            accountStatusUpdatedBy: request.auth!.uid,
+            authDisabled:           change.authDisabled,
+          };
+          if (change.status === "deleted") {
+            payload.accountStatusReason = "Firebase Authentication user not found during reconciliation.";
+            payload.authDeletedAt = admin.firestore.FieldValue.serverTimestamp();
+          } else if (change.status === "deactivated") {
+            payload.accountStatusReason = "Firebase Authentication user is disabled.";
+            payload.authDeletedAt = admin.firestore.FieldValue.delete();
+          } else {
+            payload.accountStatusReason = admin.firestore.FieldValue.delete();
+            payload.authDeletedAt = admin.firestore.FieldValue.delete();
+          }
+          batch.set(db.collection("users").doc(change.uid), payload, { merge: true });
+        }
+        await batch.commit();
+      }
+
+      await writeUserAccountAudit(request, "user_auth_directory_reconciled", "users", {
+        scannedFirestoreUsers: usersSnap.size,
+        scannedAuthUsers: authUsers.size,
+        changed: changes.length,
+        deleted: changes.filter((change) => change.status === "deleted").length,
+        deactivated: changes.filter((change) => change.status === "deactivated").length,
+        reactivated: changes.filter((change) => change.status === "active").length,
+      });
+    }
+
+    return {
+      ok: true as const,
+      dryRun: !apply,
+      scannedFirestoreUsers: usersSnap.size,
+      scannedAuthUsers: authUsers.size,
+      changed: changes.length,
+      deleted: changes.filter((change) => change.status === "deleted").length,
+      deactivated: changes.filter((change) => change.status === "deactivated").length,
+      reactivated: changes.filter((change) => change.status === "active").length,
+      changes: changes.slice(0, 200),
+    };
+  },
+);
+
+function requireFounder(request: CallableRequest<Record<string, unknown>>): void {
   const token = request.auth?.token;
   if (!token || token.admin !== true) {
     throw new HttpsError("permission-denied", "Admin only.");
@@ -5321,7 +5607,7 @@ function requireFounder(request: any): void {
 }
 
 async function writeOpsAdminAudit(
-  request: any,
+  request: CallableRequest<Record<string, unknown>>,
   action: "admin_invited" | "admin_revoked" | "admin_role_changed" | "role_permissions_updated",
   targetUid: string,
   metadata: Record<string, unknown>,

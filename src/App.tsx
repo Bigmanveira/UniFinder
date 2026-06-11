@@ -4,6 +4,7 @@ import { Loader2 } from "lucide-react";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { MaintenanceGate } from "./components/MaintenanceGate";
+import { AccountStatusGate } from "./components/AccountStatusGate";
 
 // Landing is eager so the very first paint doesn't wait on an extra
 // round-trip — it's by far the most common entry point and we don't want
@@ -128,18 +129,20 @@ function App() {
               <Route path="/results" element={<LockedPreviewPage />} />
 
               <Route element={<ProtectedRoute />}>
-                <Route path="/app" element={<DashboardPage />} />
-                <Route path="/app/reports/:reportId" element={<FullReportPage />} />
-                <Route path="/app/roadmap" element={<RoadmapPage />} />
-                <Route path="/app/roadmap/onboarding" element={<RoadmapOnboardingPage />} />
-                <Route path="/app/visa-interview" element={<VisaInterviewPage />} />
-                <Route path="/app/interview-reports/:reportId" element={<InterviewReportDetailPage />} />
-                <Route path="/app/cv-studio"                    element={<CvStudioPage />} />
-                <Route path="/app/cv-studio/review"             element={<CvStudioReviewPage />} />
-                <Route path="/app/cv-studio/build"              element={<CvStudioBuildPage />} />
-                <Route path="/app/cv-studio/convert"            element={<CvStudioConvertPage />} />
-                <Route path="/app/cv-studio/history"            element={<CvStudioHistoryPage />} />
-                <Route path="/app/cv-studio/document/:documentId" element={<CvDocumentDetailPage />} />
+                <Route element={<AccountStatusGate />}>
+                  <Route path="/app" element={<DashboardPage />} />
+                  <Route path="/app/reports/:reportId" element={<FullReportPage />} />
+                  <Route path="/app/roadmap" element={<RoadmapPage />} />
+                  <Route path="/app/roadmap/onboarding" element={<RoadmapOnboardingPage />} />
+                  <Route path="/app/visa-interview" element={<VisaInterviewPage />} />
+                  <Route path="/app/interview-reports/:reportId" element={<InterviewReportDetailPage />} />
+                  <Route path="/app/cv-studio"                    element={<CvStudioPage />} />
+                  <Route path="/app/cv-studio/review"             element={<CvStudioReviewPage />} />
+                  <Route path="/app/cv-studio/build"              element={<CvStudioBuildPage />} />
+                  <Route path="/app/cv-studio/convert"            element={<CvStudioConvertPage />} />
+                  <Route path="/app/cv-studio/history"            element={<CvStudioHistoryPage />} />
+                  <Route path="/app/cv-studio/document/:documentId" element={<CvDocumentDetailPage />} />
+                </Route>
               </Route>
             </Route>
           </Routes>
