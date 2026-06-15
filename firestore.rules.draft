@@ -133,6 +133,22 @@ service cloud.firestore {
                    'application_documents', 'visa_interview_preparation',
                    'pre_departure_preparation', 'not_sure'];
     }
+    function isValidPrimaryNeedList(needs) {
+      return needs is list && needs.size() >= 1 && needs.size() <= 8
+        && needs.toSet().size() == needs.size()
+        && (needs.size() < 1 || isValidPrimaryNeed(needs[0]))
+        && (needs.size() < 2 || isValidPrimaryNeed(needs[1]))
+        && (needs.size() < 3 || isValidPrimaryNeed(needs[2]))
+        && (needs.size() < 4 || isValidPrimaryNeed(needs[3]))
+        && (needs.size() < 5 || isValidPrimaryNeed(needs[4]))
+        && (needs.size() < 6 || isValidPrimaryNeed(needs[5]))
+        && (needs.size() < 7 || isValidPrimaryNeed(needs[6]))
+        && (needs.size() < 8 || isValidPrimaryNeed(needs[7]));
+    }
+    function isValidPrimaryNeedValue(needs) {
+      return (needs is string && isValidPrimaryNeed(needs))
+        || isValidPrimaryNeedList(needs);
+    }
     function isValidOriginCountry(c) {
       return c in ['ghana', 'nigeria', 'kenya', 'india', 'other'];
     }
@@ -296,7 +312,7 @@ service cloud.firestore {
       return roadmapKeysHaveAll(d) && roadmapKeysHaveOnly(d)
         && d.userId is string && d.userId.size() >= 1 && d.userId.size() <= 80
         && isValidStageId(d.currentStage)
-        && isValidPrimaryNeed(d.primaryNeed)
+        && isValidPrimaryNeedValue(d.primaryNeed)
         && isValidOriginCountry(d.originCountry)
         && isValidCompletedLevel(d.completedAcademicLevel)
         && isValidTargetLevel(d.targetAcademicLevel)
@@ -322,6 +338,7 @@ service cloud.firestore {
       // CREATE: shape-validated, userId must match path.
       allow create: if isActiveOwner(userId)
                     && request.resource.data.userId == userId
+                    && isValidPrimaryNeedList(request.resource.data.primaryNeed)
                     && isValidRoadmapShape(request.resource.data);
 
       // UPDATE: full shape re-validated. userId + createdAt immutable.
@@ -332,6 +349,8 @@ service cloud.firestore {
                     && request.resource.data.userId == request.auth.uid
                     && request.resource.data.createdAt == resource.data.createdAt
                     && request.resource.data.version >= resource.data.version
+                    && (resource.data.primaryNeed is string
+                        || request.resource.data.primaryNeed is list)
                     && roadmapKeysHaveOnly(request.resource.data)
                     && request.resource.data.keys().hasAll(resource.data.keys())
                     && isValidRoadmapShape(request.resource.data);

@@ -75,6 +75,7 @@ const ITEM_STATUS_ENUM = [
 
 const MAX_CHECKLIST_ITEMS = 50;            // Blocker 2: hard cap, mirror of rules.
 const MAX_PROCESS_STATUSES = 13;           // == PROCESS_STATUS_ENUM.length
+const MAX_PRIMARY_NEEDS = 8;               // == PRIMARY_NEED_ENUM.length
 const MAX_SHORT_STRING = 200;
 const MAX_LONG_STRING = 4_000;
 const MAX_ID_LEN = 80;
@@ -188,6 +189,25 @@ function classifyProcessStatus(value) {
   return { codes: [], normalised: arr, repaired };
 }
 
+function classifyPrimaryNeed(value) {
+  const needs = typeof value === "string" ? [value] : value;
+  if (!Array.isArray(needs)) {
+    return { codes: ["PRIMARY_NEED_NOT_ARRAY_OR_STRING"] };
+  }
+  if (needs.length < 1 || needs.length > MAX_PRIMARY_NEEDS) {
+    return { codes: [`PRIMARY_NEED_LENGTH_${needs.length}`] };
+  }
+  const seen = new Set();
+  for (const need of needs) {
+    if (!PRIMARY_NEED_ENUM.includes(need)) {
+      return { codes: [`PRIMARY_NEED_INVALID_MEMBER_${need}`] };
+    }
+    if (seen.has(need)) return { codes: ["PRIMARY_NEED_DUPLICATE_MEMBER"] };
+    seen.add(need);
+  }
+  return { codes: [] };
+}
+
 // ── recommendedTool ───────────────────────────────────────────────────
 function classifyRecommendedTool(tool) {
   if (!isPlainObject(tool)) return { codes: ["RECOMMENDED_TOOL_NOT_OBJECT"] };
@@ -239,7 +259,6 @@ function classifyDoc(doc, opts = {}) {
     codes.push("USER_ID_PATH_MISMATCH");
   }
   if (!STAGE_ENUM.includes(doc.currentStage))                   codes.push("INVALID_STAGE");
-  if (!PRIMARY_NEED_ENUM.includes(doc.primaryNeed))             codes.push("INVALID_PRIMARY_NEED");
   if (!ORIGIN_COUNTRY_ENUM.includes(doc.originCountry))         codes.push("INVALID_ORIGIN_COUNTRY");
   if (!COMPLETED_LEVEL_ENUM.includes(doc.completedAcademicLevel)) codes.push("INVALID_COMPLETED_LEVEL");
   if (!TARGET_LEVEL_ENUM.includes(doc.targetAcademicLevel))     codes.push("INVALID_TARGET_LEVEL");
@@ -262,6 +281,10 @@ function classifyDoc(doc, opts = {}) {
   const statusReport = classifyProcessStatus(doc.currentProcessStatus);
   codes.push(...statusReport.codes);
   if (statusReport.repaired) repairs.push("LEGACY_PROCESS_STATUS_STRING_TO_ARRAY");
+
+  const primaryNeedReport = classifyPrimaryNeed(doc.primaryNeed);
+  if (primaryNeedReport.codes.length > 0) codes.push("INVALID_PRIMARY_NEED");
+  codes.push(...primaryNeedReport.codes);
 
   // checklist
   if (!Array.isArray(doc.checklist)) {
@@ -313,12 +336,12 @@ module.exports = {
   STAGE_ENUM, PROCESS_STATUS_ENUM, PRIMARY_NEED_ENUM,
   ORIGIN_COUNTRY_ENUM, COMPLETED_LEVEL_ENUM, TARGET_LEVEL_ENUM,
   START_TERM_ENUM, ITEM_STATUS_ENUM,
-  MAX_CHECKLIST_ITEMS, MAX_PROCESS_STATUSES,
+  MAX_CHECKLIST_ITEMS, MAX_PROCESS_STATUSES, MAX_PRIMARY_NEEDS,
   MAX_SHORT_STRING, MAX_LONG_STRING, MAX_ID_LEN, TARGET_VERSION,
   // Predicates
   isPlainObject, isInt, isShortString, isLongString, isValidTimestampLike,
   // Classifiers
-  classifyItem, classifyProcessStatus, classifyRecommendedTool, classifyDoc,
+  classifyItem, classifyProcessStatus, classifyPrimaryNeed, classifyRecommendedTool, classifyDoc,
   // Manifest helpers
   templateHashOf,
 };

@@ -19,6 +19,7 @@ import {
   applyDiagnosticUpdate,
   calculateProgress,
   CHECKLIST_TEMPLATES,
+  coercePrimaryNeeds,
   coerceProcessStatuses,
   generateRoadmapForUser,
   getNextStage,
@@ -38,7 +39,7 @@ const baseAnswers: OnboardingAnswers = {
   completedAcademicLevel: "bachelors",
   targetAcademicLevel:    "masters",
   currentProcessStatus:   ["just_starting"],
-  primaryNeed:            "finding_schools",
+  primaryNeed:            ["finding_schools"],
   originCountry:          "ghana",
   preferredStartTerm:     "fall_2026",
 };
@@ -69,7 +70,7 @@ describe("getStageFromOnboarding", () => {
     expect(getStageFromOnboarding({
       ...baseAnswers,
       currentProcessStatus: ["received_i20"],
-      primaryNeed: "visa_interview_preparation",
+      primaryNeed: ["understanding_costs", "visa_interview_preparation"],
     })).toBe("visa_preparation");
   });
 
@@ -77,7 +78,7 @@ describe("getStageFromOnboarding", () => {
     expect(getStageFromOnboarding({
       ...baseAnswers,
       currentProcessStatus: ["have_admission"],
-      primaryNeed: "visa_interview_preparation",
+      primaryNeed: ["visa_interview_preparation"],
     })).toBe("visa_preparation");
   });
 
@@ -112,6 +113,20 @@ describe("coerceProcessStatuses", () => {
   });
   it("returns the array as-is when already array", () => {
     expect(coerceProcessStatuses(["paid_sevis", "completed_ds160"])).toEqual(["paid_sevis", "completed_ds160"]);
+  });
+});
+
+describe("coercePrimaryNeeds", () => {
+  it("returns [] for null/undefined", () => {
+    expect(coercePrimaryNeeds(undefined)).toEqual([]);
+    expect(coercePrimaryNeeds(null)).toEqual([]);
+  });
+  it("wraps a legacy single value into an array", () => {
+    expect(coercePrimaryNeeds("finding_schools")).toEqual(["finding_schools"]);
+  });
+  it("preserves an existing array", () => {
+    expect(coercePrimaryNeeds(["finding_schools", "understanding_costs"]))
+      .toEqual(["finding_schools", "understanding_costs"]);
   });
 });
 
@@ -375,7 +390,7 @@ describe("applyDiagnosticUpdate", () => {
     completedAcademicLevel: "bachelors",
     targetAcademicLevel: "masters",
     currentProcessStatus: ["just_starting"],
-    primaryNeed: "finding_schools",
+    primaryNeed: ["finding_schools"],
     preferredStartTerm: "fall_2026",
     currentStage: "discovery",
     progressPercentage: 50,

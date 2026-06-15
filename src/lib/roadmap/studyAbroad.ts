@@ -324,7 +324,9 @@ export interface OnboardingAnswers {
    *  coerceProcessStatuses() below normalises both shapes for read
    *  paths; getStageFromOnboarding() accepts the array form. */
   currentProcessStatus:   CurrentProcessStatus[];
-  primaryNeed:            PrimaryNeed;
+  /** Support areas the user wants help with. New writes are arrays;
+   *  persisted legacy roadmap docs may still contain one string. */
+  primaryNeed:            PrimaryNeed[];
   originCountry:          OriginCountry;
   preferredStartTerm:     StartTerm;
 }
@@ -335,6 +337,14 @@ export interface OnboardingAnswers {
 export function coerceProcessStatuses(
   value: CurrentProcessStatus | CurrentProcessStatus[] | undefined | null,
 ): CurrentProcessStatus[] {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+/** Normalise legacy single-value roadmap docs into the multi-select shape. */
+export function coercePrimaryNeeds(
+  value: PrimaryNeed | PrimaryNeed[] | undefined | null,
+): PrimaryNeed[] {
   if (!value) return [];
   return Array.isArray(value) ? value : [value];
 }
@@ -365,9 +375,9 @@ const PROCESS_TO_STAGE: Record<CurrentProcessStatus, RoadmapStageId> = {
  * of those stages — that's where they actually need to focus.
  *
  * Tiebreakers (apply if ANY selected status matches):
- *   - "received_i20"  + primaryNeed = visa-related → visa_preparation
- *   - "have_admission" + primaryNeed = visa-related → visa_preparation
- *   - primaryNeed = "not_sure" → trust the statuses alone.
+ *   - "received_i20"  + any visa-related need → visa_preparation
+ *   - "have_admission" + any visa-related need → visa_preparation
+ *   - only "not_sure" selected → trust the statuses alone.
  */
 export function getStageFromOnboarding(answers: OnboardingAnswers): RoadmapStageId {
   const statuses = coerceProcessStatuses(answers.currentProcessStatus);
@@ -388,7 +398,8 @@ export function getStageFromOnboarding(answers: OnboardingAnswers): RoadmapStage
   // Visa-interest override — if the user has an I-20 or admission AND
   // they say visa interview prep is what they need most, jump straight
   // to Visa Preparation regardless of the natural mapping.
-  const needsVisaPrep = answers.primaryNeed === "visa_interview_preparation";
+  const primaryNeeds = coercePrimaryNeeds(answers.primaryNeed);
+  const needsVisaPrep = primaryNeeds.includes("visa_interview_preparation");
   if (needsVisaPrep && (statuses.includes("received_i20") || statuses.includes("have_admission"))) {
     return "visa_preparation";
   }
@@ -411,7 +422,8 @@ export interface StudyRoadmap {
    *  pre-multi-select docs. Use coerceProcessStatuses() to normalise
    *  before display. */
   currentProcessStatus:   CurrentProcessStatus | CurrentProcessStatus[];
-  primaryNeed:            PrimaryNeed;
+  /** Always an array on new writes; legacy docs may contain one string. */
+  primaryNeed:            PrimaryNeed | PrimaryNeed[];
   preferredStartTerm:     StartTerm;
   currentStage:           RoadmapStageId;
   progressPercentage:     number;          // 0-100, computed at write time

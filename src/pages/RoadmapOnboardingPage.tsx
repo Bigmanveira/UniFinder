@@ -199,7 +199,7 @@ export default function RoadmapOnboardingPage() {
       case 1: return Boolean(answers.completedAcademicLevel);
       case 2: return Boolean(answers.targetAcademicLevel);
       case 3: return Array.isArray(answers.currentProcessStatus) && answers.currentProcessStatus.length > 0;
-      case 4: return Boolean(answers.primaryNeed);
+      case 4: return Array.isArray(answers.primaryNeed) && answers.primaryNeed.length > 0;
       case 5: return Boolean(answers.originCountry);
       case 6: return Boolean(answers.preferredStartTerm);
       default: return false;
@@ -292,15 +292,24 @@ export default function RoadmapOnboardingPage() {
           />
         )}
         {step === 4 && (
-          <QuestionPanel
+          <MultiSelectPanel<Q4>
             kicker="What you need"
-            question="What do you need help with most right now?"
-            sub="We'll surface the right tool first based on this."
+            question="What do you need help with right now?"
+            sub="Tick every one that applies. We'll use these to prioritize the most relevant support."
             icon={<Compass size={20} />}
             iconBg="from-amber-500 to-orange-600"
             options={Q4_OPTIONS}
-            value={answers.primaryNeed}
-            onPick={(v) => { setAnswer("primaryNeed", v); }}
+            values={answers.primaryNeed ?? []}
+            onToggle={(v) => {
+              const current = answers.primaryNeed ?? [];
+              const next = current.includes(v)
+                ? current.filter((x) => x !== v)
+                : v === "not_sure"
+                  ? [v]
+                  : [...current.filter((x) => x !== "not_sure"), v];
+              setAnswer("primaryNeed", next);
+            }}
+            twoColumns
           />
         )}
         {step === 5 && (
@@ -431,7 +440,7 @@ function isComplete(a: Partial<OnboardingAnswers>): a is OnboardingAnswers {
     a.completedAcademicLevel &&
     a.targetAcademicLevel &&
     Array.isArray(a.currentProcessStatus) && a.currentProcessStatus.length > 0 &&
-    a.primaryNeed &&
+    Array.isArray(a.primaryNeed) && a.primaryNeed.length > 0 &&
     a.originCountry &&
     a.preferredStartTerm,
   );
@@ -494,10 +503,8 @@ function QuestionPanel<T extends string>({
 }
 
 // ── MultiSelectPanel ──────────────────────────────────────────────────
-// Multi-select variant of QuestionPanel. Used by Step 3 so the user
-// can tick every process-status that applies (e.g. "I have admission"
-// + "I have paid SEVIS" + "I have completed DS-160"). The stage
-// assignment picks the furthest-along selection.
+// Multi-select variant of QuestionPanel. Used by process status and
+// support needs so users can tick every option that applies.
 function MultiSelectPanel<T extends string>({
   kicker, question, sub, icon, iconBg, options, values, onToggle, twoColumns,
 }: {

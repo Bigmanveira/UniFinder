@@ -61,7 +61,7 @@ function validRoadmap(uid: string) {
     completedAcademicLevel: "bachelors",
     targetAcademicLevel: "masters",
     currentProcessStatus: ["just_starting"],
-    primaryNeed: "finding_schools",
+    primaryNeed: ["finding_schools"],
     preferredStartTerm: "fall_2026",
     currentStage: "discovery",
     progressPercentage: 0,
@@ -104,6 +104,39 @@ D("studyRoadmaps Firestore rules — emulator", () => {
   it("owner can create a valid roadmap", async () => {
     const alice = testEnv.authenticatedContext("alice").firestore();
     await assertSucceeds(setDoc(doc(alice, "studyRoadmaps/alice"), validRoadmap("alice")));
+  });
+
+  it("owner can create a roadmap with multiple support needs", async () => {
+    const alice = testEnv.authenticatedContext("alice").firestore();
+    const roadmap = {
+      ...validRoadmap("alice"),
+      primaryNeed: ["finding_schools", "scholarships_funding"],
+    };
+    await assertSucceeds(setDoc(doc(alice, "studyRoadmaps/alice"), roadmap));
+  });
+
+  it("rejects create with an empty or invalid support-needs list", async () => {
+    const alice = testEnv.authenticatedContext("alice").firestore();
+    await assertFails(setDoc(doc(alice, "studyRoadmaps/alice"), {
+      ...validRoadmap("alice"),
+      primaryNeed: [],
+    }));
+    await assertFails(setDoc(doc(alice, "studyRoadmaps/alice"), {
+      ...validRoadmap("alice"),
+      primaryNeed: ["finding_schools", "not_a_need"],
+    }));
+    await assertFails(setDoc(doc(alice, "studyRoadmaps/alice"), {
+      ...validRoadmap("alice"),
+      primaryNeed: ["finding_schools", "finding_schools"],
+    }));
+  });
+
+  it("rejects new roadmaps using the legacy single support need", async () => {
+    const alice = testEnv.authenticatedContext("alice").firestore();
+    await assertFails(setDoc(doc(alice, "studyRoadmaps/alice"), {
+      ...validRoadmap("alice"),
+      primaryNeed: "finding_schools",
+    }));
   });
 
   it("owner can read their own roadmap", async () => {
@@ -225,6 +258,23 @@ D("studyRoadmaps Firestore rules — emulator", () => {
     });
     const alice = testEnv.authenticatedContext("alice").firestore();
     await assertFails(updateDoc(doc(alice, "studyRoadmaps/alice"), { version: 1 }));
+  });
+
+  it("keeps legacy support-need docs writable and prevents array downgrades", async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "studyRoadmaps/alice"), {
+        ...validRoadmap("alice"),
+        primaryNeed: "finding_schools",
+      });
+    });
+    const alice = testEnv.authenticatedContext("alice").firestore();
+    const ref = doc(alice, "studyRoadmaps/alice");
+
+    await assertSucceeds(updateDoc(ref, { progressPercentage: 1 }));
+    await assertSucceeds(updateDoc(ref, {
+      primaryNeed: ["finding_schools", "scholarships_funding"],
+    }));
+    await assertFails(updateDoc(ref, { primaryNeed: "finding_schools" }));
   });
 
   it("rejects DELETE from the client even as the owner", async () => {

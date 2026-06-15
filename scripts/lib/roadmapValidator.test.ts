@@ -35,10 +35,17 @@ const validator = require_("./roadmapValidator.cjs") as {
     normalised?: Record<string, unknown>;
   };
   classifyProcessStatus: (value: unknown) => { codes: string[]; normalised?: string[]; repaired?: boolean };
+  classifyPrimaryNeed: (value: unknown) => { codes: string[] };
   classifyRecommendedTool: (tool: unknown) => { codes: string[] };
   MAX_CHECKLIST_ITEMS: number;
 };
-const { classifyDoc, classifyProcessStatus, classifyRecommendedTool, MAX_CHECKLIST_ITEMS } = validator;
+const {
+  classifyDoc,
+  classifyProcessStatus,
+  classifyPrimaryNeed,
+  classifyRecommendedTool,
+  MAX_CHECKLIST_ITEMS,
+} = validator;
 
 const TEMPLATES_PATH = resolve(__dirname_, "..", "..", "src", "lib", "roadmap", "checklistTemplates.json");
 const templates = JSON.parse(readFileSync(TEMPLATES_PATH, "utf-8")) as Record<string, Array<Record<string, unknown>>>;
@@ -50,7 +57,7 @@ function emptyValidDoc(overrides: Record<string, unknown> = {}) {
     completedAcademicLevel: "bachelors",
     targetAcademicLevel: "masters",
     currentProcessStatus: ["just_starting"],
-    primaryNeed: "finding_schools",
+    primaryNeed: ["finding_schools"],
     preferredStartTerm: "fall_2026",
     currentStage: "discovery",
     progressPercentage: 0,
@@ -104,6 +111,12 @@ describe("classifyDoc — top-level shape", () => {
     expect(classifyDoc(emptyValidDoc({ targetAcademicLevel: "x" })).codes).toContain("INVALID_TARGET_LEVEL");
     expect(classifyDoc(emptyValidDoc({ preferredStartTerm: "spring_3000" })).codes).toContain("INVALID_START_TERM");
   });
+  it("accepts legacy and multi-select support needs", () => {
+    expect(classifyDoc(emptyValidDoc({ primaryNeed: "finding_schools" })).status).toBe("READY");
+    expect(classifyDoc(emptyValidDoc({
+      primaryNeed: ["finding_schools", "scholarships_funding"],
+    })).status).toBe("READY");
+  });
   it("BLOCKED on progressPercentage out of range", () => {
     expect(classifyDoc(emptyValidDoc({ progressPercentage: -1 })).codes).toContain("INVALID_PROGRESS_PERCENTAGE");
     expect(classifyDoc(emptyValidDoc({ progressPercentage: 101 })).codes).toContain("INVALID_PROGRESS_PERCENTAGE");
@@ -120,6 +133,20 @@ describe("classifyDoc — top-level shape", () => {
       .toContain("INVALID_UPDATED_AT");
     expect(classifyDoc(emptyValidDoc({ createdAt: 1.5 })).codes)
       .toContain("INVALID_CREATED_AT");
+  });
+});
+
+describe("classifyPrimaryNeed", () => {
+  it("accepts a legacy string and a valid array", () => {
+    expect(classifyPrimaryNeed("finding_schools").codes).toEqual([]);
+    expect(classifyPrimaryNeed(["finding_schools", "understanding_costs"]).codes).toEqual([]);
+  });
+  it("rejects empty, duplicate, and invalid arrays", () => {
+    expect(classifyPrimaryNeed([]).codes).toContain("PRIMARY_NEED_LENGTH_0");
+    expect(classifyPrimaryNeed(["finding_schools", "finding_schools"]).codes)
+      .toContain("PRIMARY_NEED_DUPLICATE_MEMBER");
+    expect(classifyPrimaryNeed(["unknown"]).codes)
+      .toContain("PRIMARY_NEED_INVALID_MEMBER_unknown");
   });
 });
 
