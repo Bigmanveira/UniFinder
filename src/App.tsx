@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { MaintenanceGate } from "./components/MaintenanceGate";
 import { AccountStatusGate } from "./components/AccountStatusGate";
+import SupportChatWidget from "./components/SupportChatWidget";
 
 // Landing is eager so the very first paint doesn't wait on an extra
 // round-trip — it's by far the most common entry point and we don't want
@@ -147,6 +148,7 @@ function App() {
             </Route>
           </Routes>
         </Suspense>
+        <SupportChatWidget />
       </BrowserRouter>
     </AuthProvider>
   );

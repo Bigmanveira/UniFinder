@@ -54,6 +54,7 @@ import {
 } from "./opsAdmins.js";
 import { logError } from "./errorLogger.js";
 import { createRateLimiter, extractClientIp } from "./rateLimiter.js";
+import { answerSupportQuestion, type SupportChatHistoryItem } from "./supportChat.js";
 
 admin.initializeApp();
 
@@ -173,6 +174,14 @@ const opsSignInRateLimit = createRateLimiter({
 const userSignInRateLimit = createRateLimiter({
   maxPerWindow: 8,
   windowMs:     60 * 60 * 1000,   // 1 hour
+});
+
+// supportChat: public so signed-out visitors can resolve login, pricing,
+// and FAQ questions. Keep the window short enough for a real conversation
+// while bounding anonymous Claude spend from one IP.
+const supportChatRateLimit = createRateLimiter({
+  maxPerWindow: 30,
+  windowMs:     10 * 60 * 1000,   // 10 minutes
 });
 
 // Decide whether a returnUrl origin is one the ops portal is allowed to
@@ -562,6 +571,87 @@ function bucketizeForClaude(matches: any[]): BucketedMatches {
 export const testFunction = onCall({ ...LIGHT_OPTS }, async () => {
   return { ok: true, message: "Firebase Functions is working for UniFinder" };
 });
+
+// ============================================================
+// supportChat — public, retrieval-grounded product support.
+//
+// The browser sends only the current message, a short session transcript,
+// and the current route. No chat text is persisted. The helper retrieves
+// from a curated app-only knowledge base before Claude is called; questions
+// with no matching verified facts return a deterministic escalation instead.
+// ============================================================
+
+export const supportChat = onCall(
+  {
+    ...HEAVY_OPTS,
+    secrets: [ANTHROPIC_API_KEY],
+    timeoutSeconds: 30,
+    memory: "256MiB",
+  },
+  async (request) => {
+    const ip = extractClientIp(request.rawRequest);
+    const rateKey = request.auth?.uid ? `uid:${request.auth.uid}` : `ip:${ip}`;
+    const limit = supportChatRateLimit(rateKey);
+    if (!limit.allowed) {
+      const retrySeconds = Math.max(1, Math.ceil(limit.retryAfterMs / 1000));
+      throw new HttpsError(
+        "resource-exhausted",
+        `Too many support messages. Try again in ${retrySeconds} seconds.`,
+      );
+    }
+
+    const message = typeof request.data?.message === "string"
+      ? request.data.message.trim()
+      : "";
+    if (!message || message.length > 1200) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Message must be between 1 and 1200 characters.",
+      );
+    }
+
+    const route = typeof request.data?.route === "string"
+      ? request.data.route.trim().slice(0, 160)
+      : "/";
+    const rawHistory = Array.isArray(request.data?.history)
+      ? request.data.history.slice(-8)
+      : [];
+    const history: SupportChatHistoryItem[] = rawHistory
+      .filter((item: any) =>
+        (item?.role === "user" || item?.role === "assistant") &&
+        typeof item?.content === "string"
+      )
+      .map((item: any) => ({
+        role: item.role,
+        content: item.content.trim().slice(0, 1000),
+      }));
+
+    const result = await answerSupportQuestion({
+      message,
+      history,
+      route,
+      signedIn: !!request.auth?.uid,
+      apiKey: ANTHROPIC_API_KEY.value(),
+    });
+
+    if (result.status === "fallback" && result.errorMessage) {
+      console.warn("[supportChat] Claude fallback:", result.errorMessage);
+      void logError({
+        category: "ai_call",
+        source: "supportChat.claude_fallback",
+        severity: "warning",
+        message: result.errorMessage,
+        userId: request.auth?.uid ?? null,
+        context: {
+          route,
+          signedIn: !!request.auth?.uid,
+        },
+      });
+    }
+
+    return result.response;
+  },
+);
 
 // ============================================================
 // applyReferralCode — records a pending referral that pays out the

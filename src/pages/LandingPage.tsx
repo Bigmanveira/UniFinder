@@ -107,12 +107,12 @@ export default function LandingPage() {
         <div className="flex-1 text-center lg:text-left animate-fade-up">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-slate-200 text-slate-600 text-xs font-bold tracking-widest uppercase mb-8 shadow-sm">
             <span className="w-2 h-2 rounded-full bg-primary-500 animate-pulse"></span>
-            Personalised Study Abroad Roadmap
+            Your Personalised Study Abroad Platform
           </div>
 
           <h1 className="text-5xl md:text-7xl font-black text-slate-900 tracking-tight leading-[1.05] mb-6">
-            Your personalised <br className="hidden md:block"/>
-            <span className="text-transparent bg-clip-text bg-gradient-to-br from-primary-600 to-accent-500">roadmap to studying in the USA.</span>
+            Everything you need <br className="hidden md:block"/>
+            <span className="text-transparent bg-clip-text bg-gradient-to-br from-primary-600 to-accent-500">to study abroad.</span>
           </h1>
 
           <p className="text-lg md:text-xl text-slate-500 font-medium max-w-2xl mx-auto lg:mx-0 mb-10 leading-relaxed">
@@ -210,12 +210,15 @@ export default function LandingPage() {
       </section>
 
       {/* Feature Section */}
-      <section id="how-it-works" className="scroll-mt-24 py-20 md:py-24 bg-white relative z-20">
-        <div className="max-w-6xl mx-auto px-6">
-          <Reveal className="text-center mb-12 md:mb-16">
+      <section id="how-it-works" className="scroll-mt-24 py-20 md:py-28 bg-slate-50 relative z-20 overflow-hidden">
+        <div className="absolute inset-0 dot-grid-bg opacity-40 pointer-events-none" />
+        <div className="hidden md:block absolute -top-24 left-[8%] w-72 h-72 rounded-full bg-primary-200/40 blur-[100px] pointer-events-none" />
+        <div className="hidden md:block absolute -bottom-28 right-[5%] w-80 h-80 rounded-full bg-accent-500/15 blur-[110px] pointer-events-none" />
+        <div className="max-w-6xl mx-auto px-6 relative">
+          <Reveal className="text-center mb-12 md:mb-14">
             <p className="text-xs font-black tracking-[0.2em] uppercase text-primary-600 mb-4">How it works</p>
             <h2 className="text-3xl md:text-5xl font-black text-slate-900 tracking-tight mb-4">Your acceptance <br/><span className="text-primary-600">starts here.</span></h2>
-            <p className="text-lg text-slate-500 font-medium max-w-2xl mx-auto">Skip the guesswork. Get a personalised college shortlist built around your strengths, your budget, and your future — grounded in verified program data.</p>
+            <p className="text-base md:text-lg text-slate-500 font-medium max-w-xl mx-auto">A verified shortlist, built around your profile and turned into clear next steps.</p>
           </Reveal>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 md:gap-6">
@@ -223,24 +226,27 @@ export default function LandingPage() {
               <FeatureCard
                 index={1}
                 icon={<Target className="text-accent-600" size={24} />}
-                title="Matched to who you really are"
-                desc="Your GPA, scores, budget, and goals shape every recommendation — so the colleges you see are ones where you can actually get in, afford to attend, and thrive."
+                title="Built around you"
+                desc="Your academics, budget, and goals shape every match."
+                tone="cyan"
               />
             </Reveal>
             <Reveal delay={80}>
               <FeatureCard
                 index={2}
                 icon={<ShieldCheck className="text-emerald-600" size={24} />}
-                title="Real schools. Real programs."
-                desc="Every match is cross-checked against accredited program data. No invented schools, no dead listings, no application fees wasted chasing programs that don't exist."
+                title="Verified programs"
+                desc="Only real schools with confirmed programs make the list."
+                tone="emerald"
               />
             </Reveal>
             <Reveal delay={160}>
               <FeatureCard
                 index={3}
                 icon={<BrainCircuit className="text-primary-600" size={24} />}
-                title="Clear reasons, real strategy"
-                desc="Each match comes with a written explanation of why it fits, the funding paths worth chasing, and exactly what to strengthen — turning your shortlist into a plan."
+                title="A plan you can act on"
+                desc="See why each school fits and what to do next."
+                tone="blue"
               />
             </Reveal>
           </div>
@@ -304,10 +310,25 @@ export default function LandingPage() {
               The acceptance is only half the journey. A live AI consular officer reads your I-20, asks the questions a real officer would, and scores how you answer.
             </p>
 
-            <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-8 max-w-lg">
-              <FeaturePill icon={<Video size={18} />}    label="Live avatar"    color="text-primary-600" />
-              <FeaturePill icon={<Mic size={18} />}      label="Voice answers"  color="text-emerald-600" />
-              <FeaturePill icon={<BarChart3 size={18} />} label="Scored feedback" color="text-amber-500" />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-8 max-w-lg">
+              <InterviewFeatureCard
+                icon={<Video size={17} />}
+                label="Live avatar"
+                eyebrow="Face-to-face"
+                variant="avatar"
+              />
+              <InterviewFeatureCard
+                icon={<Mic size={17} />}
+                label="Voice answers"
+                eyebrow="Speak naturally"
+                variant="voice"
+              />
+              <InterviewFeatureCard
+                icon={<BarChart3 size={17} />}
+                label="Scored feedback"
+                eyebrow="Know what to fix"
+                variant="score"
+              />
             </div>
 
             <Link to={simulatorHref} className="inline-flex items-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold px-7 py-3.5 rounded-full transition-colors shadow-xl shadow-slate-900/20">
@@ -388,46 +409,221 @@ export default function LandingPage() {
 }
 
 function FeatureCard({
-  index, icon, title, desc,
+  index, icon, title, desc, tone,
 }: {
-  index?: number;
+  index: number;
   icon: React.ReactNode;
   title: string;
   desc: string;
+  tone: "cyan" | "emerald" | "blue";
 }) {
+  const toneStyles = {
+    cyan: {
+      surface: "from-cyan-50 via-white to-blue-50",
+      glow: "bg-cyan-400/20",
+      badge: "bg-cyan-50 text-cyan-700 border-cyan-200",
+      line: "from-cyan-400 to-blue-500",
+    },
+    emerald: {
+      surface: "from-emerald-50 via-white to-teal-50",
+      glow: "bg-emerald-400/20",
+      badge: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      line: "from-emerald-400 to-teal-500",
+    },
+    blue: {
+      surface: "from-blue-50 via-white to-indigo-50",
+      glow: "bg-primary-400/20",
+      badge: "bg-primary-50 text-primary-700 border-primary-200",
+      line: "from-primary-400 to-indigo-500",
+    },
+  }[tone];
+
   return (
-    <div className="group relative bg-white rounded-2xl p-7 md:p-8 border border-slate-200 hover:border-slate-300 hover:shadow-xl hover:shadow-slate-900/[0.04] hover:-translate-y-0.5 transition-all duration-300 h-full">
-      {/* Index + icon row — the number reads as a chapter marker, classic
-          enterprise pattern (Stripe / Linear). Icon tile sits in a soft
-          slate well that inverts to white on hover so the card feels
-          interactive without being noisy. */}
-      <div className="flex items-start justify-between mb-6">
-        <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 group-hover:bg-white group-hover:border-slate-200 group-hover:shadow-sm transition-all duration-300">
-          {icon}
-        </div>
-        {index !== undefined && (
-          <span className="text-[10px] font-black tracking-[0.22em] uppercase text-slate-400 tabular-nums">
+    <article className="group relative h-full overflow-hidden rounded-[28px] border border-white bg-white shadow-lg shadow-slate-900/[0.05] transition-all duration-500 hover:-translate-y-2 hover:shadow-2xl hover:shadow-slate-900/10">
+      <div className={`relative h-52 overflow-hidden bg-gradient-to-br ${toneStyles.surface} p-5`}>
+        <div className={`absolute -right-10 -top-12 h-36 w-36 rounded-full ${toneStyles.glow} blur-2xl transition-transform duration-700 group-hover:scale-150`} />
+        <div className="absolute inset-x-5 top-5 flex items-center justify-between">
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/80 bg-white/90 shadow-sm transition-transform duration-500 group-hover:-rotate-6 group-hover:scale-110">
+            {icon}
+          </div>
+          <span className={`rounded-full border px-3 py-1 text-[10px] font-black tracking-[0.18em] ${toneStyles.badge}`}>
             {String(index).padStart(2, "0")}
           </span>
-        )}
+        </div>
+
+        <div className="absolute inset-x-5 bottom-5">
+          {index === 1 && <ProfileMatchVisual />}
+          {index === 2 && <VerifiedProgramsVisual />}
+          {index === 3 && <ActionPlanVisual />}
+        </div>
       </div>
 
-      {/* Short accent rule sits between the icon row and the heading.
-          Anchors the eye and adds a touch of brand colour without leaning
-          on a full gradient wash. */}
-      <div className="w-8 h-px bg-slate-200 mb-5" />
+      <div className="relative p-6 md:p-7">
+        <div className={`mb-5 h-1 w-12 rounded-full bg-gradient-to-r ${toneStyles.line} transition-all duration-500 group-hover:w-20`} />
+        <h3 className="mb-2 text-xl md:text-2xl font-black tracking-tight text-slate-900">{title}</h3>
+        <p className="text-sm font-medium leading-relaxed text-slate-500">{desc}</p>
+      </div>
+    </article>
+  );
+}
 
-      <h3 className="text-lg md:text-xl font-black text-slate-900 mb-3 tracking-tight leading-snug">{title}</h3>
-      <p className="text-sm md:text-[15px] text-slate-500 font-medium leading-relaxed">{desc}</p>
+function ProfileMatchVisual() {
+  return (
+    <div className="animate-feature-float rounded-2xl border border-white/90 bg-white/90 p-3.5 shadow-lg shadow-cyan-900/5">
+      <div className="mb-3 flex items-center gap-2">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-primary-600 text-[10px] font-black text-white">YOU</div>
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 h-2 w-20 rounded-full bg-slate-800" />
+          <div className="h-1.5 w-14 rounded-full bg-slate-200" />
+        </div>
+        <span className="rounded-full bg-cyan-50 px-2 py-1 text-[9px] font-black text-cyan-700">PROFILE FIT</span>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <MiniMetric label="GPA" value="3.8" />
+        <MiniMetric label="Budget" value="$30k" />
+        <MiniMetric label="Goal" value="MS" />
+      </div>
     </div>
   );
 }
 
-function FeaturePill({ icon, label, color }: { icon: React.ReactNode; label: string; color: string }) {
+function VerifiedProgramsVisual() {
+  const programs = ["Computer Science", "Data Science", "Cybersecurity"];
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl px-2 py-3 text-center hover:shadow-md transition-shadow">
-      <div className={`flex items-center justify-center mb-1 ${color}`}>{icon}</div>
-      <p className="text-[10px] sm:text-[11px] font-bold text-slate-700">{label}</p>
+    <div className="relative overflow-hidden rounded-2xl border border-white/90 bg-white/90 p-3 shadow-lg shadow-emerald-900/5">
+      <div className="animate-feature-scan absolute inset-x-3 h-px bg-gradient-to-r from-transparent via-emerald-400 to-transparent opacity-80" />
+      <div className="space-y-2">
+        {programs.map((program, index) => (
+          <div
+            key={program}
+            className="flex items-center gap-2 rounded-xl border border-slate-100 bg-white px-3 py-2 transition-transform duration-500 group-hover:translate-x-1"
+            style={{ transitionDelay: `${index * 45}ms` }}
+          >
+            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
+              <CheckCircle2 size={12} />
+            </div>
+            <span className="min-w-0 flex-1 truncate text-[10px] font-bold text-slate-700">{program}</span>
+            <span className="text-[8px] font-black uppercase tracking-wider text-emerald-600">Verified</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ActionPlanVisual() {
+  const steps = [
+    { label: "Shortlist", status: "Done", active: true },
+    { label: "Funding", status: "Next", active: true },
+    { label: "Applications", status: "Ready", active: false },
+  ];
+  return (
+    <div className="rounded-2xl border border-white/90 bg-slate-950 p-3.5 text-white shadow-xl shadow-primary-900/15">
+      <div className="mb-3 flex items-center justify-between">
+        <span className="text-[9px] font-black uppercase tracking-[0.18em] text-primary-300">Your action plan</span>
+        <span className="rounded-full bg-white/10 px-2 py-1 text-[8px] font-bold text-white/70">3 steps</span>
+      </div>
+      <div className="space-y-2.5">
+        {steps.map((step, index) => (
+          <div key={step.label} className="flex items-center gap-2.5">
+            <div className={`flex h-5 w-5 items-center justify-center rounded-full text-[8px] font-black ${step.active ? "bg-primary-500 text-white" : "bg-white/10 text-white/50"}`}>
+              {index + 1}
+            </div>
+            <span className="flex-1 text-[10px] font-bold text-white/90">{step.label}</span>
+            <span className={`text-[8px] font-black uppercase tracking-wider ${step.active ? "text-primary-300" : "text-white/40"}`}>{step.status}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-slate-50 px-2 py-2 text-center">
+      <p className="text-[8px] font-black uppercase tracking-wider text-slate-400">{label}</p>
+      <p className="mt-0.5 text-[11px] font-black text-slate-800">{value}</p>
+    </div>
+  );
+}
+
+function InterviewFeatureCard({
+  icon,
+  label,
+  eyebrow,
+  variant,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  eyebrow: string;
+  variant: "avatar" | "voice" | "score";
+}) {
+  const badgeStyles = {
+    avatar: "bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-200/70",
+    voice:  "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200/70",
+    score:  "bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200/70",
+  } as const;
+  const badgeText = {
+    avatar: "Live",
+    voice:  "Listening",
+    score:  "8.6 / 10",
+  } as const;
+  return (
+    <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all duration-500 hover:-translate-y-1 hover:border-primary-200 hover:shadow-xl hover:shadow-primary-900/[0.08]">
+        <div className="mb-4 flex items-center justify-between">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary-50 text-primary-700 transition-transform duration-500 group-hover:scale-[1.06]">
+            {icon}
+          </div>
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-tight ${badgeStyles[variant]}`}>
+            {variant === "avatar" && (
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-500" />
+            )}
+            {badgeText[variant]}
+          </span>
+        </div>
+
+        <div className="mb-4 flex h-14 items-center justify-center rounded-xl bg-slate-50/80 ring-1 ring-inset ring-slate-100">
+          {variant === "avatar" && (
+            <div className="relative">
+              <div className="absolute inset-0 animate-ping rounded-full bg-primary-300/40" style={{ animationDuration: "2.4s" }} />
+              <div className="relative h-9 w-9 overflow-hidden rounded-full bg-gradient-to-br from-primary-400 to-accent-500 ring-2 ring-white">
+                <img src="/anna.webp" alt="" aria-hidden className="h-full w-full object-cover object-top" />
+              </div>
+            </div>
+          )}
+          {variant === "voice" && (
+            <div className="flex h-9 items-center gap-1">
+              {[0, 1, 2, 3, 4].map((bar) => (
+                <span
+                  key={bar}
+                  className="animate-audio-bar w-1 rounded-full bg-emerald-500"
+                  style={{ height: `${14 + (bar % 3) * 6}px`, animationDelay: `${bar * -0.12}s` }}
+                />
+              ))}
+            </div>
+          )}
+          {variant === "score" && (
+            <div className="w-full space-y-1.5 px-4">
+              <ScoreLine width="88%" color="bg-primary-500" />
+              <ScoreLine width="76%" color="bg-amber-400" />
+              <ScoreLine width="92%" color="bg-emerald-500" />
+            </div>
+          )}
+        </div>
+
+        <p className="text-sm font-semibold leading-tight text-slate-900">{label}</p>
+        <p className="mt-1 text-xs font-medium leading-snug text-slate-500">{eyebrow}</p>
+      </div>
+  );
+}
+
+function ScoreLine({ width, color }: { width: string; color: string }) {
+  return (
+    <div className="h-1.5 overflow-hidden rounded-full bg-slate-200">
+      <div
+        className={`h-full rounded-full ${color} transition-all duration-700 group-hover:brightness-110`}
+        style={{ width }}
+      />
     </div>
   );
 }

@@ -51,4 +51,26 @@
   @media (prefers-reduced-motion: reduce) {
     .animate-fade-up, .animate-fade-up-slow { animation: none; }
   }
+
+  @keyframes feature-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
+  }
+  .animate-feature-float {
+    animation: feature-float 4s ease-in-out infinite;
+  }
+
+  @keyframes feature-scan {
+    0% { top: 12%; opacity: 0; }
+    15% { opacity: 0.8; }
+    85% { opacity: 0.8; }
+    100% { top: 88%; opacity: 0; }
+  }
+  .animate-feature-scan {
+    animation: feature-scan 3.2s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .animate-feature-float, .animate-feature-scan { animation: none; }
+  }
 }
