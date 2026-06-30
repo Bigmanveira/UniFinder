@@ -261,6 +261,12 @@ function documentCategoryBoost(question: FlatQuestion, documents: ExtractedDocum
   return 0;
 }
 
+function localizeQuestionText(value: string): string {
+  return value
+    .replace(/\bGhanaian\b/gi, "home-country")
+    .replace(/\bGhana\b/gi, "your home country");
+}
+
 function toRetrievedQuestion(
   question: FlatQuestion,
   mode: RetrievedVisaQuestion["mode"],
@@ -272,24 +278,35 @@ function toRetrievedQuestion(
   if (!useGenericHomeCountry) {
     return { ...question, mode, reason, score, matchedRedFlags };
   }
-  const localize = (value: string) => value
-    .replace(/\bGhanaian\b/gi, "home-country")
-    .replace(/\bGhana\b/gi, "your home country");
   return {
     ...question,
-    question: localize(question.question),
-    intent: localize(question.intent),
-    follow_ups: question.follow_ups.map(localize),
-    good_answer_signals: question.good_answer_signals.map(localize),
-    red_flags: question.red_flags.map(localize),
+    question: localizeQuestionText(question.question),
+    intent: localizeQuestionText(question.intent),
+    follow_ups: question.follow_ups.map(localizeQuestionText),
+    good_answer_signals: question.good_answer_signals.map(localizeQuestionText),
+    red_flags: question.red_flags.map(localizeQuestionText),
     safety_instruction: question.safety_instruction
-      ? localize(question.safety_instruction)
+      ? localizeQuestionText(question.safety_instruction)
       : undefined,
     mode,
     reason,
     score,
-    matchedRedFlags: matchedRedFlags.map(localize),
+    matchedRedFlags: matchedRedFlags.map(localizeQuestionText),
   };
+}
+
+export function isForbiddenVisaQuestionText(text: string): boolean {
+  return /\bfamily\b.{0,80}\btravel(?:ed|led|s|ing)?\b|\btravel(?:ed|led|s|ing)?\b.{0,80}\bfamily\b/i.test(text);
+}
+
+export function isApprovedVisaQuestionText(questionId: string, text: string): boolean {
+  const question = questionsById.get(questionId);
+  if (!question || isForbiddenVisaQuestionText(text)) return false;
+  const approvedTexts = [question.question, ...question.follow_ups];
+  return approvedTexts.some((approvedText) =>
+    normalizeText(text) === normalizeText(approvedText) ||
+    normalizeText(text) === normalizeText(localizeQuestionText(approvedText)),
+  );
 }
 
 export function pickInitialVisaQuestion(): RetrievedVisaQuestion {

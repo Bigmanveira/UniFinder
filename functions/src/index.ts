@@ -12,12 +12,17 @@ import { Resend } from "resend";
 import {
   generateOfficerTurn, scoreVisaInterview, VISA_DISCLAIMER,
   pickIntroQuestion,
+  type OfficerTurnResult,
   type TranscriptTurn,
 } from "./visaInterview.js";
 import { createHeyGenSessionToken, endHeyGenSession } from "./liveAvatarSession.js";
 import { synthesizeOfficerAudio } from "./avatarTts.js";
 import { extractVisaDocument, type VisaDocumentType, type ExtractedDocument } from "./visaDocExtractor.js";
-import { VISA_QUESTION_BANK_INFO } from "./visaQuestionRetriever.js";
+import {
+  isApprovedVisaQuestionText,
+  isForbiddenVisaQuestionText,
+  VISA_QUESTION_BANK_INFO,
+} from "./visaQuestionRetriever.js";
 import {
   generateAcademicCv,
   extractCvText,
@@ -1537,6 +1542,21 @@ async function logAiRun(args: {
 // bucket flag without paying, and a creditTransactions row is still
 // written (type:"founder_bucket_reveal", amount:0) so the audit
 // trail captures the action.
+function assertGroundedVisaOfficerTurn(officer: OfficerTurnResult, sessionId: string): void {
+  if (officer.isFinalQuestion) return;
+  if (officer.questionId && isApprovedVisaQuestionText(officer.questionId, officer.text)) return;
+
+  console.error("[visa] blocked unapproved officer question", {
+    sessionId,
+    questionId: officer.questionId ?? null,
+    text: officer.text,
+  });
+  throw new HttpsError(
+    "internal",
+    "The next interview question failed the approved question-bank check. Please try again.",
+  );
+}
+
 export const revealMatchReportBucket = onCall(
   { ...LIGHT_OPTS },
   async (request) => {
@@ -1931,6 +1951,7 @@ export const sendVisaInterviewAnswer = onCall(
       isReturningApplicant: session.isReturningApplicant === true,
       applicantContexts: Array.isArray(session.applicantContexts) ? session.applicantContexts : [],
     });
+    assertGroundedVisaOfficerTurn(officer, sessionId);
 
     // Persist officer reply
     const officerMsgRef = await db.collection("visaInterviewMessages").add({
@@ -2203,6 +2224,7 @@ export const recordVisaInterviewDocument = onCall(
         isReturningApplicant: session.isReturningApplicant === true,
         applicantContexts: Array.isArray(session.applicantContexts) ? session.applicantContexts : [],
       });
+      assertGroundedVisaOfficerTurn(officer, sessionId);
       nextOfficerText = officer.text;
       // Once the interview proper has started, currentStage must NEVER revert
       // to "documents". If it does, the next upload would be treated as part
@@ -2298,7 +2320,7 @@ export const recordVisaInterviewDocument = onCall(
 
 // ── finishVisaInterviewSession ───────────────────────────────────────────────
 export const finishVisaInterviewSession = onCall(
-  { ...HOT_OPTS, secrets: [ANTHROPIC_API_KEY] },
+  { ...HEAVY_OPTS, secrets: [ANTHROPIC_API_KEY] },
   async (request) => {
     await assertUserAppAccess(request);
     const uid = request.auth?.uid;
@@ -2936,6 +2958,10 @@ export const generateAvatarSpeech = onCall(
     }
     if (text.length > 4000) {
       throw new HttpsError("invalid-argument", "Text too long");
+    }
+    if (isForbiddenVisaQuestionText(text)) {
+      console.error("[visa] blocked forbidden family-travel TTS line", { sessionId, userId: uid });
+      throw new HttpsError("failed-precondition", "This question is not in the approved interview bank.");
     }
 
     // Confirm the caller owns the session AND that we haven't blown past
