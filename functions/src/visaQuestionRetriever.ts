@@ -56,6 +56,14 @@ export interface VisaQuestionRetrieval {
   sensitiveTopicTriggered: boolean;
 }
 
+export interface SelectedVisaQuestion {
+  text: string;
+  questionId: string;
+  categoryId: string;
+  stage: VisaOfficerStage;
+  mode: RetrievedVisaQuestion["mode"];
+}
+
 interface FlatQuestion extends QuestionBankQuestion {
   categoryId: string;
   categoryLabel: string;
@@ -296,6 +304,8 @@ export function retrieveVisaQuestions(args: {
   resolvedDocumentTypes?: readonly VisaDocumentType[];
   questionCount: number;
   limit?: number;
+  isReturningApplicant?: boolean;
+  applicantContexts?: readonly string[];
 }): VisaQuestionRetrieval {
   const { transcript, questionCount, limit = 4 } = args;
   const extractedDocuments = args.extractedDocuments ?? [];
@@ -335,8 +345,41 @@ export function retrieveVisaQuestions(args: {
   );
   const sensitiveTopicTriggered = hasSensitiveTopicTrigger(transcript);
   const ghanaContext = hasGhanaContext(transcript, extractedDocuments);
+  const studentTurnCount = transcript.filter((turn) => turn.role === "student").length;
+  const applicantContexts = new Set(args.applicantContexts ?? []);
+  const priorOfficerTexts = transcript
+    .filter((turn) => turn.role === "officer")
+    .map((turn) => turn.text);
 
   const candidates: RetrievedVisaQuestion[] = [];
+  if (
+    args.isReturningApplicant === true &&
+    studentTurnCount <= 4
+  ) {
+    const refusalQuestion = questionsById.get("travel_002");
+    if (refusalQuestion) {
+      const requiredFollowUps = refusalQuestion.follow_ups.filter((followUp) =>
+        /reason were you given|what has changed/i.test(followUp),
+      );
+      const nextRequiredFollowUp = requiredFollowUps.find((followUp) =>
+        !isQuestionTextAlreadyUsed(followUp, priorOfficerTexts),
+      );
+      if (nextRequiredFollowUp) {
+        candidates.push({
+          ...toRetrievedQuestion(
+            refusalQuestion,
+            "follow_up",
+            "approved returning-applicant refusal follow-up",
+            240,
+            [],
+            !ghanaContext,
+          ),
+          follow_ups: [nextRequiredFollowUp],
+        });
+      }
+    }
+  }
+
   if (previousQuestion && lastAnswer) {
     const explicitRiskLanguage = /\b((main|primary) reason.{0,24}(work|live|stay)|(?:stay|remain|live).{0,24}(permanent|forever)|(?:do not|don't|cannot|can't|won't).{0,18}(return|go back)|borrowed.{0,18}(funds|money|bank statement))\b/i.test(lastAnswer);
     const redFlags = matchedLines(
@@ -386,6 +429,22 @@ export function retrieveVisaQuestions(args: {
       if (question.categoryId === "travel_history_and_refusals" && questionCount >= 4) score += 10;
       if (question.categoryId === "technical_or_field_specific_questions" && questionCount >= 2) score += 8;
       if (question.categoryId === "city_and_life_awareness" && questionCount >= 2) score += 6;
+      if (
+        applicantContexts.has("changed_school_or_program") &&
+        ["school_choice", "program_fit"].includes(question.categoryId)
+      ) score += 36;
+      if (
+        applicantContexts.has("changed_funding_or_sponsor") &&
+        question.categoryId === "finances_and_sponsorship"
+      ) score += 36;
+      if (
+        applicantContexts.has("document_practice") &&
+        question.categoryId === "documents_and_process"
+      ) score += 30;
+      if (
+        applicantContexts.has("international_travel_history") &&
+        question.categoryId === "travel_history_and_refusals"
+      ) score += 26;
       return toRetrievedQuestion(
         question,
         "new_topic",
@@ -416,6 +475,48 @@ export function retrieveVisaQuestions(args: {
     lastAnswerWasVague,
     sensitiveTopicTriggered,
   };
+}
+
+function isQuestionTextAlreadyUsed(
+  text: string,
+  priorOfficerTexts: readonly string[],
+): boolean {
+  const normalized = normalizeText(text);
+  return priorOfficerTexts.some((priorText) => {
+    const normalizedPrior = normalizeText(priorText);
+    if (normalized === normalizedPrior) return true;
+    return sharedTokenCount(text, priorText) >= 3 && tokenOverlap(text, priorText) >= 0.8;
+  });
+}
+
+export function selectVisaQuestion(
+  retrieval: VisaQuestionRetrieval,
+  transcript: RetrievalTranscriptTurn[],
+): SelectedVisaQuestion | null {
+  const priorOfficerTexts = transcript
+    .filter((turn) => turn.role === "officer")
+    .map((turn) => turn.text)
+    .filter(Boolean);
+
+  for (const candidate of retrieval.candidates) {
+    const approvedTexts = candidate.mode === "follow_up"
+      ? candidate.follow_ups
+      : [candidate.question];
+    const text = approvedTexts.find((approvedText) =>
+      !isQuestionTextAlreadyUsed(approvedText, priorOfficerTexts),
+    );
+    if (!text) continue;
+
+    return {
+      text,
+      questionId: candidate.id,
+      categoryId: candidate.categoryId,
+      stage: candidate.stage,
+      mode: candidate.mode,
+    };
+  }
+
+  return null;
 }
 
 export function formatRetrievedQuestionsForOfficer(retrieval: VisaQuestionRetrieval): string {
@@ -449,9 +550,9 @@ export function formatRetrievedQuestionsForOfficer(retrieval: VisaQuestionRetrie
   lines.push(
     "\nQUESTION-BANK RULES:",
     "- Ask one concise question only.",
-    "- For mode=follow_up, use one approved follow-up or a close paraphrase tied to what the student actually said.",
-    "- For mode=new_topic, use the primary question or a close paraphrase; do not invent a factual premise.",
-    "- Return sourceQuestionId exactly as one candidate ID. Document cross-checks may use document_cross_check; the prior-refusal change question may use returning_applicant_change.",
+    "- For mode=follow_up, use one approved follow-up verbatim.",
+    "- For mode=new_topic, use the primary question verbatim.",
+    "- Return sourceQuestionId exactly as one candidate ID. No special or invented source IDs are allowed.",
     "- If closing the interview, sourceQuestionId may be null.",
   );
   return lines.join("\n");

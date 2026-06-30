@@ -1,6 +1,6 @@
 export const VISA_INTERVIEW_QUESTION_BANK = {
   "rag_dataset_name": "CollegeReady_F1_Visa_Interview_Question_Bank_v2_2026",
-  "version": "2.0",
+  "version": "2.1",
   "last_updated": "2026-06-30",
   "purpose": "Power a realistic AI F-1 visa interview simulator for international students, especially Ghanaian applicants, using common F-1 interview themes, official visa-process requirements, and current reported screening patterns.",
   "important_disclaimer": "This dataset is for visa interview practice only. It does not provide legal advice, does not guarantee visa approval, and should not coach applicants to lie, hide information, or misrepresent facts.",
@@ -696,6 +696,7 @@ export const VISA_INTERVIEW_QUESTION_BANK = {
           "question": "Have you ever been refused a U.S. visa?",
           "intent": "Check honesty and prior application history.",
           "follow_ups": [
+            "What reason were you given for the refusal?",
             "When were you refused?",
             "What visa type was it?",
             "What has changed since then?"
@@ -1096,4 +1097,3 @@ export const VISA_INTERVIEW_QUESTION_BANK = {
     }
   ]
 } as const;
-

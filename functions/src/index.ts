@@ -291,6 +291,13 @@ const REVEAL_BUCKET_CREDIT_COST = 5;
 const VISA_PREVIEW_DURATION_SEC = 180;
 const VISA_PAID_DURATION_SEC    = 300;
 const VISA_PREVIEW_COOLDOWN_DAYS = 7;
+const VISA_APPLICANT_CONTEXTS = new Set([
+  "previous_refusal",
+  "changed_school_or_program",
+  "changed_funding_or_sponsor",
+  "document_practice",
+  "international_travel_history",
+]);
 
 // Academic CV Studio — three AI tools with a free-preview + paid-unlock
 // model. Generation runs once on submit (Sonnet, ~$0.015 per doc on our
@@ -1501,9 +1508,13 @@ async function logAiRun(args: {
   try {
     const db = admin.firestore();
     await db.collection("aiRuns").add({
-      ...args,
-      provider:  "anthropic",
-      model:     "claude-sonnet-4-5",
+      userId: args.userId,
+      sessionId: args.sessionId,
+      type: args.type,
+      status: args.status,
+      ...(args.errorMessage ? { errorMessage: args.errorMessage } : {}),
+      provider:  args.type === "visa_interview_next_question" ? "rag" : "anthropic",
+      model:     args.type === "visa_interview_next_question" ? "deterministic-rag-v2" : "claude-haiku-4-5",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
   } catch (err: any) {
@@ -1629,7 +1640,7 @@ export const revealMatchReportBucket = onCall(
 
 // ── startVisaInterviewSession ─────────────────────────────────────────────────
 export const startVisaInterviewSession = onCall(
-  { ...LIGHT_OPTS, secrets: [ANTHROPIC_API_KEY] },
+  { ...LIGHT_OPTS },
   async (request) => {
     await assertUserAppAccess(request);
     const uid = request.auth?.uid;
@@ -1641,7 +1652,14 @@ export const startVisaInterviewSession = onCall(
     }
     const interviewMode: "text" | "voice" | "avatar" =
       mode === "voice" || mode === "avatar" ? mode : "text";
-    const returningApplicant = isReturningApplicant === true;
+    const applicantContexts = Array.isArray(request.data?.applicantContexts)
+      ? [...new Set(
+          request.data.applicantContexts
+            .filter((value: unknown): value is string => typeof value === "string")
+            .filter((value: string) => VISA_APPLICANT_CONTEXTS.has(value)),
+        )].slice(0, VISA_APPLICANT_CONTEXTS.size)
+      : [];
+    const returningApplicant = isReturningApplicant === true || applicantContexts.includes("previous_refusal");
 
     const db = admin.firestore();
     const founder = isFounderEmail(request.auth?.token?.email as string | undefined);
@@ -1777,6 +1795,7 @@ export const startVisaInterviewSession = onCall(
         kind:                 sessionKind,         // "preview" | "paid"
         previewDurationSec:   durationSec,         // server-enforced cap consulted by generateOfficerTurn
         isReturningApplicant: returningApplicant,  // routes "what has changed?" prompt addition
+        applicantContexts,
         mode:                 interviewMode,
         avatarProvider:       interviewMode === "avatar" ? "heygen_liveavatar" : "none",
         currentStage:         "documents",
@@ -1839,6 +1858,7 @@ export const startVisaInterviewSession = onCall(
         mode:               interviewMode,
         kind:               sessionKind,
         isReturningApplicant: returningApplicant,
+        applicantContexts,
       },
     });
 
@@ -1863,7 +1883,7 @@ export const startVisaInterviewSession = onCall(
 // speaking, then stares at a "thinking" pill for 5+ seconds. Always-warm
 // removes that.
 export const sendVisaInterviewAnswer = onCall(
-  { ...HOT_OPTS, secrets: [ANTHROPIC_API_KEY] },
+  { ...HOT_OPTS },
   async (request) => {
     await assertUserAppAccess(request);
     const uid = request.auth?.uid;
@@ -1892,14 +1912,13 @@ export const sendVisaInterviewAnswer = onCall(
       sessionId, userId: uid, role: "student", text, stage: session.currentStage ?? null, createdAt: now,
     });
 
-    // Build a fresh transcript and let Claude pick the next question
+    // Build a fresh transcript and select the next approved RAG question.
     const transcript = await loadTranscript(sessionId);
     const extractedDocs: ExtractedDocument[] = Object.values(session.extractedDocuments ?? {});
     const unavailableDocumentTypes: VisaDocumentType[] = [];
     if (session.documentsSkipped?.i20) unavailableDocumentTypes.push("i20");
     if (session.documentsSkipped?.ds160) unavailableDocumentTypes.push("ds160_confirmation");
     const officer = await generateOfficerTurn({
-      apiKey:        ANTHROPIC_API_KEY.value(),
       transcript,
       questionCount: typeof session.questionCount === "number" ? session.questionCount : 1,
       extractedDocuments: extractedDocs,
@@ -1910,6 +1929,7 @@ export const sendVisaInterviewAnswer = onCall(
       // (those pre-date this feature so they're all paid).
       maxDurationSec: typeof session.previewDurationSec === "number" ? session.previewDurationSec : 300,
       isReturningApplicant: session.isReturningApplicant === true,
+      applicantContexts: Array.isArray(session.applicantContexts) ? session.applicantContexts : [],
     });
 
     // Persist officer reply
@@ -2174,7 +2194,6 @@ export const recordVisaInterviewDocument = onCall(
         unavailableDocumentTypes.push("ds160_confirmation");
       }
       const officer = await generateOfficerTurn({
-        apiKey:        ANTHROPIC_API_KEY.value(),
         transcript,
         questionCount: typeof session.questionCount === "number" ? session.questionCount : 1,
         extractedDocuments: Object.values(extractedDocsAfter),
@@ -2182,6 +2201,7 @@ export const recordVisaInterviewDocument = onCall(
         elapsedMs:     elapsedSinceInterviewStart(session),
         maxDurationSec: typeof session.previewDurationSec === "number" ? session.previewDurationSec : 300,
         isReturningApplicant: session.isReturningApplicant === true,
+        applicantContexts: Array.isArray(session.applicantContexts) ? session.applicantContexts : [],
       });
       nextOfficerText = officer.text;
       // Once the interview proper has started, currentStage must NEVER revert
@@ -2278,7 +2298,7 @@ export const recordVisaInterviewDocument = onCall(
 
 // ── finishVisaInterviewSession ───────────────────────────────────────────────
 export const finishVisaInterviewSession = onCall(
-  { ...HEAVY_OPTS, secrets: [ANTHROPIC_API_KEY] },
+  { ...HOT_OPTS, secrets: [ANTHROPIC_API_KEY] },
   async (request) => {
     await assertUserAppAccess(request);
     const uid = request.auth?.uid;
@@ -2381,7 +2401,7 @@ export const finishVisaInterviewSession = onCall(
       disclaimer:                    score.disclaimer,
       questionBankName:              VISA_QUESTION_BANK_INFO.name,
       questionBankVersion:           VISA_QUESTION_BANK_INFO.version,
-      scoringVersion:                "2.0-evidence-weighted",
+      scoringVersion:                "3.0-performance-grounded",
       aiStatus:                      score.status,
       createdAt:                     now,
     };

@@ -7,7 +7,7 @@ import { db, functions } from "../lib/firebase";
 import { useAuth } from "../hooks/useAuth";
 import { isFounderEmail } from "../lib/founders";
 import type {
-  VisaDocumentType, VisaInterviewMessage, VisaInterviewReport,
+  VisaApplicantContext, VisaDocumentType, VisaInterviewMessage, VisaInterviewReport,
 } from "../types";
 import InterviewIntroCard from "../components/visa/InterviewIntroCard";
 import DocumentUploadModal from "../components/visa/DocumentUploadModal";
@@ -185,7 +185,7 @@ export default function VisaInterviewPage() {
     return unsub;
   }, [user, sessionId]);
 
-  const startInterview = async (accepted: boolean, isReturningApplicant: boolean) => {
+  const startInterview = async (accepted: boolean, applicantContexts: VisaApplicantContext[]) => {
     if (!user) { navigate("/login"); return; }
     if (!speech.isSupported) {
       setError("Voice mode requires Chrome, Edge, or Safari. This browser doesn't support speech recognition.");
@@ -225,7 +225,8 @@ export default function VisaInterviewPage() {
       const res = await fn({
         mode: "avatar",
         disclaimerAccepted: accepted,
-        isReturningApplicant,
+        applicantContexts,
+        isReturningApplicant: applicantContexts.includes("previous_refusal"),
       });
       const data = res.data as {
         sessionId: string;
@@ -605,7 +606,7 @@ export default function VisaInterviewPage() {
 
 
         {phase === "intro" && (
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-3xl mx-auto">
             <InterviewIntroCard
               onStart={startInterview}
               starting={starting}
@@ -717,6 +718,30 @@ function FullScreenInterview({
           some life without distracting from the video. */}
       <div className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80vmin] h-[80vmin] bg-blue-500/10 rounded-full blur-[120px]" aria-hidden />
       <div className="pointer-events-none absolute bottom-0 right-0 w-[40vmin] h-[40vmin] bg-cyan-500/10 rounded-full blur-[100px]" aria-hidden />
+
+      {ending && (
+        <div
+          className="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/88 px-5 backdrop-blur-xl"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="w-full max-w-sm rounded-[28px] border border-white/15 bg-white/[0.08] p-7 text-center shadow-2xl shadow-black/50">
+            <div className="relative mx-auto mb-5 flex h-16 w-16 items-center justify-center">
+              <span className="absolute inset-0 rounded-full border border-blue-300/25" />
+              <span className="absolute inset-1 animate-spin rounded-full border-2 border-transparent border-t-blue-300 border-r-violet-300" />
+              <Loader2 size={22} className="animate-spin text-white" />
+            </div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-blue-200">Interview complete</p>
+            <h2 className="mt-2 text-xl font-bold tracking-tight text-white">Building your feedback report</h2>
+            <p className="mt-2 text-sm leading-relaxed text-slate-300">
+              Reviewing each answer against the question bank and calculating your performance scores.
+            </p>
+            <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-white/10">
+              <div className="h-full w-2/3 animate-pulse rounded-full bg-gradient-to-r from-blue-400 to-violet-400" />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Avatar — centered, sized to fit the viewport. The internal
             LiveAvatarPanel maintains its own aspect ratio (3:4 on mobile,

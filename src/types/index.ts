@@ -78,6 +78,13 @@ export type VisaDocumentType =
   | "sponsor_letter"
   | "transcript";
 
+export type VisaApplicantContext =
+  | "previous_refusal"
+  | "changed_school_or_program"
+  | "changed_funding_or_sponsor"
+  | "document_practice"
+  | "international_travel_history";
+
 export interface VisaInterviewSession {
   id?: string;
   userId: string;

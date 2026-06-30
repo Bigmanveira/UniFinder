@@ -7,8 +7,9 @@ Anna uses `CollegeReady_F1_Visa_Interview_Question_Bank_v2_2026` as a local, ver
 1. `visaQuestionRetriever.ts` ranks a small set of approved questions for the current transcript.
 2. Brief or risky answers prioritize an approved follow-up from the previous question.
 3. Strong answers advance through uncovered core categories: purpose, school, programme, funding, post-study plans, and documents.
-4. Claude receives only the retrieved candidates, document context, and interview transcript.
-5. Claude must return the selected `sourceQuestionId`; invalid or missing IDs use the grounded fallback.
+4. The retriever returns the exact approved primary question or follow-up; interview turns are never freely generated or paraphrased.
+5. Previously used question text is suppressed before the next turn is selected.
+6. Pre-interview applicant context changes category ranking only. A previous refusal forces the approved refusal-reason and changed-circumstances follow-ups in order.
 
 No embedding service or vector database is required. The bank is small enough for deterministic in-memory retrieval, which avoids extra latency and infrastructure.
 
@@ -28,6 +29,7 @@ Harm, mistreatment, and fear-of-return questions are not mandatory. They are ret
 - Question-specific strong-answer signals and red flags are supplied only for questions actually asked.
 - Documents are used only to check spoken consistency; uploads do not add points by themselves.
 - The final headline score is a deterministic weighted calculation from calibrated sub-scores.
+- Claude Haiku returns schema-validated feedback, then transcript evidence metrics calibrate every component so reports cannot collapse to a fixed score.
 - Very short, repeated, or incomplete answer sets receive conservative caps.
 
 ## Updating the bank
