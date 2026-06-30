@@ -58,8 +58,8 @@ export default function BrandLogo({
   const inner = (
     <div className={`flex items-center ${s.gap} ${className}`}>
       <div
-        className={`${s.circle} rounded-full overflow-hidden flex-shrink-0 shadow-md shadow-primary-500/30 flex items-center justify-center p-2 ring-1 ring-white/20`}
-        style={{ background: "radial-gradient(circle at 30% 30%, #7dd3fc 0%, #60a5fa 50%, #3b82f6 100%)" }}
+        className={`${s.circle} rounded-full overflow-hidden flex-shrink-0 shadow-lg shadow-primary-600/25 flex items-center justify-center p-2 ring-1 ring-white/35`}
+        style={{ background: "linear-gradient(145deg, #7dd3fc 0%, #3b82f6 52%, #1d4ed8 100%)" }}
       >
         <img
           src={webLogo}

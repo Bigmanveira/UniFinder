@@ -423,7 +423,7 @@ function Stepper({ currentStage }: { currentStage: RoadmapStageId }) {
                     state === "completed"
                       ? "bg-emerald-500 text-white"
                       : state === "current"
-                        ? "bg-white text-emerald-700 border-[3px] border-emerald-500 shadow-[0_0_0_4px_rgba(16,185,129,0.12)]"
+                        ? "bg-white text-emerald-700 border-[3px] border-emerald-500 shadow-[0_0_0_4px_rgba(59,130,246,0.12)]"
                         : "bg-white text-slate-400 border border-slate-300"
                   }`}
                 >

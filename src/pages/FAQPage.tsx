@@ -122,9 +122,9 @@ export default function FAQPage() {
           <BrandLogo size="sm" />
           <div className="flex gap-6 text-sm font-bold text-slate-400">
             <Link to="/faq" className="hover:text-primary-600 transition-colors">FAQ</Link>
-            <a href="#" className="hover:text-primary-600 transition-colors">Privacy Policy</a>
-            <a href="#" className="hover:text-primary-600 transition-colors">Terms of Service</a>
-            <a href="#" className="hover:text-primary-600 transition-colors">Contact</a>
+            <Link to="/privacy" className="hover:text-primary-600 transition-colors">Privacy Policy</Link>
+            <Link to="/terms" className="hover:text-primary-600 transition-colors">Terms of Service</Link>
+            <Link to="/contact" className="hover:text-primary-600 transition-colors">Contact</Link>
           </div>
           <p className="text-xs font-medium text-slate-400">
             Â© 2026 College Ready. Not affiliated with the U.S. Government.
@@ -135,3 +135,4 @@ export default function FAQPage() {
     </div>
   );
 }
+

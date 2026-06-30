@@ -139,6 +139,9 @@ export interface VisaInterviewReport {
   recommendedPractice: string[];
   sampleImprovedAnswers: { question: string; improvedAnswer: string; whyBetter: string }[];
   disclaimer: string;
+  questionBankName?: string;
+  questionBankVersion?: string;
+  scoringVersion?: string;
   createdAt: any;
 }
 

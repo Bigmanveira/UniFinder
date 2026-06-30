@@ -51,6 +51,44 @@ const DEFAULT_TEMPLATES = [
   "How do I contact support?",
 ];
 
+function playSupportNotificationSound(): void {
+  const AudioContextConstructor = window.AudioContext ??
+    (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextConstructor) return;
+
+  const context = new AudioContextConstructor();
+  const play = () => {
+    const start = context.currentTime;
+    const gain = context.createGain();
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(0.045, start + 0.018);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.28);
+    gain.connect(context.destination);
+
+    const firstTone = context.createOscillator();
+    firstTone.type = "sine";
+    firstTone.frequency.setValueAtTime(720, start);
+    firstTone.frequency.exponentialRampToValueAtTime(860, start + 0.12);
+    firstTone.connect(gain);
+    firstTone.start(start);
+    firstTone.stop(start + 0.15);
+
+    const secondTone = context.createOscillator();
+    secondTone.type = "sine";
+    secondTone.frequency.setValueAtTime(1040, start + 0.08);
+    secondTone.connect(gain);
+    secondTone.start(start + 0.08);
+    secondTone.stop(start + 0.24);
+    secondTone.addEventListener("ended", () => void context.close(), { once: true });
+  };
+
+  if (context.state === "suspended") {
+    void context.resume().then(play).catch(() => void context.close());
+    return;
+  }
+  play();
+}
+
 const ROUTE_TEMPLATES: Array<{ match: (path: string) => boolean; questions: string[] }> = [
   {
     match: (path) => path === "/pricing" || path === "/app",
@@ -165,8 +203,10 @@ export default function SupportChatWidget() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>(readStoredMessages);
   const [sending, setSending] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const endRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const nudgeSoundPlayedRef = useRef(false);
 
   const templateQuestions = useMemo(
     () => ROUTE_TEMPLATES.find(({ match }) => match(location.pathname))?.questions ?? DEFAULT_TEMPLATES,
@@ -196,6 +236,34 @@ export default function SupportChatWidget() {
   useEffect(() => {
     if (open) window.setTimeout(() => inputRef.current?.focus(), 100);
   }, [open]);
+
+  useEffect(() => {
+    if (open || messages.length > 0 || unreadCount > 0) return;
+    const timer = window.setTimeout(() => setUnreadCount(1), 2200);
+    return () => window.clearTimeout(timer);
+  }, [messages.length, open, unreadCount]);
+
+  useEffect(() => {
+    if (open || unreadCount === 0 || nudgeSoundPlayedRef.current) return;
+
+    const playSound = () => {
+      if (nudgeSoundPlayedRef.current) return;
+      nudgeSoundPlayedRef.current = true;
+      playSupportNotificationSound();
+    };
+
+    if (navigator.userActivation?.hasBeenActive) {
+      playSound();
+      return;
+    }
+
+    window.addEventListener("pointerdown", playSound, { once: true });
+    window.addEventListener("keydown", playSound, { once: true });
+    return () => {
+      window.removeEventListener("pointerdown", playSound);
+      window.removeEventListener("keydown", playSound);
+    };
+  }, [open, unreadCount]);
 
   const clearConversation = () => {
     setMessages([]);
@@ -262,11 +330,11 @@ export default function SupportChatWidget() {
       {open && (
         <section
           aria-label="College Ready support assistant"
-          className="mb-3 flex h-[min(680px,calc(100vh-6.5rem))] w-[calc(100vw-2rem)] max-w-[390px] flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl shadow-slate-900/20"
+          className="mb-3 flex h-[min(680px,calc(100vh-6.5rem))] w-[calc(100vw-2rem)] max-w-[390px] flex-col overflow-hidden rounded-[28px] border border-primary-100 bg-white shadow-[0_28px_80px_rgba(30,58,138,0.22)]"
         >
-          <header className="flex items-center justify-between bg-slate-950 px-4 py-3.5 text-white">
+          <header className="flex items-center justify-between bg-gradient-to-r from-primary-950 via-primary-900 to-primary-800 px-4 py-3.5 text-white">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-primary-500">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-300 to-primary-600 shadow-lg shadow-primary-950/30">
                 <MessageCircle size={20} />
               </div>
               <div className="min-w-0">
@@ -458,13 +526,22 @@ export default function SupportChatWidget() {
 
       <button
         type="button"
-        onClick={() => setOpen((current) => !current)}
-        className="ml-auto flex h-14 items-center gap-2 rounded-full bg-slate-950 px-4 text-white shadow-xl shadow-slate-900/25 transition-all hover:-translate-y-0.5 hover:bg-primary-700"
-        aria-label={open ? "Close support assistant" : "Open support assistant"}
+        onClick={() => {
+          if (!open) setUnreadCount(0);
+          setOpen((current) => !current);
+        }}
+        className="relative ml-auto flex h-14 w-14 items-center justify-center gap-2 rounded-full border border-primary-400/20 bg-gradient-to-r from-primary-950 via-primary-900 to-primary-700 text-white shadow-[0_16px_40px_rgba(30,58,138,0.3)] transition-all hover:-translate-y-0.5 hover:shadow-[0_20px_48px_rgba(37,99,235,0.36)] sm:w-auto sm:px-4"
+        aria-label={open ? "Close support assistant" : `Open support assistant${unreadCount ? `, ${unreadCount} new message` : ""}`}
         aria-expanded={open}
       >
+        {!open && unreadCount > 0 && (
+          <span className="support-chat-badge absolute -right-1 -top-1 flex h-6 min-w-6 items-center justify-center rounded-full border-2 border-white bg-[#7dd3fc] px-1 text-[10px] font-black text-[#172554] shadow-[0_8px_22px_rgba(37,99,235,0.42)]" aria-live="polite">
+            <span className="support-chat-badge-ring absolute inset-0 rounded-full border border-[#7dd3fc]" />
+            <span className="relative">{unreadCount}</span>
+          </span>
+        )}
         {open ? <X size={20} /> : <MessageCircle size={20} />}
-        <span className="text-sm font-black">{open ? "Close" : "Ask support"}</span>
+        <span className="hidden text-sm font-black sm:inline">{open ? "Close" : "Ask support"}</span>
       </button>
     </div>
   );

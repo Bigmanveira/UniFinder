@@ -19,6 +19,7 @@ import {
   getStudyRoadmap,
   upsertRoadmapFromOnboarding,
 } from "../lib/roadmap/roadmapClient";
+import { reportClientError } from "../lib/clientErrorReporter";
 import {
   LABELS,
   type CompletedAcademicLevel,
@@ -185,9 +186,18 @@ export default function RoadmapOnboardingPage() {
       });
       navigate("/app/roadmap", { replace: true });
     } catch (err: unknown) {
-      console.error("[roadmap-onboarding] submit failed:", err);
-      const msg = err instanceof Error ? err.message : "Could not save your answers. Please try again.";
-      setError(msg);
+      reportClientError(err, {
+        source: "client.roadmap_onboarding.submit",
+        context: {
+          step,
+          hasExistingRoadmap,
+          primaryNeedCount: answers.primaryNeed?.length ?? 0,
+          currentProcessStatusCount: answers.currentProcessStatus?.length ?? 0,
+          preferredStartTerm: answers.preferredStartTerm ?? null,
+        },
+      });
+      console.warn("[roadmap-onboarding] submit failed:", err);
+      setError(getRoadmapSubmitErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
@@ -447,6 +457,23 @@ function isComplete(a: Partial<OnboardingAnswers>): a is OnboardingAnswers {
 }
 
 // ── QuestionPanel ─────────────────────────────────────────────────────
+function getRoadmapSubmitErrorMessage(error: unknown): string {
+  const code = getErrorCode(error);
+  if (code === "permission-denied") {
+    return "We couldn't save your roadmap because your session could not be verified. Refresh, sign in again, and try once more.";
+  }
+  if (code === "unavailable" || code === "deadline-exceeded") {
+    return "We couldn't reach the database right now. Check your connection and try again.";
+  }
+  return "Could not save your answers. Please try again.";
+}
+
+function getErrorCode(error: unknown): string | null {
+  if (typeof error !== "object" || error === null || !("code" in error)) return null;
+  const code = (error as { code?: unknown }).code;
+  return typeof code === "string" ? code : null;
+}
+
 function QuestionPanel<T extends string>({
   kicker, question, sub, icon, iconBg, options, value, onPick, twoColumns,
 }: {

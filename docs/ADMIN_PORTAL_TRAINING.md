@@ -142,7 +142,7 @@ This is the first page you'll see when you sign in. It answers three questions a
 
 - **Total users**: lifetime account count, de-duplicated by email.
 - **New signups · 7d**: how many new humans signed up in the last 7 days.
-- **Errors · 24h**: backend errors logged in the last 24 hours. A non-zero number doesn't automatically mean something's broken — many errors are non-fatal (e.g., a Resend hiccup on a single welcome email).
+- **Errors · 24h**: backend and browser-reported errors logged in the last 24 hours. A non-zero number doesn't automatically mean something's broken — many errors are non-fatal (e.g., a Resend hiccup on a single welcome email).
 - **Reports unlocked · 7d**: the most important number. This tracks paid product activity, not just signups.
 
 ### What to do if the Maintenance card is RED
@@ -497,7 +497,7 @@ A user mentions an error they saw. You want to find what happened on the backend
 
 1. **Errors** in sidebar.
 2. Filter by time range (start narrow — 24h).
-3. Filter by category if you know it (e.g., `payment_webhook` if it was a checkout issue).
+3. Filter by category if you know it (e.g., `payment_webhook` for checkout issues or `client` for browser-side user errors).
 4. Scan messages for keywords.
 5. If you find a relevant row, click into the attributable user (if shown) to see their detail page.
 

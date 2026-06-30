@@ -1,5 +1,15 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { type ExtractedDocument, formatDocumentsForOfficer } from "./visaDocExtractor.js";
+import {
+  type ExtractedDocument,
+  type VisaDocumentType,
+  formatDocumentsForOfficer,
+} from "./visaDocExtractor.js";
+import {
+  buildQuestionBankScoringContext,
+  formatRetrievedQuestionsForOfficer,
+  pickInitialVisaQuestion,
+  retrieveVisaQuestions,
+} from "./visaQuestionRetriever.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Disclaimer attached to every Claude response. Must never be removed.
@@ -14,18 +24,19 @@ export const VISA_DISCLAIMER =
 // (i.e. after both DS-160 and I-20 have been uploaded). Avoids the previous
 // always-the-same-greeting feel.
 // ─────────────────────────────────────────────────────────────────────────────
-export const VISA_INTRO_QUESTIONS = [
-  "Thank you. Let's begin. Why do you want to study in the United States?",
-  "Now then — why are you here today? What brings you to apply for an F-1 visa?",
-  "Tell me a bit about yourself, and what you're hoping to study.",
-  "Walk me through your plan. What programme will you be attending and where?",
-  "Why did you choose to pursue your studies in the U.S. rather than at home?",
-  "Let's get started. Which school will you be attending, and what made you pick it?",
-  "First question — what is the field you'll be studying, and why that field?",
-];
-
-export function pickIntroQuestion(): string {
-  return VISA_INTRO_QUESTIONS[Math.floor(Math.random() * VISA_INTRO_QUESTIONS.length)];
+export function pickIntroQuestion(): {
+  text: string;
+  stage: string;
+  questionId: string;
+  categoryId: string;
+} {
+  const selected = pickInitialVisaQuestion();
+  return {
+    text: selected.question,
+    stage: "introduction",
+    questionId: selected.id,
+    categoryId: selected.categoryId,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -39,14 +50,12 @@ YOUR ROLE
 - Ask realistic, professional F-1 visa interview questions, one at a time.
 - Cover: school choice, programme choice, funding & finances, career plans after graduation, ties to home country, prior travel & academic background, document readiness (I-20, DS-160).
 
-PERSECUTION & SAFETY (REQUIRED — ask EXACTLY ONCE per interview, before wrap-up)
-- U.S. consular officers now ask every applicant two safety questions late in the interview, regardless of country of origin. They are not warm-ups and they are not optional coverage.
-- Word them clearly and neutrally — same tone as any other interview question. Do NOT preface with sympathy, an apology, or "this might be uncomfortable." Just ask.
-- Question 1: "Have you experienced harm or mistreatment in your country of nationality or last habitual residence?"
-- Question 2: "Do you fear harm or mistreatment in returning to your country of nationality?"
-- If the student answers "no" to both, accept it and move on without probing.
-- If the student answers "yes" to either, ask ONE brief clarifying follow-up ("Could you tell me a bit more?") and then move toward closing. Do NOT cross-examine, do NOT debate, do NOT give immigration / asylum advice. Anna is conducting a practice F-1 interview, not adjudicating a protection claim.
-- Set stage to "home_ties" when asking these questions (they belong topically with home-country ties).
+QUESTION-BANK GROUNDING
+- A compact APPROVED QUESTION-BANK RETRIEVAL section is appended on every turn. Ground the next question in exactly one retrieved candidate.
+- Return that candidate's exact ID as sourceQuestionId. Use the primary question or an approved follow-up, with only a concise contextual paraphrase when needed.
+- Do not invent an unsupported question, factual premise, policy claim, or contradiction.
+- Sensitive harm, mistreatment, or fear-of-return questions appear only when retrieval explicitly includes them. Follow their safety instruction exactly; never force them into every interview.
+- Official core evidence areas are academic purpose and preparation, school/programme choice, funding, intent to depart after study, and document readiness.
 - Stay concise. One short question per turn. No paragraph-long set-ups.
 - Speak in the second person ("you"), professional but neutral tone — neither warm nor hostile.
 - If the student gives a vague, evasive, or inconsistent answer, ask a polite clarifying follow-up before moving on.
@@ -88,17 +97,20 @@ Return ONLY valid JSON with this exact shape — no markdown fences, no extra pr
 {
   "text": "string — your next question or follow-up. ≤ 35 words.",
   "stage": "introduction" | "study_plan" | "school_choice" | "finances" | "career_plan" | "home_ties" | "documents" | "wrap_up",
-  "requiresDocumentUpload": "i20" | "ds160_confirmation" | null,
+  "requiresDocumentUpload": "i20" | "ds160_confirmation" | "bank_statement" | "sponsor_letter" | "employment_letter" | "transcript" | null,
+  "sourceQuestionId": "one retrieved candidate ID" | "document_cross_check" | "returning_applicant_change" | null,
   "isFinalQuestion": false
 }
 
-Set isFinalQuestion to true ONLY when you are explicitly closing the interview ("Thank you, that's all from me today.").`;
+Set isFinalQuestion to true ONLY when you are explicitly closing the interview ("Thank you, that's all from me today."). When closing, sourceQuestionId may be null.`;
 
 export interface OfficerTurnResult {
   text: string;
   stage: string;
-  requiresDocumentUpload: "i20" | "ds160_confirmation" | null;
+  requiresDocumentUpload: VisaDocumentType | null;
   isFinalQuestion: boolean;
+  questionId?: string;
+  categoryId?: string;
   status: "completed" | "fallback" | "failed";
   errorMessage?: string;
 }
@@ -106,6 +118,9 @@ export interface OfficerTurnResult {
 export interface TranscriptTurn {
   role: "officer" | "student" | "system";
   text: string;
+  stage?: string;
+  questionId?: string;
+  categoryId?: string;
 }
 
 const VALID_STAGES = new Set([
@@ -115,49 +130,38 @@ const VALID_STAGES = new Set([
 
 function safeOfficerFallback(
   turnIndex: number,
-  lastUser: string | undefined,
   extractedDocuments?: ExtractedDocument[],
+  transcript: TranscriptTurn[] = [],
+  unavailableDocumentTypes: VisaDocumentType[] = [],
 ): OfficerTurnResult {
-  // Deterministic fallback so the practice can continue if Claude is unreachable.
-  const fallbackBank: { text: string; stage: string }[] = [
-    { text: "Thank you. Could you tell me which college you'll be attending and why you chose it?",       stage: "school_choice" },
-    { text: "What programme will you be studying, and how does it fit your career plans?",                  stage: "study_plan" },
-    { text: "How are you funding your studies? Please walk me through the sources of your tuition and living costs.", stage: "finances" },
-    { text: "What do you plan to do after graduation? Where do you see yourself working, and in which country?", stage: "career_plan" },
-    { text: "What ties do you have to your home country that will bring you back after your studies?",       stage: "home_ties" },
-    { text: "Have you received your I-20 from the school? Can you confirm the SEVIS ID printed on it?",      stage: "documents" },
-    { text: "Has anyone in your family travelled to the United States before, or sponsored a student visa?", stage: "home_ties" },
-    { text: "Thank you. That's all I need from you today.",                                                  stage: "wrap_up" },
-  ];
-  const idx = Math.min(turnIndex, fallbackBank.length - 1);
-  const f = fallbackBank[idx];
-  // Lightly probe vague answers
-  let text = f.text;
-  if (lastUser && lastUser.trim().length < 8 && f.stage !== "wrap_up") {
-    text = "Could you give me a bit more detail on that, please?";
+  if (turnIndex >= 8) {
+    return {
+      text: "Thank you. That's all I need from you today.",
+      stage: "wrap_up",
+      requiresDocumentUpload: null,
+      isFinalQuestion: true,
+      status: "fallback",
+    };
   }
-  // If the student has already attempted to upload an I-20 (even one we
-  // couldn't read), DON'T re-request it. The Claude path has its own dedup
-  // via the system prompt + sanity check; the fallback path was previously
-  // bypassing it and asking for the I-20 a second time even when the
-  // session.extractedDocuments showed it had been attempted — that was the
-  // bug user hit on 2026-05-18.
-  const i20AlreadyAttempted = !!extractedDocuments?.some((d) => d.documentType === "i20");
-  let requiresDocumentUpload: "i20" | "ds160_confirmation" | null = null;
-  let fallbackText = text;
-  if (idx === 5) {
-    if (i20AlreadyAttempted) {
-      // Swap the I-20 line for a follow-up that doesn't ask for an upload.
-      fallbackText = "Has anyone in your family travelled to or studied in the United States before?";
-    } else {
-      requiresDocumentUpload = "i20";
-    }
-  }
+
+  const retrieval = retrieveVisaQuestions({
+    transcript,
+    extractedDocuments,
+    resolvedDocumentTypes: unavailableDocumentTypes,
+    questionCount: turnIndex,
+    limit: 3,
+  });
+  const selected = retrieval.candidates[0];
+  const fallbackText = selected.mode === "follow_up"
+    ? selected.follow_ups[0] ?? selected.question
+    : selected.question;
   return {
     text: fallbackText,
-    stage: f.stage,
-    requiresDocumentUpload,
-    isFinalQuestion: f.stage === "wrap_up",
+    stage: selected.stage,
+    requiresDocumentUpload: null,
+    isFinalQuestion: false,
+    questionId: selected.id,
+    categoryId: selected.categoryId,
     status: "fallback",
   };
 }
@@ -180,12 +184,15 @@ export async function generateOfficerTurn(args: {
   /** When true, Anna asks "What has changed since your last interview?"
    *  early in the flow. Set from session.isReturningApplicant. */
   isReturningApplicant?: boolean;
+  /** Documents the student explicitly skipped. Retrieval treats these as
+   *  resolved so Anna probes verbally instead of requesting them again. */
+  unavailableDocumentTypes?: VisaDocumentType[];
 }): Promise<OfficerTurnResult> {
   const {
     apiKey, transcript, questionCount, extractedDocuments,
     elapsedMs = 0, maxDurationSec = 300, isReturningApplicant = false,
+    unavailableDocumentTypes = [],
   } = args;
-  const lastUser = [...transcript].reverse().find((t) => t.role === "student")?.text;
   const elapsedSec = elapsedMs / 1000;
 
   // HARD CAP: if elapsed >= maxDurationSec, force close without calling
@@ -235,9 +242,20 @@ export async function generateOfficerTurn(args: {
   const documentsContext = extractedDocuments && extractedDocuments.length > 0
     ? formatDocumentsForOfficer(extractedDocuments)
     : "";
+  const unavailableDocumentsContext = unavailableDocumentTypes.length > 0
+    ? `\n\nUNAVAILABLE DOCUMENTS: The student already said they do not have ${unavailableDocumentTypes.join(", ")}. Do not request those files again; ask a verbal question if a fact is still needed.`
+    : "";
+  const retrieval = retrieveVisaQuestions({
+    transcript,
+    extractedDocuments,
+    resolvedDocumentTypes: unavailableDocumentTypes,
+    questionCount,
+    limit: 4,
+  });
+  const retrievedQuestionContext = formatRetrievedQuestionsForOfficer(retrieval);
 
   if (!apiKey) {
-    return safeOfficerFallback(questionCount, lastUser, extractedDocuments);
+    return safeOfficerFallback(questionCount, extractedDocuments, transcript, unavailableDocumentTypes);
   }
 
   try {
@@ -261,21 +279,22 @@ export async function generateOfficerTurn(args: {
     // analytical task where quality matters more than latency.
     //
     // Prompt caching (audit 2026-05-15): the static OFFICER_SYSTEM_PROMPT is
-    // separated into its own cached block; the dynamic wrappingHint +
-    // documentsContext follow as a second uncached block (they change every
+    // separated into its own cached block; the dynamic timing, retrieval,
+    // and document context follow as a second uncached block (they change every
     // turn). Haiku's minimum cacheable prompt is 2048 tokens — the system
     // prompt alone is around 1500 tokens, so cache hits only kick in for
     // interviews with documents that push the prompt past the threshold.
     // Net effect: free win when it applies, no-op when it doesn't.
     const response = await anthropic.messages.create({
       model: "claude-haiku-4-5-20251001",
-      max_tokens: 350,
+      max_tokens: 450,
       temperature: 0.4,
       system: [
         { type: "text", text: OFFICER_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
-        ...(wrappingHint || documentsContext || returningApplicantHint
-          ? [{ type: "text" as const, text: wrappingHint + returningApplicantHint + documentsContext }]
-          : []),
+        {
+          type: "text" as const,
+          text: wrappingHint + returningApplicantHint + documentsContext + unavailableDocumentsContext + retrievedQuestionContext,
+        },
       ],
       messages,
     });
@@ -291,18 +310,50 @@ export async function generateOfficerTurn(args: {
       .trim();
     let parsed: any;
     try { parsed = JSON.parse(cleaned); }
-    catch { return safeOfficerFallback(questionCount, lastUser, extractedDocuments); }
+    catch { return safeOfficerFallback(questionCount, extractedDocuments, transcript, unavailableDocumentTypes); }
 
-    const text = typeof parsed.text === "string" ? parsed.text.trim() : "";
-    if (!text) return safeOfficerFallback(questionCount, lastUser, extractedDocuments);
+    const parsedText = typeof parsed.text === "string" ? parsed.text.trim() : "";
+    if (!parsedText) return safeOfficerFallback(questionCount, extractedDocuments, transcript, unavailableDocumentTypes);
 
-    const stage = VALID_STAGES.has(parsed.stage) ? parsed.stage : "study_plan";
-    const ALLOWED_DOC_REQUESTS = new Set([
+    const parsedStage = VALID_STAGES.has(parsed.stage) ? parsed.stage : "study_plan";
+    const parsedIsFinal = parsed.isFinalQuestion === true || parsedStage === "wrap_up";
+    const sourceQuestionId = typeof parsed.sourceQuestionId === "string"
+      ? parsed.sourceQuestionId.trim()
+      : "";
+    const selectedCandidate = retrieval.candidates.find(
+      (candidate) => candidate.id === sourceQuestionId,
+    );
+    const specialSourceAllowed =
+      (sourceQuestionId === "document_cross_check" && !!documentsContext) ||
+      (sourceQuestionId === "returning_applicant_change" && isReturningApplicant);
+    if (!parsedIsFinal && !selectedCandidate && !specialSourceAllowed) {
+      console.warn("[visaInterview] ungrounded sourceQuestionId:", sourceQuestionId || "missing");
+      return safeOfficerFallback(questionCount, extractedDocuments, transcript, unavailableDocumentTypes);
+    }
+
+    const approvedFallbackText = selectedCandidate
+      ? selectedCandidate.mode === "follow_up"
+        ? selectedCandidate.follow_ups[0] ?? selectedCandidate.question
+        : selectedCandidate.question
+      : parsedText;
+    const wordCount = parsedText.split(/\s+/).filter(Boolean).length;
+    const priorOfficerTexts = new Set(
+      transcript
+        .filter((turn) => turn.role === "officer")
+        .map((turn) => turn.text.trim().toLowerCase()),
+    );
+    let text = wordCount <= 35 ? parsedText : approvedFallbackText;
+    if (!parsedIsFinal && priorOfficerTexts.has(text.toLowerCase())) {
+      text = approvedFallbackText;
+    }
+
+    const stage = selectedCandidate?.stage ?? parsedStage;
+    const ALLOWED_DOC_REQUESTS = new Set<VisaDocumentType>([
       "i20", "ds160_confirmation",
       "bank_statement", "sponsor_letter", "employment_letter", "transcript",
     ]);
-    let requiresDocumentUpload = ALLOWED_DOC_REQUESTS.has(parsed.requiresDocumentUpload)
-      ? parsed.requiresDocumentUpload
+    let requiresDocumentUpload: VisaDocumentType | null = ALLOWED_DOC_REQUESTS.has(parsed.requiresDocumentUpload)
+      ? parsed.requiresDocumentUpload as VisaDocumentType
       : null;
     // Sanity check 1: even if Claude's JSON says it's asking for a doc,
     // only honor the request if the spoken text actually contains an
@@ -333,12 +384,28 @@ export async function generateOfficerTurn(args: {
         requiresDocumentUpload = null;
       }
     }
-    const isFinalQuestion = parsed.isFinalQuestion === true || stage === "wrap_up";
+    const isFinalQuestion = parsedIsFinal || stage === "wrap_up";
+    const questionId = selectedCandidate?.id || (specialSourceAllowed ? sourceQuestionId : undefined);
+    const categoryId = selectedCandidate?.categoryId || (
+      sourceQuestionId === "document_cross_check"
+        ? "integrity_and_consistency"
+        : sourceQuestionId === "returning_applicant_change"
+          ? "travel_history_and_refusals"
+          : undefined
+    );
 
-    return { text, stage, requiresDocumentUpload, isFinalQuestion, status: "completed" };
+    return {
+      text,
+      stage,
+      requiresDocumentUpload,
+      isFinalQuestion,
+      questionId,
+      categoryId,
+      status: "completed",
+    };
   } catch (err: any) {
     console.error("[visaInterview] Claude officer error:", err?.message);
-    const fb = safeOfficerFallback(questionCount, lastUser, extractedDocuments);
+    const fb = safeOfficerFallback(questionCount, extractedDocuments, transcript, unavailableDocumentTypes);
     return { ...fb, status: "failed", errorMessage: err?.message ?? "Unknown" };
   }
 }
@@ -353,19 +420,31 @@ CRITICAL RULES
 - This is practice feedback. Never imply you can predict the real visa outcome.
 - Never coach the student to lie, hide facts, invent sponsors, or fabricate documents.
 - Encourage truthful, clear, consistent answers grounded in the student's actual situation.
+- Score only evidence present in the student's spoken answers. Do not reward facts that appear only in the officer's question.
+- Do not invent contradictions, missing documents, financial problems, or strong performance that the transcript does not show.
+- If student-provided document facts are supplied, use them only to verify consistency with spoken answers. Uploading a document does not itself earn points, and an unreadable document does not itself lose points.
 - If the student's transcript shows a red flag (immigrant intent, weak finances, vague career plan, inconsistencies), call it out plainly — don't soft-pedal.
 - "Improved" sample answers should be more articulate and complete, but they must be hypothetical reformulations of the student's OWN claims, never invented facts.
+
+CALIBRATION ANCHORS
+- 90-100: specific, internally consistent, concise, and supported by concrete details across the answers.
+- 75-89: credible and clear with only minor omissions or weak phrasing.
+- 60-74: partially convincing but vague, generic, incomplete, or uneven.
+- 40-59: major gaps, weak knowledge, repeated uncertainty, or unresolved inconsistencies.
+- 0-39: evasive, materially contradictory, clearly unprepared, or unable to explain the study plan.
+- Use the full range. Do not cluster every score around 70-85.
+- If an area was not directly tested, infer conservatively from related answers and do not score it above 70.
 
 SCORING CRITERIA (each 0-100)
 - clarityScore: how clearly the student communicates
 - consistencyScore: do their answers across turns line up?
-- confidenceScore: how composed and certain do they sound?
+- confidenceScore: confidence visible in wording and command of facts only; never infer from accent, grammar quirks, or voice characteristics absent from the transcript
 - financialReadinessScore: how convincingly do they cover funding?
 - schoolProgramExplanationScore: how well do they articulate school + programme choice?
 - careerPlanScore: how concrete and credible are their post-grad plans?
 - homeTiesScore: how clear are the reasons they'd return home?
 - documentReadinessScore: how prepared do they sound on I-20, DS-160, SEVIS?
-- overallScore: a holistic average; do not just average — weight by how much each area matters.
+- overallScore: provide your estimate, but the application recalculates the final headline score from the calibrated sub-scores.
 
 OUTPUT FORMAT
 Return ONLY valid JSON, exactly this shape, no markdown fences:
@@ -435,11 +514,18 @@ function safeScoringFallback(): ScoringResult {
   };
 }
 
-const SCORE_KEYS = [
-  "overallScore", "clarityScore", "consistencyScore", "confidenceScore",
-  "financialReadinessScore", "schoolProgramExplanationScore", "careerPlanScore",
-  "homeTiesScore", "documentReadinessScore",
-] as const;
+const COMPONENT_SCORE_WEIGHTS = {
+  clarityScore: 0.12,
+  consistencyScore: 0.15,
+  confidenceScore: 0.08,
+  financialReadinessScore: 0.15,
+  schoolProgramExplanationScore: 0.15,
+  careerPlanScore: 0.12,
+  homeTiesScore: 0.15,
+  documentReadinessScore: 0.08,
+} as const;
+
+type ComponentScoreKey = keyof typeof COMPONENT_SCORE_WEIGHTS;
 
 function clampScore(v: any): number {
   const n = typeof v === "number" ? v : parseFloat(v);
@@ -447,16 +533,85 @@ function clampScore(v: any): number {
   return Math.max(0, Math.min(100, Math.round(n)));
 }
 
+function calibrateComponentScores(
+  scores: Record<ComponentScoreKey, number>,
+  transcript: TranscriptTurn[],
+): Record<ComponentScoreKey, number> {
+  const studentAnswers = transcript
+    .filter((turn) => turn.role === "student")
+    .map((turn) => turn.text.trim())
+    .filter(Boolean);
+  if (studentAnswers.length === 0) {
+    return Object.fromEntries(
+      Object.keys(scores).map((key) => [key, 0]),
+    ) as Record<ComponentScoreKey, number>;
+  }
+
+  const wordCounts = studentAnswers.map((answer) => answer.split(/\s+/).filter(Boolean).length);
+  const substantiveRatio = wordCounts.filter((count) => count >= 8).length / studentAnswers.length;
+  const averageWords = wordCounts.reduce((sum, count) => sum + count, 0) / wordCounts.length;
+  const normalizedAnswers = studentAnswers.map((answer) => answer.toLowerCase().replace(/\s+/g, " "));
+  const uniqueAnswerRatio = new Set(normalizedAnswers).size / normalizedAnswers.length;
+  const calibrated = { ...scores };
+
+  const globalCap = studentAnswers.length < 2 ? 45 : studentAnswers.length < 3 ? 58 : 100;
+  for (const key of Object.keys(calibrated) as ComponentScoreKey[]) {
+    calibrated[key] = Math.min(calibrated[key], globalCap);
+  }
+
+  if (substantiveRatio < 0.5 || averageWords < 6) {
+    calibrated.clarityScore = Math.min(calibrated.clarityScore, 52);
+    calibrated.confidenceScore = Math.min(calibrated.confidenceScore, 50);
+  }
+  if (uniqueAnswerRatio < 0.7) {
+    calibrated.consistencyScore = Math.min(calibrated.consistencyScore, 55);
+    calibrated.clarityScore = Math.min(calibrated.clarityScore, 55);
+  }
+  return calibrated;
+}
+
+function calculateWeightedOverall(scores: Record<ComponentScoreKey, number>): number {
+  const weighted = (Object.entries(COMPONENT_SCORE_WEIGHTS) as Array<[ComponentScoreKey, number]>)
+    .reduce((sum, [key, weight]) => sum + scores[key] * weight, 0);
+  return clampScore(weighted);
+}
+
 export async function scoreVisaInterview(args: {
   apiKey: string;
   transcript: TranscriptTurn[];
+  extractedDocuments?: ExtractedDocument[];
 }): Promise<ScoringResult> {
   if (!args.apiKey || args.transcript.length === 0) return safeScoringFallback();
 
   // Compose a transcript Claude can read
   const transcriptText = args.transcript
-    .map((t) => `${t.role.toUpperCase()}: ${t.text}`)
+    .map((turn) => {
+      const metadata = turn.questionId
+        ? ` [questionId=${turn.questionId}; category=${turn.categoryId ?? "unknown"}]`
+        : "";
+      return `${turn.role.toUpperCase()}${metadata}: ${turn.text}`;
+    })
     .join("\n");
+  const scoringContext = buildQuestionBankScoringContext(args.transcript);
+  const scoringDocumentContext = (args.extractedDocuments ?? [])
+    .filter((document) => document.status === "completed" && document.summary)
+    .map((document) => {
+      const fields = Object.entries(document.fields)
+        .filter(([, value]) => value !== null && value !== "")
+        .map(([key, value]) => `${key}=${value}`)
+        .join("; ");
+      return `- ${document.documentType}: ${document.summary}${fields ? `; ${fields}` : ""}`;
+    });
+  const studentAnswers = args.transcript.filter((turn) => turn.role === "student");
+  const scoringInput = [
+    `Transcript metrics: ${studentAnswers.length} student answers.`,
+    scoringContext,
+    scoringDocumentContext.length > 0
+      ? `STUDENT-PROVIDED DOCUMENT FACTS FOR CONSISTENCY CHECKING ONLY:\n${scoringDocumentContext.join("\n")}`
+      : "",
+    "PRACTICE INTERVIEW TRANSCRIPT:",
+    transcriptText,
+  ].filter(Boolean).join("\n\n");
 
   try {
     const anthropic = new Anthropic({ apiKey: args.apiKey });
@@ -471,7 +626,7 @@ export async function scoreVisaInterview(args: {
       system: [
         { type: "text", text: SCORER_SYSTEM_PROMPT, cache_control: { type: "ephemeral" } },
       ],
-      messages: [{ role: "user", content: `Score this practice F-1 visa interview transcript:\n\n${transcriptText}` }],
+      messages: [{ role: "user", content: scoringInput }],
     });
 
     const raw = response.content
@@ -483,8 +638,7 @@ export async function scoreVisaInterview(args: {
       .trim();
     const parsed = JSON.parse(raw);
 
-    const result: ScoringResult = {
-      overallScore:                  clampScore(parsed.overallScore),
+    const componentScores = calibrateComponentScores({
       clarityScore:                  clampScore(parsed.clarityScore),
       consistencyScore:              clampScore(parsed.consistencyScore),
       confidenceScore:               clampScore(parsed.confidenceScore),
@@ -493,6 +647,18 @@ export async function scoreVisaInterview(args: {
       careerPlanScore:               clampScore(parsed.careerPlanScore),
       homeTiesScore:                 clampScore(parsed.homeTiesScore),
       documentReadinessScore:        clampScore(parsed.documentReadinessScore),
+    }, args.transcript);
+
+    const result: ScoringResult = {
+      overallScore:                  calculateWeightedOverall(componentScores),
+      clarityScore:                  componentScores.clarityScore,
+      consistencyScore:              componentScores.consistencyScore,
+      confidenceScore:               componentScores.confidenceScore,
+      financialReadinessScore:       componentScores.financialReadinessScore,
+      schoolProgramExplanationScore: componentScores.schoolProgramExplanationScore,
+      careerPlanScore:               componentScores.careerPlanScore,
+      homeTiesScore:                 componentScores.homeTiesScore,
+      documentReadinessScore:        componentScores.documentReadinessScore,
       strengths:                     Array.isArray(parsed.strengths) ? parsed.strengths.slice(0, 5).map(String) : [],
       weaknesses:                    Array.isArray(parsed.weaknesses) ? parsed.weaknesses.slice(0, 5).map(String) : [],
       redFlagsToImprove:             Array.isArray(parsed.redFlagsToImprove) ? parsed.redFlagsToImprove.slice(0, 5).map(String) : [],
@@ -507,7 +673,6 @@ export async function scoreVisaInterview(args: {
       disclaimer: VISA_DISCLAIMER,
       status: "completed",
     };
-    void SCORE_KEYS; // referenced indirectly above
     return result;
   } catch (err: any) {
     console.error("[visaInterview] Claude scoring error:", err?.message);

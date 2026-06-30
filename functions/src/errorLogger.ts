@@ -51,6 +51,7 @@ export type ErrorCategory =
   | "ai_call"
   | "email_send"
   | "external_api"
+  | "client"
   | "storage"
   | "tts"
   | "other";

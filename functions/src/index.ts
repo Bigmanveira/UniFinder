@@ -17,6 +17,7 @@ import {
 import { createHeyGenSessionToken, endHeyGenSession } from "./liveAvatarSession.js";
 import { synthesizeOfficerAudio } from "./avatarTts.js";
 import { extractVisaDocument, type VisaDocumentType, type ExtractedDocument } from "./visaDocExtractor.js";
+import { VISA_QUESTION_BANK_INFO } from "./visaQuestionRetriever.js";
 import {
   generateAcademicCv,
   extractCvText,
@@ -181,6 +182,14 @@ const userSignInRateLimit = createRateLimiter({
 // while bounding anonymous Claude spend from one IP.
 const supportChatRateLimit = createRateLimiter({
   maxPerWindow: 30,
+  windowMs:     10 * 60 * 1000,   // 10 minutes
+});
+
+// logClientError: public observability endpoint. Legit users should only
+// generate a handful of reports per session, but a broken browser path can
+// fire repeatedly. This cap keeps visibility while bounding spam.
+const clientErrorRateLimit = createRateLimiter({
+  maxPerWindow: 60,
   windowMs:     10 * 60 * 1000,   // 10 minutes
 });
 
@@ -564,6 +573,42 @@ function bucketizeForClaude(matches: any[]): BucketedMatches {
   };
 }
 
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function readShortString(value: unknown, maxLength: number): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  return trimmed.length > maxLength ? trimmed.slice(0, maxLength) : trimmed;
+}
+
+function normalizeClientSource(value: string): string {
+  const cleaned = value.replace(/[^a-zA-Z0-9_.:-]/g, "_").slice(0, 160);
+  return cleaned.startsWith("client.") ? cleaned : `client.${cleaned || "unknown"}`;
+}
+
+function readClientContext(value: unknown): Record<string, unknown> {
+  if (!isPlainRecord(value)) return {};
+  try {
+    const json = JSON.stringify(value);
+    if (json.length > 8_000) {
+      return {
+        truncated: true,
+        originalBytes: json.length,
+        keys: Object.keys(value).slice(0, 80),
+      };
+    }
+    return JSON.parse(json) as Record<string, unknown>;
+  } catch {
+    return {
+      parseFailed: true,
+      keys: Object.keys(value).slice(0, 80),
+    };
+  }
+}
+
 // ============================================================
 // Test Function
 // ============================================================
@@ -571,6 +616,56 @@ function bucketizeForClaude(matches: any[]): BucketedMatches {
 export const testFunction = onCall({ ...LIGHT_OPTS }, async () => {
   return { ok: true, message: "Firebase Functions is working for UniFinder" };
 });
+
+// ============================================================
+// logClientError — browser-side error capture for ops visibility.
+//
+// Firestore Rules intentionally block direct client writes to /errorLogs.
+// This callable is the narrow ingestion path: rate-limited, sanitized,
+// auth-optional, and written through the existing Admin SDK logger so the
+// ops Errors page can see user-facing failures, not just backend failures.
+// ============================================================
+
+export const logClientError = onCall(
+  {
+    ...LIGHT_OPTS,
+    timeoutSeconds: 10,
+    memory: "256MiB",
+  },
+  async (request) => {
+    const ip = extractClientIp(request.rawRequest);
+    const rateKey = request.auth?.uid ? `uid:${request.auth.uid}` : `ip:${ip}`;
+    const limit = clientErrorRateLimit(rateKey);
+    if (!limit.allowed) {
+      return { ok: false as const, throttled: true as const };
+    }
+
+    const data = isPlainRecord(request.data) ? request.data : {};
+    const source = normalizeClientSource(readShortString(data.source, 160) ?? "client.unknown");
+    const severity = data.severity === "warning" ? "warning" : "error";
+    const message = readShortString(data.message, 1_000) ?? "Unknown client error";
+    const context = readClientContext(data.context);
+
+    await logError({
+      category: "client",
+      source,
+      severity,
+      message,
+      userId: request.auth?.uid ?? null,
+      context: {
+        ...context,
+        name: readShortString(data.name, 120) ?? null,
+        code: readShortString(data.code, 120) ?? null,
+        stack: readShortString(data.stack, 4_000) ?? null,
+        page: readShortString(data.page, 300) ?? null,
+        serverUserAgent: readShortString(request.rawRequest?.headers?.["user-agent"], 240) ?? null,
+        signedIn: Boolean(request.auth?.uid),
+      },
+    });
+
+    return { ok: true as const };
+  },
+);
 
 // ============================================================
 // supportChat — public, retrieval-grounded product support.
@@ -1384,7 +1479,13 @@ async function loadTranscript(sessionId: string): Promise<TranscriptTurn[]> {
   snap.forEach((d) => {
     const data = d.data();
     if (data?.role === "officer" || data?.role === "student" || data?.role === "system") {
-      turns.push({ role: data.role, text: String(data.text ?? "") });
+      turns.push({
+        role: data.role,
+        text: String(data.text ?? ""),
+        stage: typeof data.stage === "string" ? data.stage : undefined,
+        questionId: typeof data.questionId === "string" ? data.questionId : undefined,
+        categoryId: typeof data.categoryId === "string" ? data.categoryId : undefined,
+      });
     }
   });
   return turns;
@@ -1680,6 +1781,10 @@ export const startVisaInterviewSession = onCall(
         avatarProvider:       interviewMode === "avatar" ? "heygen_liveavatar" : "none",
         currentStage:         "documents",
         questionCount:        0, // the greeting is not a real interview question
+        questionIdsAsked:     [],
+        categoryIdsCovered:   [],
+        questionBankName:     VISA_QUESTION_BANK_INFO.name,
+        questionBankVersion:  VISA_QUESTION_BANK_INFO.version,
         disclaimerAccepted:   true,
         documentsRequested:   { i20: false, ds160: true },
         documentsUploaded:    { i20: false, ds160: false },
@@ -1790,11 +1895,15 @@ export const sendVisaInterviewAnswer = onCall(
     // Build a fresh transcript and let Claude pick the next question
     const transcript = await loadTranscript(sessionId);
     const extractedDocs: ExtractedDocument[] = Object.values(session.extractedDocuments ?? {});
+    const unavailableDocumentTypes: VisaDocumentType[] = [];
+    if (session.documentsSkipped?.i20) unavailableDocumentTypes.push("i20");
+    if (session.documentsSkipped?.ds160) unavailableDocumentTypes.push("ds160_confirmation");
     const officer = await generateOfficerTurn({
       apiKey:        ANTHROPIC_API_KEY.value(),
       transcript,
       questionCount: typeof session.questionCount === "number" ? session.questionCount : 1,
       extractedDocuments: extractedDocs,
+      unavailableDocumentTypes,
       elapsedMs:     elapsedSinceInterviewStart(session),
       // Preview sessions: 180s; paid sessions: 300s. Fall back to 300s for
       // any legacy session that doesn't have previewDurationSec stamped
@@ -1808,6 +1917,8 @@ export const sendVisaInterviewAnswer = onCall(
       sessionId, userId: uid, role: "officer",
       text:  officer.text,
       stage: officer.stage,
+      ...(officer.questionId ? { questionId: officer.questionId } : {}),
+      ...(officer.categoryId ? { categoryId: officer.categoryId } : {}),
       createdAt: now,
     });
 
@@ -1825,6 +1936,14 @@ export const sendVisaInterviewAnswer = onCall(
       currentStage:  clampedStage,
       updatedAt:     now,
     };
+    if (officer.questionId) {
+      updates.lastQuestionId = officer.questionId;
+      updates.questionIdsAsked = admin.firestore.FieldValue.arrayUnion(officer.questionId);
+    }
+    if (officer.categoryId) {
+      updates.lastCategoryId = officer.categoryId;
+      updates.categoryIdsCovered = admin.firestore.FieldValue.arrayUnion(officer.categoryId);
+    }
     if (officer.requiresDocumentUpload === "i20") {
       updates["documentsRequested.i20"] = true;
     } else if (officer.requiresDocumentUpload === "ds160_confirmation") {
@@ -2006,6 +2125,8 @@ export const recordVisaInterviewDocument = onCall(
     let nextStage: string;
     let questionCountIncrement = 0;
     let nextIsFinalQuestion = false;
+    let nextQuestionId: string | undefined;
+    let nextCategoryId: string | undefined;
 
     if (isInitialDoc && isInIntroPhase && !ds160Resolved) {
       nextOfficerText = "Thank you. Now please upload your DS-160 confirmation page.";
@@ -2016,11 +2137,13 @@ export const recordVisaInterviewDocument = onCall(
       nextRequiresUpload = "i20";
       nextStage = "documents";
     } else if (isInitialDoc && isInIntroPhase) {
-      // Both initial docs resolved (uploaded or skipped) — start the
-      // interview with a randomized opener and stamp the session with the
-      // start time so we can hard-cap the total length.
-      nextOfficerText = pickIntroQuestion();
-      nextStage = "introduction";
+      // Both initial docs resolved (uploaded or skipped) — start with an
+      // approved question-bank opener and preserve its source metadata.
+      const opener = pickIntroQuestion();
+      nextOfficerText = opener.text;
+      nextStage = opener.stage;
+      nextQuestionId = opener.questionId;
+      nextCategoryId = opener.categoryId;
       questionCountIncrement = 1;
     } else {
       // Mid-interview document event. Either a supporting doc (bank
@@ -2043,11 +2166,19 @@ export const recordVisaInterviewDocument = onCall(
         });
       }
       const transcript = await loadTranscript(sessionId);
+      const unavailableDocumentTypes: VisaDocumentType[] = [];
+      if (session.documentsSkipped?.i20 || (isSkip && documentType === "i20")) {
+        unavailableDocumentTypes.push("i20");
+      }
+      if (session.documentsSkipped?.ds160 || (isSkip && documentType === "ds160_confirmation")) {
+        unavailableDocumentTypes.push("ds160_confirmation");
+      }
       const officer = await generateOfficerTurn({
         apiKey:        ANTHROPIC_API_KEY.value(),
         transcript,
         questionCount: typeof session.questionCount === "number" ? session.questionCount : 1,
         extractedDocuments: Object.values(extractedDocsAfter),
+        unavailableDocumentTypes,
         elapsedMs:     elapsedSinceInterviewStart(session),
         maxDurationSec: typeof session.previewDurationSec === "number" ? session.previewDurationSec : 300,
         isReturningApplicant: session.isReturningApplicant === true,
@@ -2068,12 +2199,16 @@ export const recordVisaInterviewDocument = onCall(
         : null;
       questionCountIncrement = 1;
       nextIsFinalQuestion = officer.isFinalQuestion;
+      nextQuestionId = officer.questionId;
+      nextCategoryId = officer.categoryId;
     }
 
     const officerMsgRef = await db.collection("visaInterviewMessages").add({
       sessionId, userId: uid, role: "officer",
       text:  nextOfficerText,
       stage: nextStage,
+      ...(nextQuestionId ? { questionId: nextQuestionId } : {}),
+      ...(nextCategoryId ? { categoryId: nextCategoryId } : {}),
       createdAt: now,
     });
 
@@ -2090,6 +2225,14 @@ export const recordVisaInterviewDocument = onCall(
     if (documentType === "ds160_confirmation" && isSkip)     updates["documentsSkipped.ds160"]  = true;
     if (questionCountIncrement) {
       updates.questionCount = admin.firestore.FieldValue.increment(questionCountIncrement);
+    }
+    if (nextQuestionId) {
+      updates.lastQuestionId = nextQuestionId;
+      updates.questionIdsAsked = admin.firestore.FieldValue.arrayUnion(nextQuestionId);
+    }
+    if (nextCategoryId) {
+      updates.lastCategoryId = nextCategoryId;
+      updates.categoryIdsCovered = admin.firestore.FieldValue.arrayUnion(nextCategoryId);
     }
     // Stamp the start time when transitioning out of the documents phase
     // into the interview proper. Used downstream to enforce the duration
@@ -2179,6 +2322,7 @@ export const finishVisaInterviewSession = onCall(
     const score = await scoreVisaInterview({
       apiKey:     ANTHROPIC_API_KEY.value(),
       transcript,
+      extractedDocuments: Object.values(sessionData?.extractedDocuments ?? {}),
     });
 
     const now = admin.firestore.FieldValue.serverTimestamp();
@@ -2235,6 +2379,9 @@ export const finishVisaInterviewSession = onCall(
       recommendedPractice:           score.recommendedPractice,
       sampleImprovedAnswers:         score.sampleImprovedAnswers,
       disclaimer:                    score.disclaimer,
+      questionBankName:              VISA_QUESTION_BANK_INFO.name,
+      questionBankVersion:           VISA_QUESTION_BANK_INFO.version,
+      scoringVersion:                "2.0-evidence-weighted",
       aiStatus:                      score.status,
       createdAt:                     now,
     };

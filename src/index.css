@@ -3,6 +3,15 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --brand-sky: #7dd3fc;
+    --brand-blue: #3b82f6;
+    --brand-royal: #2563eb;
+    --brand-deep: #1e3a8a;
+    --brand-ink: #0f172a;
+    --brand-mist: #eff6ff;
+  }
+
   html {
     scroll-behavior: smooth;
     /* Global clearance for the fixed navbar — every anchor scroll
@@ -13,11 +22,394 @@
   }
 
   body {
-    @apply antialiased text-slate-900 bg-slate-50 selection:bg-primary-500 selection:text-white;
+    @apply antialiased text-slate-900 selection:bg-primary-500 selection:text-white;
+    background: #f6f9fd;
+    font-family: "Manrope", system-ui, sans-serif;
+  }
+}
+
+@layer components {
+  .cr-landing {
+    font-family: "Manrope", system-ui, sans-serif;
+  }
+
+  .landing-nav-link {
+    color: #5f6978;
+    font-size: 0.8125rem;
+    font-weight: 800;
+    transition: color 220ms ease;
+  }
+
+  .landing-nav-link:hover {
+    color: #3156d9;
+  }
+
+  .landing-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    font-weight: 800;
+    line-height: 1;
+    transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1), background-color 240ms ease, color 240ms ease, border-color 240ms ease, box-shadow 240ms ease;
+  }
+
+  .landing-button:hover {
+    transform: translateY(-2px);
+  }
+
+  .landing-button:active {
+    transform: translateY(0);
+  }
+
+  .landing-button:focus-visible,
+  .landing-nav-link:focus-visible {
+    outline: 3px solid rgba(49, 86, 217, 0.28);
+    outline-offset: 3px;
+  }
+
+  .landing-button-primary {
+    background: #3b82f6;
+    color: #fff;
+    box-shadow: 0 16px 36px rgba(59, 130, 246, 0.24);
+  }
+
+  .landing-button-primary:hover {
+    background: #2563eb;
+    box-shadow: 0 20px 44px rgba(37, 99, 235, 0.3);
+  }
+
+  .landing-button-dark {
+    background: #171819;
+    color: #fff;
+  }
+
+  .landing-button-dark:hover {
+    background: #202b3c;
+  }
+
+  .landing-button-light {
+    border-color: rgba(16, 24, 39, 0.14);
+    background: rgba(255, 255, 255, 0.76);
+    color: #101827;
+  }
+
+  .landing-button-light:hover {
+    border-color: rgba(49, 86, 217, 0.35);
+    background: #fff;
+  }
+
+  .landing-button-ghost {
+    border-color: rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.07);
+    color: #fff;
+    backdrop-filter: blur(16px);
+  }
+
+  .landing-button-ghost:hover {
+    border-color: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.12);
+  }
+
+  .brand-panel {
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 1.5rem;
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 22px 65px rgba(30, 58, 138, 0.08);
+  }
+
+  .brand-action {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--brand-blue), var(--brand-royal));
+    color: white;
+    font-weight: 800;
+    box-shadow: 0 14px 34px rgba(37, 99, 235, 0.24);
+    transition: transform 220ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 220ms ease;
+  }
+
+  .brand-action:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 18px 42px rgba(37, 99, 235, 0.32);
+  }
+
+  .landing-button-icon {
+    display: inline-flex;
+    height: 2.35rem;
+    width: 2.35rem;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    background: #171819;
+    color: #fff;
+    transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1), background-color 220ms ease;
+  }
+
+  .landing-button-icon-light {
+    height: 1.9rem;
+    width: 1.9rem;
+    background: rgba(255, 255, 255, 0.14);
+  }
+
+  .landing-button:hover .landing-button-icon {
+    transform: translateX(2px) rotate(-8deg);
+  }
+
+  .landing-product-card,
+  .landing-price-card {
+    transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1), box-shadow 420ms ease, border-color 420ms ease;
+  }
+
+  .landing-product-card:hover,
+  .landing-price-card:hover {
+    transform: translateY(-7px);
+    border-color: rgba(80, 97, 217, 0.25);
+    box-shadow: 0 34px 90px rgba(16, 24, 39, 0.14);
+  }
+
+  .landing-card-arrow {
+    transition: transform 420ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .landing-card-arrow svg,
+  .landing-inline-link svg {
+    transform: rotate(-45deg);
+  }
+
+  .landing-product-card:hover .landing-card-arrow {
+    transform: rotate(45deg) scale(1.05);
+  }
+
+  .landing-inline-link span {
+    transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .landing-inline-link:hover span {
+    transform: translate(2px, -2px);
   }
 }
 
 @layer utilities {
+  .landing-map-grid {
+    background-image:
+      linear-gradient(rgba(16, 24, 39, 0.045) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(16, 24, 39, 0.045) 1px, transparent 1px),
+      radial-gradient(circle at 82% 18%, rgba(49, 86, 217, 0.12), transparent 26%),
+      radial-gradient(circle at 16% 78%, rgba(31, 157, 114, 0.08), transparent 24%);
+    background-size: 48px 48px, 48px 48px, 100% 100%, 100% 100%;
+    mask-image: linear-gradient(to bottom, black 0%, black 78%, transparent 100%);
+  }
+
+  .landing-dark-grid {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+    background-size: 44px 44px;
+  }
+
+  .landing-path-grid {
+    background-image:
+      linear-gradient(rgba(147, 197, 253, 0.07) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(147, 197, 253, 0.07) 1px, transparent 1px),
+      radial-gradient(circle at 72% 24%, rgba(59, 130, 246, 0.28), transparent 28%),
+      radial-gradient(circle at 34% 76%, rgba(125, 211, 252, 0.16), transparent 24%);
+    background-size: 34px 34px, 34px 34px, 100% 100%, 100% 100%;
+  }
+
+  @keyframes landing-editorial-drift {
+    from { transform: scale(1.035) translate3d(-0.6%, 0, 0); }
+    to { transform: scale(1.075) translate3d(0.8%, -0.8%, 0); }
+  }
+
+  @keyframes landing-editorial-year-drift {
+    0%, 100% { transform: translateY(0); opacity: 0.07; }
+    50% { transform: translateY(-8px); opacity: 0.11; }
+  }
+
+  .landing-editorial-photo {
+    -webkit-mask-image: radial-gradient(ellipse 68% 64% at 62% 48%, #000 54%, transparent 100%);
+    mask-image: radial-gradient(ellipse 68% 64% at 62% 48%, #000 54%, transparent 100%);
+  }
+
+  .landing-editorial-photo img {
+    animation: landing-editorial-drift 14s ease-in-out infinite alternate;
+    filter: saturate(0.78) contrast(1.06);
+    will-change: transform;
+  }
+
+  .landing-editorial-year {
+    animation: landing-editorial-year-drift 7s ease-in-out infinite;
+  }
+
+  .landing-editorial-proof {
+    animation: landing-float 5.5s ease-in-out infinite;
+  }
+
+  .landing-proof-panel {
+    background-image: linear-gradient(130deg, rgba(239, 246, 255, 0.66), transparent 32%, transparent 70%, rgba(219, 234, 254, 0.5));
+  }
+
+  .landing-proof-point:nth-child(1),
+  .landing-proof-point:nth-child(2) {
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  }
+
+  .landing-proof-point:nth-child(1),
+  .landing-proof-point:nth-child(3) {
+    border-right: 1px solid rgba(15, 23, 42, 0.08);
+  }
+
+  @media (min-width: 640px) {
+    .landing-proof-point:nth-child(1),
+    .landing-proof-point:nth-child(2) {
+      border-bottom: 0;
+    }
+
+    .landing-proof-point:nth-child(1),
+    .landing-proof-point:nth-child(3) {
+      border-right: 0;
+    }
+
+    .landing-proof-point:not(:first-child) {
+      border-left: 1px solid rgba(15, 23, 42, 0.08);
+    }
+  }
+
+  @keyframes support-chat-badge-pop {
+    0% { opacity: 0; transform: scale(0.25) rotate(-12deg); }
+    58% { opacity: 1; transform: scale(1.18) rotate(4deg); }
+    78% { transform: scale(0.94) rotate(-1deg); }
+    100% { opacity: 1; transform: scale(1) rotate(0deg); }
+  }
+
+  @keyframes support-chat-badge-ring {
+    0% { opacity: 0.75; transform: scale(0.85); }
+    80%, 100% { opacity: 0; transform: scale(2.1); }
+  }
+
+  .support-chat-badge {
+    animation: support-chat-badge-pop 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .support-chat-badge-ring {
+    animation: support-chat-badge-ring 1.8s ease-out 320ms 2;
+  }
+
+  @media (max-width: 767px) {
+    .landing-card-stack {
+      display: block;
+    }
+
+    .landing-stack-card {
+      position: sticky;
+      margin-bottom: 1rem;
+      isolation: isolate;
+    }
+
+    .landing-stack-card-1 {
+      top: 6.1rem;
+      z-index: 1;
+    }
+
+    .landing-stack-card-2 {
+      top: 6.7rem;
+      z-index: 2;
+    }
+
+    .landing-stack-card-3 {
+      position: relative;
+      top: auto;
+      z-index: 3;
+    }
+
+    .landing-stack-card .landing-product-card {
+      box-shadow: 0 26px 70px rgba(15, 23, 42, 0.16);
+    }
+  }
+
+  @keyframes landing-hero-copy-in {
+    from { opacity: 0; transform: translateY(28px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes landing-hero-visual-in {
+    from { opacity: 0; transform: translateY(42px) scale(0.96); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+
+  @keyframes landing-glow-breathe {
+    0%, 100% { transform: scale(1); opacity: 0.62; }
+    50% { transform: scale(1.12); opacity: 0.82; }
+  }
+
+  @keyframes landing-float {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    50% { transform: translateY(-9px) rotate(0.4deg); }
+  }
+
+  @keyframes landing-orbit {
+    from { transform: rotate(0deg) scale(1); }
+    50% { transform: rotate(180deg) scale(1.05); }
+    to { transform: rotate(360deg) scale(1); }
+  }
+
+  .landing-hero-copy {
+    animation: landing-hero-copy-in 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  .landing-hero-visual {
+    animation: landing-hero-visual-in 900ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both;
+  }
+
+  .landing-hero-glow {
+    animation: landing-glow-breathe 8s ease-in-out infinite;
+  }
+
+  .landing-boarding-pass {
+    transform: rotate(-2.5deg);
+    transition: transform 650ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .landing-closing:hover .landing-boarding-pass {
+    transform: rotate(0deg) translateY(-4px);
+  }
+
+  .landing-ticket-shine {
+    background: linear-gradient(115deg, transparent 22%, rgba(147, 197, 253, 0.16) 46%, transparent 68%);
+  }
+
+  .landing-ticket-barcode {
+    background: repeating-linear-gradient(90deg, #1e3a8a 0 2px, transparent 2px 5px, #2563eb 5px 6px, transparent 6px 9px);
+  }
+
+  .landing-float-slow {
+    animation: landing-float 5.5s ease-in-out infinite;
+  }
+
+  .landing-closing-orbit {
+    animation: landing-orbit 18s linear infinite;
+  }
+
+  .landing-closing-orbit-delay {
+    animation-duration: 13s;
+    animation-direction: reverse;
+  }
+
+  .landing-visa-frame img,
+  .landing-product-card img {
+    transition: transform 900ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .landing-visa-frame:hover img,
+  .landing-product-card:hover img {
+    transform: scale(1.035);
+  }
+
   .dot-grid-bg {
     background-image: radial-gradient(circle at 1px 1px, #e2e8f0 1px, transparent 0);
     background-size: 24px 24px;
@@ -71,6 +463,13 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .animate-feature-float, .animate-feature-scan { animation: none; }
+    .animate-feature-float, .animate-feature-scan,
+    .landing-hero-copy, .landing-hero-visual, .landing-hero-glow,
+    .landing-float-slow, .landing-closing-orbit, .landing-editorial-photo img,
+    .landing-editorial-year, .landing-editorial-proof,
+    .support-chat-badge, .support-chat-badge-ring { animation: none; }
+    .landing-button, .landing-button-icon, .landing-product-card,
+    .landing-price-card, .landing-card-arrow, .landing-boarding-pass,
+    .landing-visa-frame img, .landing-product-card img { transition: none; }
   }
 }

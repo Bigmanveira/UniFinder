@@ -9,10 +9,9 @@
 // stops asking the student to recite numbers that are already on the
 // document in front of her.
 //
-// We DO NOT use the extracted fields to score the student; the scoring
-// pass works off the spoken transcript only. Extraction here is purely
-// to make Anna's questions feel like a real interview where the officer
-// is reading the file.
+// The scoring pass uses extracted fields only to cross-check consistency
+// with spoken answers. Uploading a document never adds points by itself,
+// and an unreadable document never subtracts points by itself.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import Anthropic from "@anthropic-ai/sdk";

@@ -865,10 +865,10 @@ Append-only by design: Firestore Rules block all client writes. Only the corresp
 
 ### Error logs
 
-`/errorLogs` collection captures backend errors with:
-- `category` — `payment_webhook` / `ai_call` / `email_send` / `external_api` / `storage` / `tts` / `other`
+`/errorLogs` collection captures backend and browser-reported errors with:
+- `category` — `payment_webhook` / `ai_call` / `email_send` / `external_api` / `client` / `storage` / `tts` / `other`
 - `severity` — `error` / `warning`
-- `source` — narrow label like `paystack.signature_invalid`
+- `source` — narrow label like `paystack.signature_invalid` or `client.roadmap_onboarding.submit`
 - `userId` / `paymentId` / `context` — best-effort attribution
 
 Visible on the Errors page (`/errors`). Filter by category, severity, time range.
