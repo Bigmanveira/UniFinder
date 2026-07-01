@@ -38,6 +38,7 @@ export default function VisaInterviewPage() {
   const [messages,     setMessages]     = useState<VisaInterviewMessage[]>([]);
   const [starting,     setStarting]     = useState(false);
   const [ending,       setEnding]       = useState(false);
+  const endingRef = useRef(false);
   const [report,       setReport]       = useState<VisaInterviewReport | null>(null);
   const [error,        setError]        = useState("");
   // At-capacity popup state. Surfaced when HeyGen has no concurrent
@@ -306,7 +307,8 @@ export default function VisaInterviewPage() {
   };
 
   const endInterview = async () => {
-    if (!sessionId) return;
+    if (!sessionId || endingRef.current) return;
+    endingRef.current = true;
     setEnding(true);
     setError("");
     speech.abort();
@@ -318,6 +320,7 @@ export default function VisaInterviewPage() {
     if (sessionKind === "preview") {
       setPreviewEndOpen(true);
       setEnding(false);
+      endingRef.current = false;
       return;
     }
 
@@ -338,6 +341,7 @@ export default function VisaInterviewPage() {
       }
     } finally {
       setEnding(false);
+      endingRef.current = false;
     }
   };
 
@@ -427,6 +431,7 @@ export default function VisaInterviewPage() {
     setPendingEndAfterSpeech(false);
     setPendingMicRecoveryAfterSpeech(false);
     setFatalReason(null);
+    endingRef.current = false;
     spokenOfficerIdsRef.current.clear();
     setStage("connecting");
   };

@@ -24,6 +24,12 @@ interface Props {
 }
 
 type Phase = "idle" | "connecting" | "live" | "failed";
+type QueuedSpeech = {
+  audioBase64: string;
+  durationMs: number;
+  attempts: number;
+  started: boolean;
+};
 
 /**
  * Self-contained avatar pane. Manages the HeyGen connection, plays the
@@ -42,8 +48,11 @@ export default function LiveAvatarPanel({
   // Queue holds pre-rendered audio (TTS'd from the officer text). We don't
   // queue raw text because the TTS fetch can take 1-2s and we don't want to
   // block the avatar while we're waiting.
-  const queueRef     = useRef<{ audioBase64: string; durationMs: number }[]>([]);
+  const queueRef     = useRef<QueuedSpeech[]>([]);
+  const currentSpeechRef = useRef<QueuedSpeech | null>(null);
   const speakingRef  = useRef(false);
+  const acceptSpeechEventsRef = useRef(false);
+  const mediaInterruptedRef = useRef(false);
   const lastEnqueuedRef = useRef("");
   // Latest callback refs so the connect effect (which only runs once)
   // always invokes the current parent handlers.
@@ -57,7 +66,9 @@ export default function LiveAvatarPanel({
   const idleAfterLiveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Fallback timer for AVATAR_SPEAK_ENDED if the SDK's agent-event socket
   // isn't delivering events. See drainQueue() for why.
+  const speakStartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const speakEndedFallbackRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mediaRecoveryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Periodic keep-alive ping. HeyGen's server tears down idle sessions
   // (typically ~60s of no commands) — so when the user lingers on a
   // doc-upload modal, the LiveKit room dies and subsequent repeatAudio()
@@ -70,6 +81,7 @@ export default function LiveAvatarPanel({
 
   const [phase,  setPhase]  = useState<Phase>("idle");
   const [reason, setReason] = useState<string | null>(null);
+  const [mediaNotice, setMediaNotice] = useState<string | null>(null);
 
   useEffect(() => { onSpeakStartedRef.current = onSpeakStarted; }, [onSpeakStarted]);
   useEffect(() => { onSpeakEndedRef.current   = onSpeakEnded;   }, [onSpeakEnded]);
@@ -77,10 +89,67 @@ export default function LiveAvatarPanel({
   useEffect(() => { onLiveRef.current         = onLive;         }, [onLive]);
   useEffect(() => { onFallbackRef.current     = onFallback;     }, [onFallback]);
 
-  // Drain the queue when we have a handle. Note: speakingRef flips back to
-  // false in the AVATAR_SPEAK_ENDED callback, NOT after .speak() resolves
-  // — `repeat()` only sends a command, the actual speech runs async.
-  const drainQueue = () => {
+  function clearSpeechTimers() {
+    if (speakStartTimeoutRef.current) {
+      clearTimeout(speakStartTimeoutRef.current);
+      speakStartTimeoutRef.current = null;
+    }
+    if (speakEndedFallbackRef.current) {
+      clearTimeout(speakEndedFallbackRef.current);
+      speakEndedFallbackRef.current = null;
+    }
+  }
+
+  function completeCurrentSpeech() {
+    clearSpeechTimers();
+    currentSpeechRef.current = null;
+    acceptSpeechEventsRef.current = false;
+    speakingRef.current = false;
+    if (queueRef.current.length > 0) {
+      drainQueue();
+    } else {
+      onSpeakEndedRef.current?.();
+    }
+  }
+
+  function failCurrentSpeech(message: string) {
+    console.warn("[avatar] speech failed:", message);
+    clearSpeechTimers();
+    currentSpeechRef.current = null;
+    acceptSpeechEventsRef.current = false;
+    speakingRef.current = false;
+    mediaInterruptedRef.current = false;
+    setMediaNotice(null);
+    onTtsFailedRef.current?.();
+    if (queueRef.current.length > 0) drainQueue();
+  }
+
+  async function sendCurrentSpeech() {
+    const item = currentSpeechRef.current;
+    const handle = handleRef.current;
+    if (!item || !handle?.ready || mediaInterruptedRef.current) return;
+
+    acceptSpeechEventsRef.current = false;
+    try {
+      await handle.ensurePlayback();
+      if (item.attempts > 0) {
+        await handle.interrupt();
+        await new Promise((resolve) => setTimeout(resolve, 150));
+      }
+      if (currentSpeechRef.current !== item || mediaInterruptedRef.current) return;
+      await handle.speakAudio(item.audioBase64);
+      acceptSpeechEventsRef.current = true;
+      speakStartTimeoutRef.current = setTimeout(() => {
+        if (currentSpeechRef.current !== item || item.started || mediaInterruptedRef.current) return;
+        failCurrentSpeech("Avatar did not confirm speech start within 10 seconds.");
+      }, 10_000);
+    } catch (error: any) {
+      if (currentSpeechRef.current !== item || mediaInterruptedRef.current) return;
+      failCurrentSpeech(error?.message ?? "Could not send audio to the avatar.");
+    }
+  }
+
+  function drainQueue() {
     if (speakingRef.current) {
       console.log("[avatar] drainQueue: already speaking, skipping");
       return;
@@ -95,41 +164,56 @@ export default function LiveAvatarPanel({
       return;
     }
     console.log("[avatar] drainQueue: speaking audio", item.durationMs, "ms");
-    // Try to send the audio FIRST. If the session has dropped, repeatAudio()
-    // throws synchronously and we route through onTtsFailed without ever
-    // claiming the avatar started speaking — otherwise the duration-fallback
-    // timer below would fire onSpeakEnded for a line that never actually
-    // played, and any downstream auto-end-on-final-line would trigger.
-    handleRef.current.speakAudio(item.audioBase64).catch((err: any) => {
-      console.warn("[avatar] speakAudio failed (session dropped?):", err?.message);
-      speakingRef.current = false;
-      if (speakEndedFallbackRef.current) {
-        clearTimeout(speakEndedFallbackRef.current);
-        speakEndedFallbackRef.current = null;
-      }
-      onTtsFailedRef.current?.();
-    });
+    currentSpeechRef.current = item;
     speakingRef.current = true;
-    // Optimistic SPEAK_STARTED — if the SDK's agent-event channel doesn't
-    // deliver, AVATAR_SPEAK_STARTED will never fire and the page stays on
-    // "connecting" even though the avatar is actually talking. Calling
-    // onSpeakStarted ourselves makes the UI responsive; the real event, if
-    // it arrives, is idempotent (sets the same state). If speakAudio's
-    // promise rejects above, the catch handler will roll all of this back.
-    onSpeakStartedRef.current?.();
-    // Fallback for missing AVATAR_SPEAK_ENDED: use the exact duration the
-    // TTS endpoint reported, plus 1s padding for network jitter. If the
-    // real event fires first we cancel this.
-    const estimatedMs = item.durationMs + 1000;
-    if (speakEndedFallbackRef.current) clearTimeout(speakEndedFallbackRef.current);
-    speakEndedFallbackRef.current = setTimeout(() => {
-      if (!speakingRef.current) return;
-      console.warn("[avatar] AVATAR_SPEAK_ENDED never fired, falling back to duration estimate");
-      speakingRef.current = false;
-      if (queueRef.current.length > 0) drainQueue();
-      else onSpeakEndedRef.current?.();
-    }, estimatedMs);
-  };
+    void sendCurrentSpeech();
+  }
+
+  function handleMediaInterrupted(reasonCode: string) {
+    if (mediaInterruptedRef.current) return;
+    mediaInterruptedRef.current = true;
+    acceptSpeechEventsRef.current = false;
+    clearSpeechTimers();
+    if (currentSpeechRef.current) currentSpeechRef.current.started = false;
+    setMediaNotice("Connection interrupted. Anna will replay the question when the stream recovers.");
+    void handleRef.current?.interrupt();
+    if (mediaRecoveryTimeoutRef.current) clearTimeout(mediaRecoveryTimeoutRef.current);
+    mediaRecoveryTimeoutRef.current = setTimeout(() => {
+      const msg = `Avatar media did not recover after ${reasonCode}. Please restart the interview.`;
+      setPhase("failed");
+      setReason(msg);
+      setMediaNotice(null);
+      void handleRef.current?.stop();
+      handleRef.current = null;
+      onFallbackRef.current?.(msg);
+    }, 15_000);
+  }
+
+  function handleMediaRecovered() {
+    if (!mediaInterruptedRef.current) return;
+    mediaInterruptedRef.current = false;
+    if (mediaRecoveryTimeoutRef.current) {
+      clearTimeout(mediaRecoveryTimeoutRef.current);
+      mediaRecoveryTimeoutRef.current = null;
+    }
+    const item = currentSpeechRef.current;
+    if (!item) {
+      setMediaNotice(null);
+      return;
+    }
+    if (item.attempts >= 1) {
+      failCurrentSpeech("Avatar media was interrupted twice during the same question.");
+      return;
+    }
+    item.attempts += 1;
+    item.started = false;
+    setMediaNotice("Connection restored. Replaying Anna's question.");
+    setTimeout(() => {
+      if (currentSpeechRef.current !== item || mediaInterruptedRef.current) return;
+      setMediaNotice(null);
+      void sendCurrentSpeech();
+    }, 250);
+  }
 
   // ── Connect on mount, cleanup on unmount ─────────────────────────────────
   useEffect(() => {
@@ -225,39 +309,49 @@ export default function LiveAvatarPanel({
           onDisconnect: (rsn) => {
             if (cancelled) return;
             console.warn("[avatar] disconnected:", rsn);
-            // Stop pinging keep-alive against a dead session. We don't
-            // auto-fail on short blips — the interview can keep going via
-            // the fallback signal if it never recovers.
             if (keepAliveIntervalRef.current) {
               clearInterval(keepAliveIntervalRef.current);
               keepAliveIntervalRef.current = null;
             }
+            if (!handleRef.current) return;
+            handleRef.current = null;
+            clearSpeechTimers();
+            const msg = "The avatar connection ended unexpectedly. Please restart the interview.";
+            setPhase("failed");
+            setReason(msg);
+            setMediaNotice(null);
+            onFallbackRef.current?.(msg);
           },
           onSpeakStarted: () => {
             console.log("[avatar] AVATAR_SPEAK_STARTED");
+            const item = currentSpeechRef.current;
+            if (!item || item.started || mediaInterruptedRef.current || !acceptSpeechEventsRef.current) return;
+            item.started = true;
             speakingRef.current = true;
+            if (speakStartTimeoutRef.current) {
+              clearTimeout(speakStartTimeoutRef.current);
+              speakStartTimeoutRef.current = null;
+            }
             // First message arrived — cancel the idle watchdog.
             if (idleAfterLiveTimeoutRef.current) {
               clearTimeout(idleAfterLiveTimeoutRef.current);
               idleAfterLiveTimeoutRef.current = null;
             }
             onSpeakStartedRef.current?.();
+            speakEndedFallbackRef.current = setTimeout(() => {
+              if (currentSpeechRef.current !== item || !item.started || mediaInterruptedRef.current) return;
+              console.warn("[avatar] AVATAR_SPEAK_ENDED missing; completing after guarded duration fallback");
+              completeCurrentSpeech();
+            }, item.durationMs + 4_000);
           },
           onSpeakEnded: () => {
             console.log("[avatar] AVATAR_SPEAK_ENDED");
-            // Real event fired — cancel the time-estimate fallback so we don't
-            // also fire onSpeakEnded a second time.
-            if (speakEndedFallbackRef.current) {
-              clearTimeout(speakEndedFallbackRef.current);
-              speakEndedFallbackRef.current = null;
-            }
-            speakingRef.current = false;
-            if (queueRef.current.length > 0) {
-              drainQueue();
-            } else {
-              onSpeakEndedRef.current?.();
-            }
+            const item = currentSpeechRef.current;
+            if (!item || !item.started || mediaInterruptedRef.current || !acceptSpeechEventsRef.current) return;
+            completeCurrentSpeech();
           },
+          onMediaInterrupted: handleMediaInterrupted,
+          onMediaRecovered: handleMediaRecovered,
         });
         if (cancelled) { void handle.stop(); return; }
         // onLive already assigned handleRef.current — this is a defensive
@@ -281,9 +375,10 @@ export default function LiveAvatarPanel({
         clearTimeout(idleAfterLiveTimeoutRef.current);
         idleAfterLiveTimeoutRef.current = null;
       }
-      if (speakEndedFallbackRef.current) {
-        clearTimeout(speakEndedFallbackRef.current);
-        speakEndedFallbackRef.current = null;
+      clearSpeechTimers();
+      if (mediaRecoveryTimeoutRef.current) {
+        clearTimeout(mediaRecoveryTimeoutRef.current);
+        mediaRecoveryTimeoutRef.current = null;
       }
       if (keepAliveIntervalRef.current) {
         clearInterval(keepAliveIntervalRef.current);
@@ -291,13 +386,15 @@ export default function LiveAvatarPanel({
       }
       handleRef.current?.stop().catch(() => {});
       handleRef.current = null;
-      // Deliberately DO NOT touch queueRef / lastEnqueuedRef / speakingRef
-      // here. React 19 dev runs every effect setup → cleanup → setup, and
-      // clearing the queue between the two setups would lose the officer
-      // message that the parallel useEffect on `officerSpeech` enqueued
-      // during the first setup (the dedup ref then blocks the second
-      // setup from re-enqueueing). On a real session change the panel
-      // unmounts entirely, taking these refs with it.
+      acceptSpeechEventsRef.current = false;
+      mediaInterruptedRef.current = false;
+      if (currentSpeechRef.current) {
+        currentSpeechRef.current.started = false;
+        currentSpeechRef.current.attempts = 0;
+        queueRef.current.unshift(currentSpeechRef.current);
+        currentSpeechRef.current = null;
+      }
+      speakingRef.current = false;
       httpsCallable(functions, "endLiveAvatarSession")({ visaInterviewSessionId: sessionId }).catch(() => {});
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -324,7 +421,12 @@ export default function LiveAvatarPanel({
         const res = await fn({ sessionId, text: officerSpeech });
         const data = res.data as { audioBase64: string; durationMs: number };
         if (!data?.audioBase64) throw new Error("Empty TTS response");
-        queueRef.current.push({ audioBase64: data.audioBase64, durationMs: data.durationMs ?? 4000 });
+        queueRef.current.push({
+          audioBase64: data.audioBase64,
+          durationMs: data.durationMs ?? 4000,
+          attempts: 0,
+          started: false,
+        });
         drainQueue();
       } catch (err: any) {
         console.error("[avatar] TTS fetch failed:", err?.message);
@@ -347,7 +449,21 @@ export default function LiveAvatarPanel({
         className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-500 ${phase === "live" ? "opacity-100" : "opacity-0"}`}
         playsInline
         autoPlay
+        preload="auto"
       />
+
+      {phase === "live" && mediaNotice && (
+        <div className="absolute inset-x-3 bottom-3 z-20 flex items-center justify-between gap-3 rounded-2xl border border-amber-300/25 bg-slate-950/85 px-4 py-3 text-xs font-semibold text-amber-100 shadow-xl backdrop-blur-md">
+          <span>{mediaNotice}</span>
+          <button
+            type="button"
+            className="shrink-0 rounded-lg bg-white px-3 py-2 text-[11px] font-bold text-slate-900 transition hover:bg-slate-100"
+            onClick={() => void handleRef.current?.ensurePlayback().catch(() => {})}
+          >
+            Resume
+          </button>
+        </div>
+      )}
 
       {/* Overlay states */}
       {phase !== "live" && (

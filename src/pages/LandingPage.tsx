@@ -4,7 +4,6 @@ import {
   ArrowRight,
   BadgeCheck,
   BarChart3,
-  Building2,
   CalendarDays,
   Check,
   CheckCircle2,
@@ -45,9 +44,9 @@ export default function LandingPage() {
   }, []);
 
   return (
-    <div className="cr-landing min-h-screen overflow-x-clip bg-[#f3f7fc] text-[#111827] selection:bg-[#3b82f6] selection:text-white">
-      <header className="fixed inset-x-0 top-0 z-50 px-4 pt-4 sm:px-6">
-        <div className="mx-auto flex max-w-[1380px] items-center justify-between rounded-full border border-white/70 bg-white/90 px-4 py-3 shadow-[0_18px_60px_rgba(17,24,39,0.12)] backdrop-blur-xl sm:px-5">
+    <div className="cr-landing min-h-screen overflow-x-clip bg-[#f6f8fc] text-[#111827] selection:bg-[#3b82f6] selection:text-white">
+      <header className="fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-6 sm:pt-4">
+        <div className="mx-auto flex max-w-[1380px] items-center justify-between rounded-2xl border border-white/70 bg-white/92 px-3 py-2.5 shadow-[0_14px_45px_rgba(17,24,39,0.1)] backdrop-blur-xl sm:rounded-full sm:px-5 sm:py-3">
           <div className="sm:hidden">
             <span className="hidden min-[370px]:block"><BrandLogo size="sm" /></span>
             <span className="min-[370px]:hidden"><BrandLogo size="sm" iconOnly /></span>
@@ -80,53 +79,50 @@ export default function LandingPage() {
       </header>
 
       <main>
-        <section className="px-3 pb-6 pt-28 sm:px-5 sm:pb-8 sm:pt-32">
-          <div className="landing-hero-stage relative mx-auto max-w-[1460px] overflow-hidden rounded-[2rem] bg-[#151617] text-white shadow-[0_40px_110px_rgba(17,24,39,0.2)] sm:rounded-[2.75rem]">
-            <div className="landing-hero-glow absolute -right-28 -top-32 h-[560px] w-[560px] rounded-full bg-[#4f63ef]/70 blur-[100px]" />
-            <div className="landing-dark-grid absolute inset-0 opacity-20" />
-            <div className="relative grid min-h-[720px] items-center gap-4 px-5 pb-6 pt-12 sm:gap-12 sm:px-10 sm:pb-14 sm:pt-20 lg:grid-cols-[0.88fr_1.12fr] lg:gap-8 lg:px-16 xl:px-20">
-              <div className="landing-hero-copy text-center lg:text-left">
-                <div className="landing-hero-masthead mb-8 inline-flex flex-col items-center lg:items-start">
-                  <BrandLogo size="md" tone="light" asLink={false} />
-                  <span className="mt-4 flex items-center gap-3">
-                    <span className="h-px w-8 bg-gradient-to-r from-[#60a5fa] to-transparent" />
-                    <span className="font-utility text-[8px] font-semibold uppercase tracking-[0.2em] text-[#93c5fd] sm:text-[9px]">Built for international applicants</span>
-                  </span>
+        <section className="px-3 pb-4 pt-24 sm:px-5 sm:pb-7 sm:pt-28 lg:pt-32">
+          <div className="landing-hero-stage relative mx-auto max-w-[1460px] overflow-hidden rounded-[1.6rem] bg-[#101827] text-white shadow-[0_32px_90px_rgba(17,24,39,0.18)] sm:rounded-[2.5rem]">
+            <div className="landing-hero-glow absolute -left-24 -top-40 h-[440px] w-[440px] rounded-full bg-[#3156d9]/35 blur-[110px]" />
+            <div className="landing-dark-grid absolute inset-0 hidden opacity-15 lg:block" />
+            <div className="relative grid items-stretch lg:grid-cols-[0.92fr_1.08fr]">
+              <div className="landing-hero-copy flex flex-col justify-center px-6 py-12 text-center sm:px-10 sm:py-16 lg:min-h-[650px] lg:px-16 lg:text-left xl:px-20">
+                <div className="mx-auto mb-6 inline-flex items-center gap-2.5 text-[10px] font-extrabold uppercase tracking-[0.16em] text-[#a9c8ff] lg:mx-0">
+                  <span className="h-2 w-2 rounded-full bg-[#60a5fa] shadow-[0_0_0_5px_rgba(96,165,250,0.12)]" />
+                  Your study abroad plan
                 </div>
-                <h1 className="font-display text-[clamp(3.35rem,7vw,7rem)] font-medium leading-[0.9] tracking-[-0.065em] text-white">
+                <h1 className="font-display text-[clamp(3rem,6vw,6.5rem)] font-medium leading-[0.91] tracking-[-0.06em] text-white">
                   From shortlist
                   <span className="block text-[#8fa0ff]">to takeoff.</span>
                 </h1>
-                <p className="mx-auto mt-7 max-w-lg text-base font-medium leading-7 text-white/64 sm:text-lg lg:mx-0">
-                  Match, plan, apply, and prepare for your visa in one connected workspace.
+                <p className="mx-auto mt-6 max-w-md text-[15px] font-medium leading-7 text-white/62 sm:text-lg lg:mx-0">
+                  Match schools, organise applications, plan funding, and prepare for your visa in one place.
                 </p>
 
-                <div className="mt-9 flex flex-col justify-center gap-3 sm:flex-row lg:justify-start">
-                  <Link to={roadmapHref} className="landing-button landing-button-primary py-2 pl-6 pr-2 text-[15px]">
+                <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row lg:justify-start">
+                  <Link to={roadmapHref} className="landing-button landing-button-primary w-full py-2 pl-6 pr-2 text-[15px] sm:w-auto">
                     <span>Build my plan</span>
                     <span className="landing-button-icon"><ArrowRight size={16} /></span>
                   </Link>
-                  <Link to={simulatorHref} className="landing-button landing-button-ghost px-6 py-4 text-[15px]">
+                  <Link to={simulatorHref} className="landing-button landing-button-ghost hidden px-6 py-4 text-[15px] sm:inline-flex">
                     Practice the interview <Mic size={16} />
                   </Link>
                 </div>
 
-                <div className="mt-8 flex flex-wrap justify-center gap-x-6 gap-y-3 text-xs font-semibold text-white/55 sm:text-sm lg:justify-start">
+                <div className="mt-7 flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs font-semibold text-white/48 sm:text-sm lg:justify-start">
                   <TrustItem text="2 free credits" />
                   <TrustItem text="No subscription" />
-                  <TrustItem text="Verified programmes" />
+                  <span className="hidden sm:inline-flex"><TrustItem text="Verified programmes" /></span>
                 </div>
               </div>
 
-              <div className="landing-hero-visual">
-                <JourneyDossier />
+              <div className="landing-hero-visual hidden lg:block">
+                <HeroCampusVisual />
               </div>
             </div>
           </div>
         </section>
 
-        <section className="px-4 py-7 text-[#111827] sm:px-6 sm:py-9">
-          <div className="landing-proof-panel mx-auto max-w-7xl overflow-hidden rounded-[1.65rem] border border-[#111827]/8 bg-white shadow-[0_18px_55px_rgba(17,24,39,0.06)] sm:rounded-[1.75rem]">
+        <section className="px-3 py-5 text-[#111827] sm:px-6 sm:py-8">
+          <div className="landing-proof-panel mx-auto max-w-7xl overflow-hidden rounded-[1.35rem] border border-[#111827]/8 bg-white shadow-[0_14px_40px_rgba(17,24,39,0.05)] sm:rounded-[1.75rem]">
             <div className="landing-proof-grid grid grid-cols-2 sm:grid-cols-4">
               <ProofPoint icon={<ShieldCheck size={17} />} label="Accredited data" />
               <ProofPoint icon={<CircleDollarSign size={17} />} label="Funding-aware" />
@@ -136,25 +132,25 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="how-it-works" className="scroll-mt-24 px-5 py-20 sm:px-6 sm:py-28">
+        <section id="how-it-works" className="scroll-mt-24 px-4 py-16 sm:px-6 sm:py-24">
           <div className="mx-auto max-w-7xl">
-            <Reveal className="mx-auto mb-14 max-w-4xl text-center sm:mb-16">
+            <Reveal className="mx-auto mb-10 max-w-4xl text-center sm:mb-14">
               <p className="font-utility text-[10px] font-semibold uppercase tracking-[0.2em] text-[#5061d9]">
                 One connected journey
               </p>
-              <h2 className="mt-5 font-display text-4xl font-medium leading-[0.96] tracking-[-0.05em] text-[#111827] sm:text-6xl lg:text-7xl">
+              <h2 className="mt-4 font-display text-[2.6rem] font-medium leading-[0.96] tracking-[-0.05em] text-[#111827] sm:text-6xl lg:text-7xl">
                 Every next step,<br className="hidden sm:block" /> already in view.
               </h2>
             </Reveal>
 
-            <div className="landing-card-stack grid gap-5 lg:grid-cols-12">
+            <div className="landing-card-stack grid gap-4 sm:gap-5 lg:grid-cols-12">
               <Reveal className="landing-stack-card landing-stack-card-1 lg:col-span-7">
                 <ProductCard
                   label="Match"
                   title="Choose with evidence."
                   body="Verified schools that fit your academics, budget, and goals."
                   visual={<MatchEvidenceVisual />}
-                  className="min-h-[460px] bg-white sm:min-h-[520px]"
+                  className="bg-white sm:min-h-[500px]"
                 />
               </Reveal>
               <Reveal delay={80} className="landing-stack-card landing-stack-card-2 lg:col-span-5">
@@ -163,7 +159,7 @@ export default function LandingPage() {
                   title="Know what comes next."
                   body="Deadlines, funding, documents, and next steps in one practical view."
                   visual={<RoadmapVisual />}
-                  className="min-h-[460px] bg-[#93c5fd] sm:min-h-[520px]"
+                  className="bg-[#93c5fd] sm:min-h-[500px]"
                 />
               </Reveal>
               <Reveal delay={120} className="landing-stack-card landing-stack-card-3 lg:col-span-12">
@@ -180,15 +176,15 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="interview" className="scroll-mt-24 px-3 pb-20 sm:px-5 sm:pb-28">
-          <div className="relative mx-auto max-w-[1460px] overflow-hidden rounded-[2rem] bg-[#171819] text-white shadow-[0_36px_90px_rgba(16,24,39,0.24)] sm:rounded-[2.75rem]">
+        <section id="interview" className="scroll-mt-24 px-3 pb-16 sm:px-5 sm:pb-24">
+          <div className="relative mx-auto max-w-[1460px] overflow-hidden rounded-[1.6rem] bg-[#171819] text-white shadow-[0_30px_78px_rgba(16,24,39,0.2)] sm:rounded-[2.5rem]">
             <div className="landing-dark-grid absolute inset-0 opacity-20" />
             <div className="absolute -bottom-44 -left-24 h-[420px] w-[420px] rounded-full bg-[#5061d9]/45 blur-[110px]" />
             <div className="relative grid lg:grid-cols-[0.92fr_1.08fr]">
-              <Reveal className="order-2 min-h-[480px] lg:order-1">
+              <Reveal className="order-2 min-h-[360px] sm:min-h-[460px] lg:order-1">
                 <VisaRoom />
               </Reveal>
-              <Reveal delay={100} className="order-1 flex items-center px-7 py-14 sm:px-12 lg:order-2 lg:px-16 lg:py-20">
+              <Reveal delay={100} className="order-1 flex items-center px-6 py-12 sm:px-12 lg:order-2 lg:px-16 lg:py-20">
                 <div className="max-w-xl">
                   <p className="mb-5 font-utility text-[11px] font-semibold uppercase tracking-[0.2em] text-[#9db2ff]">
                     F-1 interview simulator
@@ -199,7 +195,7 @@ export default function LandingPage() {
                   <p className="mt-6 max-w-lg text-base font-medium leading-7 text-white/65 sm:text-lg">
                     A simulated officer listens, follows up, and shows you what weakens your case.
                   </p>
-                  <div className="mt-8 grid gap-3 sm:grid-cols-3">
+                  <div className="mt-7 grid grid-cols-3 gap-2 sm:gap-3">
                     <VisaFeature icon={<Video size={16} />} text="Live conversation" />
                     <VisaFeature icon={<FileCheck2 size={16} />} text="Document-aware" />
                     <VisaFeature icon={<BarChart3 size={16} />} text="Scored feedback" />
@@ -217,7 +213,7 @@ export default function LandingPage() {
           </div>
         </section>
 
-        <section id="pricing" className="scroll-mt-24 px-5 py-20 sm:px-6 sm:py-28">
+        <section id="pricing" className="scroll-mt-24 px-4 py-16 sm:px-6 sm:py-24">
           <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.86fr_1.14fr] lg:items-end">
             <Reveal>
               <p className="font-utility text-[10px] font-semibold uppercase tracking-[0.2em] text-[#5061d9]">Simple pricing</p>
@@ -249,7 +245,7 @@ export default function LandingPage() {
 
         <section className="px-3 pb-3 sm:px-5 sm:pb-5">
           <Reveal className="landing-closing relative mx-auto grid max-w-[1460px] overflow-hidden rounded-[2rem] bg-[#101827] text-white sm:rounded-[2.75rem] lg:grid-cols-[0.86fr_1.14fr]">
-            <div className="flex min-h-[430px] flex-col justify-between px-7 py-10 sm:px-12 sm:py-14 lg:px-16">
+            <div className="flex min-h-[380px] flex-col justify-between px-6 py-10 sm:min-h-[430px] sm:px-12 sm:py-14 lg:px-16">
               <div className="flex items-center justify-between gap-4">
                 <p className="font-utility text-[10px] font-semibold uppercase tracking-[0.2em] text-[#93c5fd]">Your next move</p>
                 <span className="hidden items-center gap-2 rounded-full border border-white/10 bg-white/[0.05] px-3 py-1.5 text-[9px] font-bold text-white/50 sm:inline-flex"><Route size={12} /> Personalised route</span>
@@ -265,10 +261,8 @@ export default function LandingPage() {
                 </Link>
               </div>
             </div>
-            <div className="relative flex min-h-[430px] items-center justify-center overflow-hidden bg-gradient-to-br from-[#1d4ed8] via-[#3b82f6] to-[#7dd3fc] p-7 sm:p-12">
+            <div className="relative hidden min-h-[430px] items-center justify-center overflow-hidden bg-gradient-to-br from-[#1d4ed8] via-[#3b82f6] to-[#7dd3fc] p-12 sm:flex">
               <div className="landing-path-grid absolute inset-0 opacity-35" />
-              <div className="landing-closing-orbit absolute h-[480px] w-[480px] rounded-full border border-white/15" />
-              <div className="landing-closing-orbit landing-closing-orbit-delay absolute h-[330px] w-[330px] rounded-full border border-white/15" />
               <RoadmapBoardingPass />
             </div>
           </Reveal>
@@ -302,70 +296,32 @@ function TrustItem({ text }: { text: string }) {
 
 function ProofPoint({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
-    <div className="landing-proof-point group relative flex min-h-[92px] items-center gap-3 px-4 py-4 text-left sm:min-h-0 sm:justify-center sm:px-5 sm:py-5 sm:text-center">
-      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[0.9rem] bg-[#eff6ff] text-[#2563eb] transition-colors duration-300 group-hover:bg-[#2563eb] group-hover:text-white">{icon}</span>
-      <span className="text-xs font-extrabold leading-tight text-[#4f5c70] sm:text-sm">{label}</span>
+    <div className="landing-proof-point group relative flex min-h-[68px] items-center gap-2.5 px-3 py-3 text-left sm:min-h-0 sm:justify-center sm:px-5 sm:py-5 sm:text-center">
+      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#eff6ff] text-[#2563eb] transition-colors duration-300 group-hover:bg-[#2563eb] group-hover:text-white sm:h-10 sm:w-10">{icon}</span>
+      <span className="text-[11px] font-extrabold leading-tight text-[#4f5c70] sm:text-sm">{label}</span>
       <span className="absolute bottom-0 left-4 right-4 h-px origin-left scale-x-0 bg-[#3b82f6] transition-transform duration-300 group-hover:scale-x-100 sm:left-8 sm:right-8" />
     </div>
   );
 }
 
-function JourneyDossier() {
+function HeroCampusVisual() {
   return (
-    <div className="landing-editorial relative mx-auto min-h-[420px] w-full max-w-[680px] sm:min-h-[600px]" aria-label="International student on a university campus">
-      <div className="absolute inset-x-[5%] bottom-[8%] top-[5%] bg-[radial-gradient(ellipse_at_center,rgba(37,99,235,0.38),transparent_68%)] blur-2xl" />
-
-      <div className="landing-editorial-photo absolute -right-[12%] inset-y-0 left-[2%] sm:-right-[4%] sm:left-[8%]">
-        <img
-          src="https://images.pexels.com/photos/6147047/pexels-photo-6147047.jpeg?auto=compress&cs=tinysrgb&w=1400"
-          alt="Student carrying a laptop outside a university building"
-          className="h-full w-full object-cover object-[58%_center]"
-        />
-        <div className="absolute inset-0 bg-[#172554]/35 mix-blend-color" />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#151617] via-transparent to-[#151617]/10" />
-      </div>
-
-      <div className="absolute left-0 top-[7%] z-10 sm:left-[3%]">
-        <p className="font-utility text-[9px] font-semibold uppercase tracking-[0.24em] text-[#93c5fd]">Global admissions · 01</p>
-        <div className="mt-3 h-px w-28 bg-gradient-to-r from-[#60a5fa] to-transparent sm:w-40" />
-      </div>
-
-      <p className="landing-editorial-year absolute -right-2 top-[1%] z-0 font-display text-[7.5rem] font-medium leading-none tracking-[-0.08em] text-white/[0.07] sm:right-0 sm:text-[11rem]" aria-hidden="true">
-        27
-      </p>
-
-      <div className="absolute bottom-[15%] left-0 z-10 max-w-[250px] sm:bottom-[12%] sm:left-[3%] sm:max-w-[310px]">
-        <p className="font-display text-[2.5rem] font-medium leading-[0.9] tracking-[-0.055em] text-white sm:text-[3.65rem]">
-          Find where<br />you belong.
-        </p>
-        <div className="mt-5 flex items-center gap-3 text-[10px] font-bold text-white/60 sm:text-xs">
-          <span className="h-px w-8 bg-[#60a5fa]" />
-          Built around your real profile
-        </div>
-      </div>
-
-      <div className="landing-editorial-proof absolute bottom-[4%] right-[2%] z-20 flex items-center gap-3 border-l border-[#60a5fa] bg-[#151617]/72 py-2 pl-4 pr-2 backdrop-blur-md sm:bottom-[8%] sm:right-[4%]">
-        <span className="flex h-9 w-9 items-center justify-center bg-[#eff6ff] text-[#2563eb]"><Building2 size={16} /></span>
+    <figure className="relative h-full min-h-[650px] overflow-hidden" aria-label="A diverse group of students on a modern university campus">
+      <img
+        src="https://images.pexels.com/photos/7683694/pexels-photo-7683694.jpeg?auto=compress&cs=tinysrgb&w=1600"
+        alt="A diverse group of students talking on a modern university campus"
+        className="h-full w-full object-cover object-[58%_center]"
+      />
+      <div className="absolute inset-0 bg-gradient-to-r from-[#101827] via-[#101827]/16 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#101827]/72 via-transparent to-[#3156d9]/10" />
+      <figcaption className="absolute bottom-8 left-8 right-8 flex items-end justify-between gap-6 border-t border-white/28 pt-5 text-white xl:bottom-10 xl:left-10 xl:right-10">
         <div>
-          <p className="font-display text-xl font-medium leading-none text-white">12</p>
-          <p className="mt-1 font-utility text-[7px] font-semibold uppercase tracking-[0.16em] text-white/55">Verified matches</p>
+          <p className="font-utility text-[9px] font-semibold uppercase tracking-[0.18em] text-[#bfdbfe]">One connected journey</p>
+          <p className="mt-2 max-w-sm text-sm font-bold leading-6 text-white/88">Shortlist, funding, applications, and visa preparation—kept in one clear plan.</p>
         </div>
-      </div>
-
-      <div className="absolute right-[2%] top-[31%] z-10 text-right sm:right-[1%] sm:top-[34%]">
-        <div className="flex items-center justify-end gap-2 text-[#93c5fd]">
-          <span className="font-display text-3xl font-medium leading-none sm:text-4xl">8</span>
-          <CircleDollarSign size={17} />
-        </div>
-        <p className="mt-1 font-utility text-[7px] font-semibold uppercase tracking-[0.17em] text-white/50">Funding paths</p>
-      </div>
-
-      <div className="absolute right-[2%] top-[52%] z-10 flex h-20 flex-col items-center justify-between sm:right-[1%] sm:h-24">
-        <span className="h-2 w-2 bg-[#60a5fa]" />
-        <span className="h-full w-px bg-gradient-to-b from-[#60a5fa] to-white/10" />
-        <span className="-rotate-90 whitespace-nowrap font-utility text-[7px] font-semibold uppercase tracking-[0.18em] text-white/40">Your next chapter</span>
-      </div>
-    </div>
+        <PlaneTakeoff size={22} className="mb-1 shrink-0 text-[#93c5fd]" />
+      </figcaption>
+    </figure>
   );
 }
 function RoadmapBoardingPass() {
@@ -454,16 +410,16 @@ function ProductCard({
   const dark = className.includes("text-white");
 
   return (
-    <article className={`landing-product-card group relative h-full overflow-hidden rounded-[1.65rem] border border-[#101827]/8 p-5 shadow-[0_22px_65px_rgba(16,24,39,0.08)] sm:rounded-[2.4rem] sm:p-8 ${className}`}>
-      <span className={`landing-card-arrow absolute right-6 top-6 z-10 flex h-11 w-11 items-center justify-center rounded-full sm:right-8 sm:top-8 ${dark ? "bg-white text-[#111827]" : "bg-[#171819] text-white"}`}>
+    <article className={`landing-product-card group relative h-full overflow-hidden rounded-[1.4rem] border border-[#101827]/8 p-6 shadow-[0_18px_52px_rgba(16,24,39,0.07)] sm:rounded-[2.4rem] sm:p-8 ${className}`}>
+      <span className={`landing-card-arrow absolute right-6 top-6 z-10 hidden h-11 w-11 items-center justify-center rounded-full sm:right-8 sm:top-8 sm:flex ${dark ? "bg-white text-[#111827]" : "bg-[#171819] text-white"}`}>
         <ArrowRight size={17} />
       </span>
       <div className={horizontal ? "lg:pr-12" : ""}>
         <p className={`font-utility text-[10px] font-semibold uppercase tracking-[0.2em] ${dark ? "text-[#8fa0ff]" : "text-[#5061d9]"}`}>{label}</p>
-        <h3 className={`mt-4 max-w-xl pr-14 font-display text-3xl font-medium leading-none tracking-[-0.04em] sm:text-4xl ${dark ? "text-white" : "text-[#111827]"}`}>{title}</h3>
+        <h3 className={`mt-4 max-w-xl font-display text-[2rem] font-medium leading-none tracking-[-0.04em] sm:pr-14 sm:text-4xl ${dark ? "text-white" : "text-[#111827]"}`}>{title}</h3>
         <p className={`mt-4 max-w-lg text-sm font-semibold leading-6 sm:text-base ${dark ? "text-white/55" : "text-[#596475]"}`}>{body}</p>
       </div>
-      <div className={`${horizontal ? "mt-9 lg:mt-0" : "mt-9"}`}>{visual}</div>
+      <div className={`${horizontal ? "mt-7 lg:mt-0" : "mt-7 sm:mt-9"}`}>{visual}</div>
     </article>
   );
 }
@@ -525,7 +481,7 @@ function RoadmapVisual() {
 function InterviewPreviewVisual() {
   return (
     <div className="grid overflow-hidden rounded-[1.6rem] border border-white/10 bg-white shadow-[0_22px_60px_rgba(0,0,0,0.22)] sm:grid-cols-[0.85fr_1.15fr]">
-      <div className="relative min-h-56 overflow-hidden bg-[#101827]">
+      <div className="relative min-h-40 overflow-hidden bg-[#101827] sm:min-h-56">
         <img src="/anna.webp" alt="Anna, simulated visa officer" className="absolute inset-0 h-full w-full object-cover object-top opacity-90" />
         <div className="absolute inset-0 bg-gradient-to-t from-[#101827] via-transparent to-transparent" />
         <div className="absolute inset-x-0 bottom-0 p-4 text-white">
@@ -533,15 +489,15 @@ function InterviewPreviewVisual() {
           <p className="mt-3 text-sm font-extrabold">Anna · Simulated officer</p>
         </div>
       </div>
-      <div className="p-5 sm:p-6">
+      <div className="p-4 sm:p-6">
         <p className="font-utility text-[9px] font-semibold uppercase tracking-[0.16em] text-[#7b8492]">Question 04</p>
-        <p className="mt-3 text-base font-extrabold leading-6 text-[#101827]">“Why is this programme the right next step for your career?”</p>
-        <div className="mt-6 grid grid-cols-3 gap-2">
+        <p className="mt-3 text-sm font-extrabold leading-5 text-[#101827] sm:text-base sm:leading-6">“Why is this programme the right next step for your career?”</p>
+        <div className="mt-6 hidden grid-cols-3 gap-2 sm:grid">
           <InterviewMetric label="Clarity" value="8.8" />
           <InterviewMetric label="Evidence" value="7.4" />
           <InterviewMetric label="Confidence" value="8.1" />
         </div>
-        <div className="mt-5 flex items-center gap-2 text-xs font-bold text-[#1d4ed8]"><CheckCircle2 size={14} /> Strong answer. Add one specific career outcome.</div>
+        <div className="mt-4 flex items-start gap-2 text-[11px] font-bold leading-4 text-[#1d4ed8] sm:mt-5 sm:text-xs"><CheckCircle2 size={14} className="mt-0.5 shrink-0" /> Strong answer. Add one specific career outcome.</div>
       </div>
     </div>
   );
@@ -558,7 +514,7 @@ function InterviewMetric({ label, value }: { label: string; value: string }) {
 
 function VisaRoom() {
   return (
-    <div className="relative h-full min-h-[480px] overflow-hidden border-r border-white/10 bg-[#22233a]">
+    <div className="relative h-full min-h-[360px] overflow-hidden border-r border-white/10 bg-[#22233a] sm:min-h-[460px]">
       <div className="absolute inset-x-8 top-8 flex items-center justify-between text-white/55 sm:inset-x-10">
         <span className="font-utility text-[9px] font-semibold uppercase tracking-[0.18em]">Interview room</span>
         <span className="inline-flex items-center gap-2 text-[10px] font-bold"><span className="h-1.5 w-1.5 rounded-full bg-[#e45656]" /> Live simulation</span>
@@ -583,7 +539,7 @@ function VisaRoom() {
 
 function VisaFeature({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
-    <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.045] px-3 py-3 text-xs font-bold text-white/75">
+    <div className="flex min-h-20 flex-col items-start justify-between gap-2 rounded-xl border border-white/10 bg-white/[0.045] px-3 py-3 text-[11px] font-bold leading-tight text-white/75 sm:min-h-0 sm:flex-row sm:items-center sm:justify-start sm:rounded-full sm:text-xs">
       <span className="text-[#9db2ff]">{icon}</span>{text}
     </div>
   );

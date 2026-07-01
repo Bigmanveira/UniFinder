@@ -2377,9 +2377,21 @@ export const finishVisaInterviewSession = onCall(
     // refunded run so support can audit later.
     if (score.status === "failed") {
       const walletRef = db.collection("creditWallets").doc(uid);
-      const refundTxRef = db.collection("creditTransactions").doc();
+      const refundTxRef = db.collection("creditTransactions").doc(`visa-scoring-refund_${sessionId}`);
       await db.runTransaction(async (tx) => {
-        const wallet = await tx.get(walletRef);
+        const [freshSession, wallet, existingRefund] = await Promise.all([
+          tx.get(sessionRef),
+          tx.get(walletRef),
+          tx.get(refundTxRef),
+        ]);
+        const alreadyRefunded = freshSession.data()?.refundIssued === true || existingRefund.exists;
+        if (alreadyRefunded) {
+          if (freshSession.exists && freshSession.data()?.refundIssued !== true) {
+            tx.update(sessionRef, { status: "completed", endedAt: now, updatedAt: now, refundIssued: true });
+          }
+          return;
+        }
+
         const current = wallet.exists ? (wallet.data()?.credits ?? 0) : 0;
         tx.set(walletRef, { credits: current + VISA_INTERVIEW_CREDIT_COST, updatedAt: now }, { merge: true });
         tx.set(refundTxRef, {

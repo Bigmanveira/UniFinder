@@ -550,7 +550,6 @@ export async function scoreVisaInterview(args: {
       max_tokens: 1800,
       temperature: 0,
       output_config: {
-        effort: "low",
         format: {
           type: "json_schema",
           schema: SCORING_OUTPUT_SCHEMA,

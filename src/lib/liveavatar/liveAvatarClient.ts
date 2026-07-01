@@ -1,4 +1,6 @@
 // ─────────────────────────────────────────────────────────────────────────────
+import { reportClientError } from "../clientErrorReporter";
+
 // HeyGen LiveAvatar — frontend SDK wrapper.
 //
 // Uses @heygen/liveavatar-web-sdk (v0.0.18+). Loaded via dynamic import so
@@ -36,7 +38,15 @@ export interface LiveAvatarConnectArgs {
   onSpeakStarted?: () => void;
   /** Called when the avatar finishes a speech segment (ie. stops talking) */
   onSpeakEnded?: () => void;
+  /** Reports the SDK's combined LiveKit/WebRTC connection health. */
+  onConnectionQualityChanged?: (quality: LiveAvatarConnectionQuality) => void;
+  /** Fires when playback stalls long enough to risk dropping audio or video. */
+  onMediaInterrupted?: (reason: string) => void;
+  /** Fires after the same media element is playing normally again. */
+  onMediaRecovered?: () => void;
 }
+
+export type LiveAvatarConnectionQuality = "GOOD" | "BAD" | "UNKNOWN";
 
 export interface LiveAvatarHandle {
   ready: boolean;
@@ -46,6 +56,8 @@ export interface LiveAvatarHandle {
    * pass the result here. See functions/src/avatarTts.ts for why.
    */
   speakAudio: (audioBase64: string) => Promise<void>;
+  /** Ensure both remote tracks are actively playing before sending speech. */
+  ensurePlayback: () => Promise<void>;
   /**
    * Poke HeyGen's `/v1/sessions/keep-alive` so the server doesn't time out
    * the session when the user lingers on a doc-upload modal. Caller should
@@ -86,6 +98,100 @@ export async function connectLiveAvatar(args: LiveAvatarConnectArgs): Promise<Li
   }
 
   const session = new LiveAvatarSession(args.sessionToken);
+  let connected = false;
+  let disposed = false;
+  let streamReady = false;
+  let mediaInterrupted = false;
+  let connectionQuality: LiveAvatarConnectionQuality = "UNKNOWN";
+  let mediaIssueTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const clearMediaIssueTimer = () => {
+    if (!mediaIssueTimer) return;
+    clearTimeout(mediaIssueTimer);
+    mediaIssueTimer = null;
+  };
+
+  const reportMediaIssue = (reason: string, error?: unknown) => {
+    reportClientError(error ?? new Error(`Live avatar media interrupted: ${reason}`), {
+      source: "client.live_avatar.media_interrupted",
+      severity: "warning",
+      context: {
+        reason,
+        avatarId: args.avatarId,
+        connectionQuality,
+        readyState: args.videoEl.readyState,
+        networkState: args.videoEl.networkState,
+        paused: args.videoEl.paused,
+      },
+    });
+  };
+
+  const markMediaInterrupted = (reason: string) => {
+    if (disposed || !connected || mediaInterrupted) return;
+    mediaInterrupted = true;
+    args.videoEl.pause();
+    reportMediaIssue(reason);
+    try { args.onMediaInterrupted?.(reason); } catch (error) { console.warn("[liveAvatar] onMediaInterrupted threw:", error); }
+  };
+
+  const markMediaRecovered = () => {
+    if (!mediaInterrupted || disposed || connectionQuality === "BAD") return;
+    mediaInterrupted = false;
+    try { args.onMediaRecovered?.(); } catch (error) { console.warn("[liveAvatar] onMediaRecovered threw:", error); }
+  };
+
+  const resumeMediaPlayback = async () => {
+    if (disposed || !streamReady || connectionQuality === "BAD") return;
+    args.videoEl.muted = false;
+    args.videoEl.volume = 1;
+    try {
+      await args.videoEl.play();
+      markMediaRecovered();
+    } catch (error) {
+      reportMediaIssue("playback_blocked", error);
+      markMediaInterrupted("playback_blocked");
+      throw error;
+    }
+  };
+
+  const scheduleMediaInterruption = (reason: string) => {
+    if (disposed || !connected || mediaInterrupted) return;
+    clearMediaIssueTimer();
+    mediaIssueTimer = setTimeout(() => {
+      mediaIssueTimer = null;
+      if (args.videoEl.readyState >= 3 && !args.videoEl.paused) return;
+      markMediaInterrupted(reason);
+    }, 1_500);
+  };
+
+  const onMediaWaiting = () => scheduleMediaInterruption("media_waiting");
+  const onMediaStalled = () => scheduleMediaInterruption("media_stalled");
+  const onMediaPause = () => scheduleMediaInterruption("unexpected_pause");
+  const onMediaPlaying = () => {
+    clearMediaIssueTimer();
+    markMediaRecovered();
+  };
+  const onMediaCanPlay = () => {
+    clearMediaIssueTimer();
+    if (mediaInterrupted && connectionQuality !== "BAD") void resumeMediaPlayback();
+  };
+
+  args.videoEl.addEventListener("waiting", onMediaWaiting);
+  args.videoEl.addEventListener("stalled", onMediaStalled);
+  args.videoEl.addEventListener("pause", onMediaPause);
+  args.videoEl.addEventListener("playing", onMediaPlaying);
+  args.videoEl.addEventListener("canplay", onMediaCanPlay);
+
+  const cleanupMedia = () => {
+    clearMediaIssueTimer();
+    args.videoEl.removeEventListener("waiting", onMediaWaiting);
+    args.videoEl.removeEventListener("stalled", onMediaStalled);
+    args.videoEl.removeEventListener("pause", onMediaPause);
+    args.videoEl.removeEventListener("playing", onMediaPlaying);
+    args.videoEl.removeEventListener("canplay", onMediaCanPlay);
+    args.videoEl.pause();
+    args.videoEl.srcObject = null;
+  };
   // NOTE: do NOT call session.attach(videoEl) here. The SDK's attach() is a
   // no-op until the remote video/audio tracks are populated, which happens
   // mid-`start()`. We attach inside the SESSION_STREAM_READY handler below.
@@ -107,6 +213,12 @@ export async function connectLiveAvatar(args: LiveAvatarConnectArgs): Promise<Li
       // to fire after a closing line that never actually played.
       session.repeatAudio(audioBase64);
     },
+    ensurePlayback: async () => {
+      if (disposed || !connected) throw new Error("Avatar session is not connected.");
+      if (connectionQuality === "BAD") throw new Error("Avatar connection is unstable.");
+      await resumeMediaPlayback();
+      if (args.videoEl.paused) throw new Error("Avatar media playback is paused.");
+    },
     keepAlive: async () => {
       try { await session.keepAlive(); }
       catch (err: any) { console.warn("[liveAvatar] keepAlive failed:", err?.message); }
@@ -115,6 +227,10 @@ export async function connectLiveAvatar(args: LiveAvatarConnectArgs): Promise<Li
       try { session.interrupt?.(); } catch { /* ignore */ }
     },
     stop: async () => {
+      disposed = true;
+      connected = false;
+      handle.ready = false;
+      cleanupMedia();
       try { await session.stop(); } catch { /* ignore */ }
     },
   };
@@ -147,9 +263,10 @@ export async function connectLiveAvatar(args: LiveAvatarConnectArgs): Promise<Li
     const onStreamReady = () => {
       // Tracks are now populated — attach them to the <video> element.
       try { session.attach(args.videoEl); } catch (e) { console.warn("[liveAvatar] attach failed:", e); }
+      streamReady = true;
       // Browsers block autoplay unless triggered from a user gesture; we are
       // (the user just clicked Start), but call play() defensively.
-      void args.videoEl.play().catch(() => {});
+      void resumeMediaPlayback().catch(() => {});
     };
 
     const onStateChanged = (state: any) => {
@@ -157,7 +274,9 @@ export async function connectLiveAvatar(args: LiveAvatarConnectArgs): Promise<Li
       if (state !== SessionState.CONNECTED) return;
       settled = true;
       clearTimeout(timeout);
+      connected = true;
       handle.ready = true;
+      void resumeMediaPlayback().catch(() => {});
       // Hand the live handle to the caller BEFORE resolving the promise so
       // they can use it synchronously inside onLive.
       try { args.onLive?.(handle); } catch (e) { console.warn("[liveAvatar] onLive threw:", e); }
@@ -165,13 +284,30 @@ export async function connectLiveAvatar(args: LiveAvatarConnectArgs): Promise<Li
     };
 
     const onDisconnect = (reason?: any) => {
+      connected = false;
+      handle.ready = false;
+      disposed = true;
+      cleanupMedia();
       args.onDisconnect?.(String(reason ?? "stream_disconnected"));
+    };
+
+    const onConnectionQualityChanged = (quality: any) => {
+      const normalized: LiveAvatarConnectionQuality =
+        quality === "GOOD" || quality === "BAD" ? quality : "UNKNOWN";
+      connectionQuality = normalized;
+      try { args.onConnectionQualityChanged?.(normalized); } catch (error) { console.warn("[liveAvatar] quality callback threw:", error); }
+      if (normalized === "BAD") {
+        markMediaInterrupted("connection_quality_bad");
+      } else if (mediaInterrupted) {
+        void resumeMediaPlayback().catch(() => {});
+      }
     };
 
     try {
       session.on(SessionEvent.SESSION_STREAM_READY,  onStreamReady);
       session.on(SessionEvent.SESSION_STATE_CHANGED, onStateChanged);
       session.on(SessionEvent.SESSION_DISCONNECTED,  onDisconnect);
+      session.on(SessionEvent.SESSION_CONNECTION_QUALITY_CHANGED, onConnectionQualityChanged);
     } catch (e) {
       console.warn("[liveAvatar] event subscription failed:", e);
     }

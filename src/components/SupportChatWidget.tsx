@@ -204,6 +204,9 @@ export default function SupportChatWidget() {
   const [messages, setMessages] = useState<ChatMessage[]>(readStoredMessages);
   const [sending, setSending] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [landingLauncherReady, setLandingLauncherReady] = useState(() =>
+    location.pathname !== "/" || (typeof window !== "undefined" && window.scrollY > 520),
+  );
   const endRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const nudgeSoundPlayedRef = useRef(false);
@@ -219,6 +222,23 @@ export default function SupportChatWidget() {
       ? latestAssistant.suggestedQuestions
       : templateQuestions;
   }, [messages, templateQuestions]);
+
+  const launcherAvailable = location.pathname !== "/" || landingLauncherReady;
+
+  useEffect(() => {
+    if (location.pathname !== "/") {
+      setLandingLauncherReady(true);
+      return;
+    }
+
+    const updateLauncherVisibility = () => {
+      const threshold = Math.min(window.innerHeight * 0.7, 560);
+      setLandingLauncherReady(window.scrollY > threshold);
+    };
+    updateLauncherVisibility();
+    window.addEventListener("scroll", updateLauncherVisibility, { passive: true });
+    return () => window.removeEventListener("scroll", updateLauncherVisibility);
+  }, [location.pathname]);
 
   useEffect(() => {
     try {
@@ -238,13 +258,13 @@ export default function SupportChatWidget() {
   }, [open]);
 
   useEffect(() => {
-    if (open || messages.length > 0 || unreadCount > 0) return;
+    if (!launcherAvailable || open || messages.length > 0 || unreadCount > 0) return;
     const timer = window.setTimeout(() => setUnreadCount(1), 2200);
     return () => window.clearTimeout(timer);
-  }, [messages.length, open, unreadCount]);
+  }, [launcherAvailable, messages.length, open, unreadCount]);
 
   useEffect(() => {
-    if (open || unreadCount === 0 || nudgeSoundPlayedRef.current) return;
+    if (!launcherAvailable || open || unreadCount === 0 || nudgeSoundPlayedRef.current) return;
 
     const playSound = () => {
       if (nudgeSoundPlayedRef.current) return;
@@ -263,7 +283,7 @@ export default function SupportChatWidget() {
       window.removeEventListener("pointerdown", playSound);
       window.removeEventListener("keydown", playSound);
     };
-  }, [open, unreadCount]);
+  }, [launcherAvailable, open, unreadCount]);
 
   const clearConversation = () => {
     setMessages([]);
@@ -324,6 +344,8 @@ export default function SupportChatWidget() {
       setSending(false);
     }
   };
+
+  if (!launcherAvailable && !open) return null;
 
   return (
     <div className="fixed bottom-4 right-4 z-[90] font-sans sm:bottom-6 sm:right-6">
