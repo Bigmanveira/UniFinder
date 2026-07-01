@@ -21,7 +21,7 @@ export default function CvStudioReviewPage() {
             </Link>
             <div className="flex-1 min-w-0">
               <h1 className="text-[15px] font-bold leading-tight truncate">Review & revamp</h1>
-              <p className="text-xs text-slate-500 truncate">Critique + rewrite your existing academic CV · 5 credits to unlock</p>
+              <p className="text-xs text-slate-500 truncate">Critique + rewrite your existing academic CV · 5,000 tokens to unlock</p>
             </div>
           </div>
         </header>
@@ -51,7 +51,7 @@ export default function CvStudioReviewPage() {
             <CvDocumentIntake
               busy={cv.generating}
               submitLabel="Review my CV (free preview)"
-              helpText="The first ~30% of your revamped CV is free to preview. Unlock the rest for 5 credits."
+              helpText="The first ~30% of your revamped CV is free to preview. Unlock the rest for 5,000 tokens."
               onSubmit={(payload) => void cv.generate(payload)}
             />
           </section>
@@ -72,7 +72,7 @@ export default function CvStudioReviewPage() {
               </h2>
               <div className="flex items-center justify-between gap-3 mb-5">
                 <p className="text-sm text-slate-600 leading-relaxed">
-                  Critique + rewritten document below. Preview free; unlock for 5 credits.
+                  Critique + rewritten document below. Preview free; unlock for 5,000 tokens.
                 </p>
                 <button
                   onClick={cv.reset}

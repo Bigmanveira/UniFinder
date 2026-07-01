@@ -18,6 +18,7 @@ import { FadeIn, FadeInItem } from "../components/FadeIn";
 import FeedbackSurveyModal from "../components/FeedbackSurveyModal";
 import { useShouldShowSurvey } from "../hooks/useShouldShowSurvey";
 import { isFounderEmail } from "../lib/founders";
+import { formatTokens } from "../lib/tokens";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SchoolLogo — small circular logo badge with graceful Clearbit → favicon
@@ -1011,7 +1012,7 @@ function LockedBucketCard({
                 {busy ? "Revealing…" : `Reveal ${meta.title} — free for you`}
               </button>
               <p className="text-[11px] text-slate-500 mt-2.5">
-                Founder account — credits aren't charged.
+                Founder account — tokens aren't charged.
               </p>
             </>
           ) : canAfford ? (
@@ -1022,10 +1023,10 @@ function LockedBucketCard({
                 className={`inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-2xl text-sm font-bold transition-colors text-white shadow-md ${theme.cta} ${theme.ctaRing} disabled:opacity-60 disabled:cursor-not-allowed`}
               >
                 {busy ? <Loader2 size={14} className="animate-spin" /> : <Lock size={14} />}
-                {busy ? "Revealing…" : `Reveal ${meta.title} — ${REVEAL_BUCKET_COST} credits`}
+                {busy ? "Revealing…" : `Reveal ${meta.title} — ${formatTokens(REVEAL_BUCKET_COST)} tokens`}
               </button>
               <p className="text-[11px] text-slate-500 mt-2.5">
-                You have {walletCredits} credit{walletCredits === 1 ? "" : "s"} · this leaves {(walletCredits ?? 0) - REVEAL_BUCKET_COST} after.
+                You have {formatTokens(walletCredits)} tokens · this leaves {formatTokens((walletCredits ?? 0) - REVEAL_BUCKET_COST)} after.
               </p>
             </>
           ) : (
@@ -1034,10 +1035,10 @@ function LockedBucketCard({
                 to="/pricing"
                 className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-2xl text-sm font-bold transition-colors bg-slate-900 hover:bg-slate-800 text-white shadow-md"
               >
-                Get credits to reveal <ArrowRight size={14} />
+                Get tokens to reveal <ArrowRight size={14} />
               </Link>
               <p className="text-[11px] text-slate-500 mt-2.5">
-                Revealing this category costs {REVEAL_BUCKET_COST} credits. You have {walletCredits ?? 0}.
+                Revealing this category costs {formatTokens(REVEAL_BUCKET_COST)} tokens. You have {formatTokens(walletCredits ?? 0)}.
               </p>
             </>
           )}

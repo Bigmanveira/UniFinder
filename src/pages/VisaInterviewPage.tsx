@@ -180,7 +180,7 @@ export default function VisaInterviewPage() {
         console.error("[visa] message snapshot error:", err.code, err.message);
         setError(`Could not load interview messages: ${err.message}`);
         setStage("failed");
-        setFatalReason("Lost connection to the interview backend. The avatar has been stopped — your interview credit will need to be refunded manually for now.");
+        setFatalReason("Lost connection to the interview backend. The avatar has been stopped — your interview tokens will need to be refunded manually for now.");
       },
     );
     return unsub;
@@ -267,7 +267,7 @@ export default function VisaInterviewPage() {
         // understand it's a cooldown, not a system failure.
         setPreviewCooldownOpen(true);
       } else if (e?.code === "resource-exhausted" || /Insufficient credits/i.test(e?.message ?? "")) {
-        setError("Not enough credits to start a practice interview. Top up your wallet to try again.");
+        setError("Not enough tokens to start a practice interview. Top up your wallet to try again.");
       } else {
         setError(e?.message ?? "Could not start the interview. Please try again.");
       }
@@ -581,8 +581,8 @@ export default function VisaInterviewPage() {
           <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-700 text-sm font-medium rounded-xl px-3 py-2.5 flex items-start gap-2">
             <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
             <span className="flex-1">{error}</span>
-            {error.includes("credits") && (
-              <Link to="/app" className="text-xs font-bold underline hover:no-underline flex-shrink-0">Get credits</Link>
+            {error.includes("tokens") && (
+              <Link to="/app" className="text-xs font-bold underline hover:no-underline flex-shrink-0">Get tokens</Link>
             )}
           </div>
         )}
@@ -790,8 +790,8 @@ function FullScreenInterview({
           <div className="pointer-events-auto max-w-md w-full bg-rose-500/15 backdrop-blur-md border border-rose-400/40 rounded-2xl px-4 py-3 text-sm text-rose-100 flex items-start gap-2.5 shadow-lg shadow-rose-900/30">
             <AlertTriangle size={14} className="mt-0.5 flex-shrink-0 text-rose-300" />
             <span className="flex-1 leading-relaxed">{error}</span>
-            {error.includes("credits") && (
-              <Link to="/app" className="text-xs font-bold underline text-rose-200 hover:text-white flex-shrink-0">Get credits</Link>
+            {error.includes("tokens") && (
+              <Link to="/app" className="text-xs font-bold underline text-rose-200 hover:text-white flex-shrink-0">Get tokens</Link>
             )}
           </div>
         )}
@@ -819,7 +819,7 @@ function FullScreenInterview({
         {stage === "failed" && (
           <div className="pointer-events-auto max-w-md w-full bg-rose-500/15 backdrop-blur-md border border-rose-400/40 rounded-2xl px-5 py-4 text-sm text-rose-50 shadow-xl shadow-rose-900/30">
             <p className="font-bold mb-1.5">Interview cannot continue.</p>
-            <p className="leading-relaxed text-rose-100/90">{fatalReason ?? "The avatar service is unavailable. Try again in a few minutes; your credit will be refunded if no answers were recorded."}</p>
+            <p className="leading-relaxed text-rose-100/90">{fatalReason ?? "The avatar service is unavailable. Try again in a few minutes; your tokens will be refunded if no answers were recorded."}</p>
           </div>
         )}
 
@@ -946,13 +946,13 @@ function PreviewEndModal({ open, onClose }: { open: boolean; onClose: () => void
         </div>
         <h2 className="text-lg font-black text-slate-900 mb-2">Your preview is up</h2>
         <p className="text-sm text-slate-600 leading-relaxed mb-5">
-          You just experienced a live AI consular interview. Top up 15 credits to run a full 5-minute mock — Anna will probe deeper and you'll get your scored feedback across nine dimensions.
+          You just experienced a live AI consular interview. Top up 15,000 tokens to run a full 5-minute mock — Anna will probe deeper and you'll get your scored feedback across nine dimensions.
         </p>
         <Link
           to="/pricing"
           className="w-full inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-2xl text-sm transition-colors mb-2"
         >
-          Top up to continue · 15 credits
+          Top up to continue · 15,000 tokens
         </Link>
         <button
           onClick={onClose}
@@ -987,13 +987,13 @@ function PreviewCooldownModal({ open, onClose }: { open: boolean; onClose: () =>
         </div>
         <h2 className="text-lg font-black text-slate-900 mb-2">Preview already used</h2>
         <p className="text-sm text-slate-600 leading-relaxed mb-5">
-          You've already run your free preview in the last 7 days. Top up 15 credits to start a full 5-minute mock interview with scored feedback.
+          You've already run your free preview in the last 7 days. Top up 15,000 tokens to start a full 5-minute mock interview with scored feedback.
         </p>
         <Link
           to="/pricing"
           className="w-full inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-2xl text-sm transition-colors mb-2"
         >
-          Top up · 15 credits
+          Top up · 15,000 tokens
         </Link>
         <button
           onClick={onClose}
@@ -1025,7 +1025,7 @@ function AtCapacityModal({ open, onClose }: { open: boolean; onClose: () => void
           All our practice rooms are in use at the moment. Kindly check back shortly.
         </p>
         <p className="text-xs text-emerald-700 font-bold mb-5">
-          You haven't been charged — your credits are safe.
+          You haven't been charged — your tokens are safe.
         </p>
         <button
           onClick={onClose}

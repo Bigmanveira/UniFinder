@@ -203,7 +203,7 @@ export default function InterviewIntroCard({
       {willBePreview && (
         <div className="rounded-2xl border border-[#c8d2f8] bg-[#f4f6ff] px-4 py-3.5 text-[13px] leading-relaxed text-[#273a77]">
           <p className="font-bold">Free 3-minute preview</p>
-          <p className="mt-0.5 text-[#4b5d96]">The full scored report unlocks with a 15-credit interview.</p>
+          <p className="mt-0.5 text-[#4b5d96]">The full scored report unlocks with a 15,000-token interview.</p>
         </div>
       )}
 
@@ -244,7 +244,7 @@ export default function InterviewIntroCard({
         ) : willBePreview ? (
           <>Start free preview <ArrowRight size={17} /></>
         ) : (
-          <>Start interview · 15 credits <ArrowRight size={17} /></>
+          <>Start interview · 15,000 tokens <ArrowRight size={17} /></>
         )}
       </button>
     </motion.div>

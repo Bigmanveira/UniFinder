@@ -14,6 +14,7 @@ import {
   Loader2, ChevronRight, Inbox,
 } from "lucide-react";
 import CvStudioFooter from "../components/cv/CvStudioFooter";
+import { formatTokens } from "../lib/tokens";
 
 interface HistoryRow {
   id:         string;
@@ -104,7 +105,7 @@ export default function CvStudioHistoryPage() {
             Your CV history
           </h2>
           <p className="text-base sm:text-[17px] text-slate-600 leading-relaxed max-w-2xl mx-auto">
-            Open any past document. Unlocked ones are ready to download; previews can be unlocked anytime if you still have the credits.
+            Open any past document. Unlocked ones are ready to download; previews can be unlocked anytime if you still have the tokens.
           </p>
         </section>
       </div>
@@ -169,7 +170,7 @@ export default function CvStudioHistoryPage() {
                           )}
                         </div>
                         <p className="text-xs text-slate-500 truncate">
-                          {fmtDate(row.createdAt)}{row.unlocked ? "" : ` Â· ${row.creditCost} credits to unlock`}
+                          {fmtDate(row.createdAt)}{row.unlocked ? "" : ` Â· ${formatTokens(row.creditCost)} tokens to unlock`}
                         </p>
                       </div>
                       <ChevronRight size={16} className="text-slate-400 group-hover:text-slate-700 transition-colors flex-shrink-0" />

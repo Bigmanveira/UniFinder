@@ -10,6 +10,9 @@
 // both emails — by design. They're different stages of the funnel:
 //   waitlist → "you're on the list"
 //   signup   → "you're in — here's how to start"
+//
+// Note: wallet grants are stored internally as CREDITS; the copy below shows
+// the user-facing TOKEN figures (1 credit = 1,000 tokens). See tokens.ts.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Resend } from "resend";
@@ -45,21 +48,21 @@ const htmlBody = (opts: { displayName?: string | null }) => `
             <tr>
               <td style="padding:28px 32px 8px 32px;font-size:15px;line-height:1.6;color:#1e293b;">
                 <p style="margin:0 0 14px 0;">${greeting(opts.displayName)}</p>
-                <p style="margin:0 0 14px 0;">Thanks for signing up. We've dropped <strong>2 free credits</strong> into your wallet so you can try the app before paying for anything.</p>
+                <p style="margin:0 0 14px 0;">Thanks for signing up. We've dropped <strong>2,000 free tokens</strong> into your wallet so you can try the app before paying for anything.</p>
 
-                <p style="margin:0 0 8px 0;"><strong>What credits unlock:</strong></p>
+                <p style="margin:0 0 8px 0;"><strong>What tokens unlock:</strong></p>
                 <ul style="margin:0 0 18px 0;padding-left:20px;font-size:14px;color:#475569;">
-                  <li style="margin-bottom:6px;"><strong style="color:#0f172a;">1 credit</strong> — unlock an AI-matched school report tailored to your profile</li>
-                  <li style="margin-bottom:6px;"><strong style="color:#0f172a;">15 credits</strong> — full F-1 visa interview practice with a live AI consular officer (with scored feedback)</li>
+                  <li style="margin-bottom:6px;"><strong style="color:#0f172a;">1,000 tokens</strong> — unlock an AI-matched school report tailored to your profile</li>
+                  <li style="margin-bottom:6px;"><strong style="color:#0f172a;">15,000 tokens</strong> — full F-1 visa interview practice with a live AI consular officer (with scored feedback)</li>
                 </ul>
 
-                <p style="margin:0 0 14px 0;">Your 2 free credits cover two match-report unlocks — enough to get a real feel for which U.S. schools are realistic for you before you spend anything.</p>
+                <p style="margin:0 0 14px 0;">Your 2,000 free tokens cover two match-report unlocks — enough to get a real feel for which U.S. schools are realistic for you before you spend anything.</p>
 
                 <p style="margin:0 0 18px 0;">
                   <a href="https://collegeready.io/app" style="display:inline-block;background:#1e3a8a;color:#fff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:12px;font-size:14px;">Open the dashboard →</a>
                 </p>
 
-                <p style="margin:0 0 6px 0;color:#475569;font-size:14px;"><strong style="color:#0f172a;">Want more credits without paying?</strong> Share your referral link from the dashboard — you earn 5 free credits for every friend who signs up.</p>
+                <p style="margin:0 0 6px 0;color:#475569;font-size:14px;"><strong style="color:#0f172a;">Want more tokens without paying?</strong> Share your referral link from the dashboard — you earn 5,000 free tokens for every friend who signs up.</p>
 
                 <p style="margin:18px 0 0 0;color:#64748b;font-size:13px;">Welcome aboard,<br/>The College Ready team</p>
               </td>
@@ -85,17 +88,17 @@ const textBody = (opts: { displayName?: string | null }) =>
     ``,
     greeting(opts.displayName) + ",",
     ``,
-    `Thanks for signing up. We've dropped 2 free credits into your wallet so you can try the app before paying for anything.`,
+    `Thanks for signing up. We've dropped 2,000 free tokens into your wallet so you can try the app before paying for anything.`,
     ``,
-    `What credits unlock:`,
-    `  • 1 credit  — unlock an AI-matched school report tailored to your profile`,
-    `  • 15 credits — full F-1 visa interview practice with a live AI consular officer`,
+    `What tokens unlock:`,
+    `  • 1,000 tokens  — unlock an AI-matched school report tailored to your profile`,
+    `  • 15,000 tokens — full F-1 visa interview practice with a live AI consular officer`,
     ``,
-    `Your 2 free credits cover two match-report unlocks — enough to get a real feel for which U.S. schools are realistic for you before you spend anything.`,
+    `Your 2,000 free tokens cover two match-report unlocks — enough to get a real feel for which U.S. schools are realistic for you before you spend anything.`,
     ``,
     `Dashboard: https://collegeready.io/app`,
     ``,
-    `Want more credits without paying? Share your referral link from the dashboard — you earn 5 free credits for every friend who signs up.`,
+    `Want more tokens without paying? Share your referral link from the dashboard — you earn 5,000 free tokens for every friend who signs up.`,
     ``,
     `Welcome aboard,`,
     `The College Ready team`,

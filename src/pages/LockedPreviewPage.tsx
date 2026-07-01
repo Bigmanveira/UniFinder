@@ -484,12 +484,12 @@ function UnlockDock({
               {unlockError && <UnlockErrorBanner kind={unlockError} />}
               <button onClick={onUnlock}
                 className="flex items-center justify-center gap-2 w-full bg-slate-900 hover:bg-slate-800 text-white text-base font-semibold py-4 rounded-2xl transition-all active:scale-[0.99]">
-                {user ? <>Unlock report Â· 1 credit <Send size={15} /></>
+                {user ? <>Unlock report Â· 1,000 tokens <Send size={15} /></>
                       : <>Create free account <ArrowRight size={15} /></>}
               </button>
               {!user && (
                 <p className="mt-3 text-center text-[11px] text-slate-500">
-                  Includes 2 free credits Â· Save schools Â· No card required
+                  Includes 2,000 free tokens Â· Save schools Â· No card required
                 </p>
               )}
             </div>
@@ -588,14 +588,14 @@ function UnlockErrorBanner({ kind }: { kind: string }) {
   if (kind === "insufficient_credits")
     return (
       <div className="mb-3 bg-rose-50 border border-rose-200 px-3.5 py-2.5 rounded-xl text-xs font-medium text-rose-700 flex items-center justify-between">
-        <span>Not enough credits.</span>
+        <span>Not enough tokens.</span>
         <Link to="/app/credits" className="underline hover:no-underline font-semibold inline-flex items-center gap-1">Get more <ChevronRight size={11} /></Link>
       </div>
     );
   if (kind === "no_eligible_programs")
     return (
       <div className="mb-3 bg-amber-50 border border-amber-200 px-3.5 py-2.5 rounded-xl text-xs font-medium text-amber-800">
-        No verified programs for this field/level yet — no credit deducted.
+        No verified programs for this field/level yet — no tokens deducted.
       </div>
     );
   return (

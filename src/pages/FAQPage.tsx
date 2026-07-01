@@ -10,16 +10,16 @@ const FAQS = [
     answer: "Our deterministic matching engine compares your specific academic profile (GPA, test scores, field of study) and funding requirements against our growing database of U.S. colleges. It provides a profile-based match estimate to guide your search."
   },
   {
-    question: "What are Credits and how do I use them?",
-    answer: "College Ready uses a simple pay-as-you-go credit system. 1 credit unlocks a full personalised match report — your Reach schools are visible right away. 5 credits reveal a Target or Safety category inside that report if you want the wider list (optional — Reach alone is enough for most users). 15 credits unlock a live F-1 visa interview practice session. You get 2 free credits just for signing up."
+    question: "What are Tokens and how do I use them?",
+    answer: "College Ready uses a simple pay-as-you-go token system. 1,000 tokens unlock a full personalised match report — your Reach schools are visible right away. 5,000 tokens reveal a Target or Safety category inside that report if you want the wider list (optional — Reach alone is enough for most users). 15,000 tokens unlock a live F-1 visa interview practice session. You get 2,000 free tokens just for signing up."
   },
   {
     question: "Does College Ready guarantee my admission?",
     answer: "No platform can guarantee college admission, as admissions committees consider subjective factors like essays and interviews. However, College Ready dramatically improves your odds by strictly filtering out programs where you do not meet the minimum objective thresholds, saving you thousands of dollars in wasted application fees."
   },
   {
-    question: "Do credits expire?",
-    answer: "Never! Once you purchase credits, they remain in your wallet indefinitely. You can use them for this application cycle, or save them if you decide to apply to graduate school a few years down the line."
+    question: "Do tokens expire?",
+    answer: "Never! Once you purchase tokens, they remain in your wallet indefinitely. You can use them for this application cycle, or save them if you decide to apply to graduate school a few years down the line."
   },
   {
     question: "Is my personal data secure?",

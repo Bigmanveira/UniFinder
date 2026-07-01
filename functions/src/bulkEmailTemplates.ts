@@ -65,7 +65,7 @@ export const BULK_EMAIL_TEMPLATES: BulkEmailTemplate[] = [
       "",
       "We noticed it's been a while since you stopped by. The application season moves fast, and we know it's a lot.",
       "",
-      "Your matches are still here, your credits are still on your account, and we've shipped a few improvements since you last logged in.",
+      "Your matches are still here, your tokens are still on your account, and we've shipped a few improvements since you last logged in.",
       "",
       "Whenever you're ready, we'll pick up exactly where you left off.",
       "",
@@ -77,13 +77,13 @@ export const BULK_EMAIL_TEMPLATES: BulkEmailTemplate[] = [
   {
     id:          "promo",
     label:       "Promo / Offer",
-    description: "Time-limited discount or credit-pack promotion.",
+    description: "Time-limited discount or token-pack promotion.",
     subject:     "A little something to help you finish strong",
     headline:    "Limited-time offer inside.",
     body: [
       "Hey,",
       "",
-      "[Describe the offer — e.g., 20% off any credit pack through Sunday, or a bonus 5 credits on the Plus pack.]",
+      "[Describe the offer — e.g., 20% off any token pack through Sunday, or a bonus 5,000 tokens on the Plus pack.]",
       "",
       "Use code [CODE] at checkout. Offer ends [date].",
       "",
@@ -91,7 +91,7 @@ export const BULK_EMAIL_TEMPLATES: BulkEmailTemplate[] = [
       "",
       "— The College Ready team",
     ].join("\n"),
-    ctaText:     "Browse credit packs",
+    ctaText:     "Browse token packs",
     ctaUrl:      "https://collegeready.io/pricing",
   },
   {

@@ -28,6 +28,7 @@ import {
   GraduationCap, Briefcase, Award, Wrench, Users, ScrollText, FileText,
 } from "lucide-react";
 import CvMarkdown from "./CvMarkdown";
+import { formatTokens } from "../../lib/tokens";
 
 interface UnlockResult {
   fullMarkdown:    string;
@@ -114,7 +115,7 @@ export default function CvPreviewPaywall({
       onUnlocked(res.data.fullMarkdown, res.data.newBalance ?? null);
     } catch (err: any) {
       if (err?.details?.reason === "insufficient_credits") {
-        setError("Not enough credits. Top up your wallet, then come back.");
+        setError("Not enough tokens. Top up your wallet, then come back.");
       } else {
         setError(err?.message ?? "Could not unlock. Please try again.");
       }
@@ -260,7 +261,7 @@ export default function CvPreviewPaywall({
                   {busy ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
                   {busy ? "Unlocking…" : "Unlock — free for you"}
                 </button>
-                <p className="text-[11px] text-slate-500 text-center lg:text-right">Founder account — no credits charged.</p>
+                <p className="text-[11px] text-slate-500 text-center lg:text-right">Founder account — no tokens charged.</p>
               </>
             ) : canAfford ? (
               <>
@@ -270,10 +271,10 @@ export default function CvPreviewPaywall({
                   className={`inline-flex items-center justify-center gap-2 px-7 py-4 rounded-2xl text-sm font-bold text-white shadow-lg ${theme.ctaBg} ${theme.ctaShadow} transition-colors disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap`}
                 >
                   {busy ? <Loader2 size={16} className="animate-spin" /> : <Lock size={16} />}
-                  {busy ? "Unlocking…" : `Unlock — ${creditCost} credits`}
+                  {busy ? "Unlocking…" : `Unlock — ${formatTokens(creditCost)} tokens`}
                 </button>
                 <p className="text-[11px] text-slate-500 text-center lg:text-right">
-                  You have {walletCredits} Â· {(walletCredits ?? 0) - creditCost} left after
+                  You have {formatTokens(walletCredits)} Â· {formatTokens((walletCredits ?? 0) - creditCost)} left after
                 </p>
               </>
             ) : (
@@ -282,10 +283,10 @@ export default function CvPreviewPaywall({
                   to="/pricing"
                   className="inline-flex items-center justify-center gap-2 px-7 py-4 rounded-2xl text-sm font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-lg shadow-slate-900/20 transition-colors whitespace-nowrap"
                 >
-                  Get credits to unlock <ArrowRight size={16} />
+                  Get tokens to unlock <ArrowRight size={16} />
                 </Link>
                 <p className="text-[11px] text-slate-500 text-center lg:text-right">
-                  {creditCost} credits needed Â· you have {walletCredits ?? 0}
+                  {formatTokens(creditCost)} tokens needed Â· you have {formatTokens(walletCredits ?? 0)}
                 </p>
               </>
             )}

@@ -7,6 +7,7 @@ import {
   Loader2, Check, AlertTriangle, ShieldCheck, Lock,
 } from "lucide-react";
 import BrandLogo from "../components/BrandLogo";
+import { formatTokens } from "../lib/tokens";
 
 type CreditPack = {
   id: string;
@@ -37,7 +38,7 @@ const currencyGlyph = (code: string): string => {
 // the copy for the marketing surface without redeploying the catalogue
 // function. Order matches the CREDIT_PACKS order on the backend.
 const PACK_FEATURES: Record<string, string[]> = {
-  try:     ["6 match-report unlocks", "Personalised application roadmap", "Credits never expire"],
+  try:     ["6 match-report unlocks", "Personalised application roadmap", "Tokens never expire"],
   starter: ["15 match-report unlocks", "1 visa interview practice", "Personalised application roadmap"],
   plus:    ["45 match-report unlocks", "3 visa interview practice sessions", "Priority email support"],
   pro:     ["120 match-report unlocks", "8 visa interview practice sessions", "Priority email support"],
@@ -170,8 +171,8 @@ export default function PricingPage() {
           Pay per match. No subscriptions.
         </h1>
         <p className="text-base md:text-lg text-slate-500 font-medium max-w-2xl mx-auto leading-relaxed">
-          Credits unlock match reports and F-1 visa interview practice. Buy what you need, when you need it.
-          Credits never expire.
+          Tokens unlock match reports and F-1 visa interview practice. Buy what you need, when you need it.
+          Tokens never expire.
         </p>
       </section>
 
@@ -185,7 +186,7 @@ export default function PricingPage() {
             <div className="flex-1">
               <p className="font-bold text-emerald-900 text-sm mb-0.5">Payment received</p>
               <p className="text-xs text-emerald-800 leading-relaxed">
-                Credits usually post within a few seconds. If your balance hasn't updated in two minutes, contact{" "}
+                Tokens usually post within a few seconds. If your balance hasn't updated in two minutes, contact{" "}
                 <a className="underline" href="mailto:support@collegeready.io">support@collegeready.io</a> with your confirmation.
               </p>
             </div>
@@ -193,7 +194,7 @@ export default function PricingPage() {
         )}
         {returnStatus === "cancelled" && (
           <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-900">
-            Payment was cancelled — no credits charged.
+            Payment was cancelled — no tokens charged.
           </div>
         )}
         {error && (
@@ -255,7 +256,7 @@ export default function PricingPage() {
                     <p className={`text-xs font-bold mt-2 ${
                       pack.recommended ? "text-slate-300" : "text-slate-700"
                     }`}>
-                      {pack.credits} credits · ${perCreditUsd}/credit
+                      {formatTokens(pack.credits)} tokens · ${perCreditUsd} per 1,000 tokens
                     </p>
                     <p className={`text-[11px] font-medium mt-1 ${
                       pack.recommended ? "text-slate-400" : "text-slate-400"
@@ -304,20 +305,20 @@ export default function PricingPage() {
           inside the report. */}
       <section className="max-w-6xl mx-auto px-6 pb-12">
         <div className="rounded-3xl border border-slate-200 bg-slate-50/60 p-6 sm:p-8">
-          <p className="text-[11px] font-black tracking-[0.2em] uppercase text-slate-500 mb-4">How credits are spent</p>
+          <p className="text-[11px] font-black tracking-[0.2em] uppercase text-slate-500 mb-4">How tokens are spent</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <CreditSpend
-              cost="1 credit"
+              cost="1,000 tokens"
               title="Unlock a match report"
               body="Generates your full AI shortlist + roadmap. Reach schools are visible right away."
             />
             <CreditSpend
-              cost="5 credits"
+              cost="5,000 tokens"
               title="Reveal a category"
               body="Unlocks Target or Safety schools inside an existing report. Optional — only if you want the wider list."
             />
             <CreditSpend
-              cost="15 credits"
+              cost="15,000 tokens"
               title="F-1 visa interview"
               body="One live AI mock interview with feedback. Practice until you're confident."
             />
@@ -342,7 +343,7 @@ export default function PricingPage() {
           <TrustCell
             icon={<Check size={18} />}
             heading="No subscriptions"
-            body="One-time payment per pack. Credits never expire and there's nothing to cancel."
+            body="One-time payment per pack. Tokens never expire and there's nothing to cancel."
           />
         </div>
         <p className="text-xs text-slate-400 mt-6 text-center leading-relaxed">

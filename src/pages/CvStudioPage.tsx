@@ -21,7 +21,7 @@ import {
 import CvStudioFooter from "../components/cv/CvStudioFooter";
 
 const TRUST = [
-  { icon: <Eye size={16} />,        title: "Preview free",          body: "See the first portion of every generated CV before you spend a credit." },
+  { icon: <Eye size={16} />,        title: "Preview free",          body: "See the first portion of every generated CV before you spend a token." },
   { icon: <ShieldCheck size={16} />, title: "Passes AI detection",   body: "Tuned to write in a real researcher's voice — terse, factual, varied. Not the patterns detectors flag." },
   { icon: <Lock size={16} />,        title: "Yours forever",         body: "Once unlocked, your CV is downloadable as Markdown and saved in your history." },
 ];
@@ -83,7 +83,7 @@ export default function CvStudioPage() {
             to="/app/cv-studio/review"
             icon={<RefreshCw size={22} />}
             iconBg="from-blue-500 to-blue-700"
-            chip={{ text: "5 credits", color: "bg-blue-50 text-blue-700 border-blue-200" }}
+            chip={{ text: "5,000 tokens", color: "bg-blue-50 text-blue-700 border-blue-200" }}
             title="Review & revamp"
             blurb="Drop in your current academic CV. We point at what's weak, then rewrite it sharper."
             sample={[
@@ -97,7 +97,7 @@ export default function CvStudioPage() {
             to="/app/cv-studio/build"
             icon={<Wrench size={20} />}
             iconBg="from-violet-500 to-fuchsia-600"
-            chip={{ text: "8 credits", color: "bg-violet-50 text-violet-700 border-violet-200" }}
+            chip={{ text: "8,000 tokens", color: "bg-violet-50 text-violet-700 border-violet-200" }}
             title="Build from scratch"
             blurb="A guided intake produces a polished CV in the standard template."
           />
@@ -106,7 +106,7 @@ export default function CvStudioPage() {
             to="/app/cv-studio/convert"
             icon={<FileText size={20} />}
             iconBg="from-emerald-500 to-teal-600"
-            chip={{ text: "8 credits", color: "bg-emerald-50 text-emerald-700 border-emerald-200" }}
+            chip={{ text: "8,000 tokens", color: "bg-emerald-50 text-emerald-700 border-emerald-200" }}
             title="Pro → Academic"
             blurb="Industry CV in, academic format out — research up front, jargon out."
           />
@@ -145,7 +145,7 @@ export default function CvStudioPage() {
               <Step n="1" title="Submit"     body="Drag-drop a PDF or .docx, paste text, or fill the guided form." />
               <Step n="2" title="Generate"   body="The AI writes the full document in seconds." />
               <Step n="3" title="Preview"    body="Read the first portion. Decide if you want the rest." />
-              <Step n="4" title="Unlock"     body="Spend credits to read + download the complete CV." />
+              <Step n="4" title="Unlock"     body="Spend tokens to read + download the complete CV." />
             </div>
           </div>
         </section>

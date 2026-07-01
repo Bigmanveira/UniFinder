@@ -41,9 +41,9 @@ const htmlBody = () => `
               <td style="padding:28px 32px 8px 32px;font-size:15px;line-height:1.6;color:#1e293b;">
                 <p style="margin:0 0 14px 0;">Hey 👋</p>
                 <p style="margin:0 0 14px 0;">Thanks for joining the College Ready waitlist. Today's the day — the platform is now open to you.</p>
-                <p style="margin:0 0 14px 0;">Create your account and you'll get <strong>2 free credits</strong> right away, enough to unlock two full AI-matched school reports before you ever pay a cent.</p>
+                <p style="margin:0 0 14px 0;">Create your account and you'll get <strong>2,000 free tokens</strong> right away, enough to unlock two full AI-matched school reports before you ever pay a cent.</p>
                 <p style="margin:18px 0;">
-                  <a href="${SIGNUP_URL}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:9999px;font-size:14px;">Claim my free credits →</a>
+                  <a href="${SIGNUP_URL}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:9999px;font-size:14px;">Claim my free tokens →</a>
                 </p>
                 <p style="margin:0 0 8px 0;">Here's what's waiting:</p>
                 <ul style="margin:0 0 14px 0;padding-left:20px;">
@@ -51,7 +51,7 @@ const htmlBody = () => `
                   <li style="margin-bottom:6px;">F-1 visa interview practice with a live AI consular officer</li>
                   <li style="margin-bottom:6px;">A personalised application roadmap, not a generic checklist</li>
                 </ul>
-                <p style="margin:0 0 14px 0;">We priced it deliberately for students — credits start at $2 USD and never expire.</p>
+                <p style="margin:0 0 14px 0;">We priced it deliberately for students — packs start at $2 USD and your tokens never expire.</p>
                 <p style="margin:0 0 6px 0;">Talk soon,<br/>The College Ready team</p>
               </td>
             </tr>
@@ -74,7 +74,7 @@ const textBody = () =>
     "",
     "Thanks for joining the waitlist. The platform is now open to you.",
     "",
-    "Sign up and get 2 free credits right away (enough to unlock two AI-matched",
+    "Sign up and get 2,000 free tokens right away (enough to unlock two AI-matched",
     "school reports before you pay):",
     "",
     `   ${SIGNUP_URL}`,
@@ -84,7 +84,7 @@ const textBody = () =>
     "  • F-1 visa interview practice with a live AI consular officer",
     "  • A personalised application roadmap, not a generic checklist",
     "",
-    "Credits start at $2 USD and never expire.",
+    "Packs start at $2 USD and your tokens never expire.",
     "",
     "Talk soon,",
     "The College Ready team",

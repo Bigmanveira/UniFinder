@@ -10,14 +10,19 @@
 //
 // This is a brand confirmation, NOT a tax/compliance receipt — Paystack's own
 // auto-receipt covers that side. Tone is warm and product-focused.
+//
+// Wallet values arrive as CREDITS; the copy renders the user-facing TOKEN
+// figures (1 credit = 1,000 tokens) via tokens.ts. The `credits`/`newBalance`
+// params stay in credits so the caller doesn't have to know about the factor.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Resend } from "resend";
+import { formatTokens } from "./tokens.js";
 
 const FROM_ADDRESS = "College Ready <noreply@collegeready.io>";
 
 function subjectFor(credits: number): string {
-  return `🎓 ${credits} credit${credits === 1 ? "" : "s"} added to your College Ready account`;
+  return `🎓 ${formatTokens(credits)} tokens added to your College Ready account`;
 }
 
 // Pick a currency glyph for the receipt copy. We only charge GHS today, but
@@ -51,7 +56,7 @@ const htmlBody = (opts: {
             <tr>
               <td style="background:linear-gradient(135deg,#1e3a8a,#0f172a);padding:32px 32px 28px 32px;color:#fff;">
                 <p style="margin:0 0 6px 0;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#bfdbfe;font-weight:700;">College Ready</p>
-                <h1 style="margin:0;font-size:24px;line-height:1.25;font-weight:700;">Credits added to your wallet 🎉</h1>
+                <h1 style="margin:0;font-size:24px;line-height:1.25;font-weight:700;">Tokens added to your wallet 🎉</h1>
               </td>
             </tr>
             <tr>
@@ -62,18 +67,18 @@ const htmlBody = (opts: {
                   <tr>
                     <td style="padding:18px 22px;font-size:14px;color:#475569;">
                       <p style="margin:0 0 6px 0;"><strong style="color:#0f172a;">${opts.packLabel} pack</strong> &nbsp;·&nbsp; ${currencyGlyph(opts.currency)}${opts.priceLocal.toFixed(2)} ${opts.currency}</p>
-                      <p style="margin:0 0 6px 0;">${opts.credits} credit${opts.credits === 1 ? "" : "s"} added</p>
+                      <p style="margin:0 0 6px 0;">${formatTokens(opts.credits)} tokens added</p>
                       <p style="margin:14px 0 0 0;padding-top:10px;border-top:1px solid #e2e8f0;color:#0f172a;font-size:13px;">
-                        New balance: <strong style="font-size:18px;">${opts.newBalance}</strong> credit${opts.newBalance === 1 ? "" : "s"}
+                        New balance: <strong style="font-size:18px;">${formatTokens(opts.newBalance)}</strong> tokens
                       </p>
                     </td>
                   </tr>
                 </table>
 
-                <p style="margin:0 0 10px 0;font-size:14px;color:#475569;"><strong style="color:#0f172a;">What credits unlock:</strong></p>
+                <p style="margin:0 0 10px 0;font-size:14px;color:#475569;"><strong style="color:#0f172a;">What tokens unlock:</strong></p>
                 <ul style="margin:0 0 18px 0;padding-left:20px;font-size:14px;color:#475569;">
-                  <li style="margin-bottom:6px;"><strong style="color:#0f172a;">1 credit</strong> — unlock an AI-matched school report</li>
-                  <li style="margin-bottom:6px;"><strong style="color:#0f172a;">15 credits</strong> — full F-1 visa interview practice with a live AI consular officer</li>
+                  <li style="margin-bottom:6px;"><strong style="color:#0f172a;">1,000 tokens</strong> — unlock an AI-matched school report</li>
+                  <li style="margin-bottom:6px;"><strong style="color:#0f172a;">15,000 tokens</strong> — full F-1 visa interview practice with a live AI consular officer</li>
                 </ul>
 
                 <p style="margin:0 0 14px 0;">
@@ -106,17 +111,17 @@ const textBody = (opts: {
   paymentId:  string;
 }) =>
   [
-    `Credits added to your College Ready wallet`,
+    `Tokens added to your College Ready wallet`,
     ``,
     `Hey — your payment came through. Quick summary:`,
     ``,
     `  ${opts.packLabel} pack · ${currencyGlyph(opts.currency)}${opts.priceLocal.toFixed(2)} ${opts.currency}`,
-    `  ${opts.credits} credit${opts.credits === 1 ? "" : "s"} added`,
-    `  New balance: ${opts.newBalance} credit${opts.newBalance === 1 ? "" : "s"}`,
+    `  ${formatTokens(opts.credits)} tokens added`,
+    `  New balance: ${formatTokens(opts.newBalance)} tokens`,
     ``,
-    `What credits unlock:`,
-    `  • 1 credit  — unlock an AI-matched school report`,
-    `  • 15 credits — full F-1 visa interview practice with a live AI consular officer`,
+    `What tokens unlock:`,
+    `  • 1,000 tokens  — unlock an AI-matched school report`,
+    `  • 15,000 tokens — full F-1 visa interview practice with a live AI consular officer`,
     ``,
     `Dashboard: https://collegeready.io/app`,
     ``,

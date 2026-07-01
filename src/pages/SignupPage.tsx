@@ -263,7 +263,7 @@ export default function SignupPage() {
         <div className="bg-white/95 backdrop-blur-2xl rounded-[32px] p-8 sm:p-10 shadow-2xl shadow-slate-900/50 border border-white/50">
           <div className="text-center mb-8">
             <h1 className="text-3xl font-black text-slate-900 mb-2">Create Account</h1>
-            <p className="text-slate-500 font-medium text-sm">Join today and get 2 free credits.</p>
+            <p className="text-slate-500 font-medium text-sm">Join today and get 2,000 free tokens.</p>
           </div>
 
           {sent ? (
@@ -287,7 +287,7 @@ export default function SignupPage() {
                   </p>
                   {referralCode.trim() && (
                     <p className="text-[11px] text-emerald-700 mt-1 leading-relaxed">
-                      Referral code <span className="font-mono font-bold">{referralCode.trim().toUpperCase()}</span> will be applied automatically when you land. Your referrer gets 5 credits once you make your first purchase.
+                      Referral code <span className="font-mono font-bold">{referralCode.trim().toUpperCase()}</span> will be applied automatically when you land. Your referrer gets 5,000 tokens once you make your first purchase.
                     </p>
                   )}
                 </div>
@@ -363,7 +363,7 @@ export default function SignupPage() {
                         placeholder="JANE2025"
                       />
                       <p className="text-[10px] text-slate-500 mt-1.5 leading-relaxed">
-                        Got a code from a marketer or friend? Bonus credits land in your wallet right after you sign in.
+                        Got a code from a marketer or friend? Bonus tokens land in your wallet right after you sign in.
                       </p>
                     </div>
                   )}

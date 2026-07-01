@@ -63,7 +63,7 @@ const KIND_COPY: Record<ReminderKind, KindCopy> = {
     subject:  "Ready to find your perfect U.S. school? 🎓",
     heading:  "Let's get you started",
     body: [
-      "Welcome again to College Ready! You've got free credits in your wallet, but you haven't tried anything yet.",
+      "Welcome again to College Ready! You've got free tokens in your wallet, but you haven't tried anything yet.",
       "The fastest win: run your school match. Tell us your profile and we'll show you which U.S. schools fit — reaches, targets and safeties, tailored to you.",
     ],
     ctaLabel: "Find my matches →",

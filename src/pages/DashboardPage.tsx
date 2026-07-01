@@ -18,6 +18,7 @@ import { FadeIn, FadeInItem } from "../components/FadeIn";
 import { getOrCreateReferralCode, buildReferralUrl } from "../lib/referrals";
 import { isFounderEmail } from "../lib/founders";
 import FeedbackSurveyModal, { type SurveyTrigger } from "../components/FeedbackSurveyModal";
+import { formatTokens } from "../lib/tokens";
 
 const VALID_DASHBOARD_TABS = new Set(["matches", "saved", "billing", "profile", "interviews"]);
 // Feedback-request emails deep-link here as /app?survey=<trigger>&ref=<reportId>.
@@ -207,7 +208,7 @@ export default function DashboardPage() {
           <DesktopNavItem icon={<ShieldAlert size={18} />} label="Live interview practice" active={false} onClick={() => navigate("/app/visa-interview")} />
           <DesktopNavItem icon={<FileText size={18} />} label="Academic CV Studio" active={false} onClick={() => {}} badge="SOON" disabled />
           <DesktopNavItem icon={<Mic size={18} />} label="Interview history" active={activeTab === "interviews"} onClick={() => setActiveTab("interviews")} badge={interviewReports.length} />
-          <DesktopNavItem icon={<Wallet size={18} />} label="Credits & Billing" active={activeTab === "billing"} onClick={() => setActiveTab("billing")} />
+          <DesktopNavItem icon={<Wallet size={18} />} label="Tokens & Billing" active={activeTab === "billing"} onClick={() => setActiveTab("billing")} />
           <DesktopNavItem icon={<User size={18} />} label="Profile" active={activeTab === "profile"} onClick={() => setActiveTab("profile")} />
         </nav>
 
@@ -233,11 +234,11 @@ export default function DashboardPage() {
             <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
               <h1 className="text-3xl font-black text-slate-900">
                 {activeTab === "saved" && "Saved Schools"}
-                {activeTab === "billing" && "Credit Wallet"}
+                {activeTab === "billing" && "Token Wallet"}
                 {activeTab === "profile" && "Your Profile"}
                 {activeTab === "interviews" && "Interview history"}
               </h1>
-              <p className="text-slate-500 font-medium text-sm mt-1">Welcome back! You have {isFounder ? "unlimited" : credits} credits available.</p>
+              <p className="text-slate-500 font-medium text-sm mt-1">Welcome back! You have {isFounder ? "unlimited" : formatTokens(credits)} tokens available.</p>
             </motion.div>
             <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex items-center gap-3">
               <button onClick={() => navigate("/intake")} className="bg-primary-600 hover:bg-primary-700 text-white font-bold text-sm px-6 py-3 rounded-full transition-colors flex items-center gap-2 shadow-xl shadow-primary-600/20 active:scale-95">
@@ -266,8 +267,8 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <FadeInItem index={0}>
                 <StatTile
-                  label="Available credits"
-                  value={isFounder ? "∞" : credits}
+                  label="Available tokens"
+                  value={isFounder ? "∞" : formatTokens(credits)}
                   accent="bg-blue-500"
                   icon={<Wallet size={15} />}
                   action={isFounder ? undefined : "Buy more"}
@@ -438,7 +439,7 @@ export default function DashboardPage() {
                         Rehearse with Anna<span className="hidden sm:inline">, your AI consular officer</span>
                       </h3>
                       <div className="flex items-center gap-2 text-[11px] sm:text-xs text-white/65 font-semibold">
-                        <span>15 credits</span>
+                        <span>15,000 tokens</span>
                         <span className="opacity-50">·</span>
                         <span>~5 min</span>
                         <span className="opacity-50">·</span>
@@ -649,7 +650,7 @@ export default function DashboardPage() {
                 <DesktopNavItem compact icon={<ShieldAlert size={16} />} label="Live interview practice" active={false}                       onClick={() => { navigate("/app/visa-interview"); setMobileNavOpen(false); }} />
                 <DesktopNavItem compact icon={<FileText size={16} />}    label="Academic CV Studio"      active={false}                       onClick={() => {}} badge="SOON" disabled />
                 <DesktopNavItem compact icon={<Mic size={16} />}         label="Interview history"       active={activeTab === "interviews"}  onClick={() => { setActiveTab("interviews"); setMobileNavOpen(false); }} badge={interviewReports.length} />
-                <DesktopNavItem compact icon={<Wallet size={16} />}      label="Credits & Billing"       active={activeTab === "billing"}     onClick={() => { setActiveTab("billing");    setMobileNavOpen(false); }} />
+                <DesktopNavItem compact icon={<Wallet size={16} />}      label="Tokens & Billing"       active={activeTab === "billing"}     onClick={() => { setActiveTab("billing");    setMobileNavOpen(false); }} />
                 <DesktopNavItem compact icon={<User size={16} />}        label="Profile"                 active={activeTab === "profile"}     onClick={() => { setActiveTab("profile");    setMobileNavOpen(false); }} />
               </nav>
 
@@ -1136,13 +1137,13 @@ function BillingTab({ credits, userId, isFounder }: { credits: number; userId: s
           </div>
           <div className="flex-1">
             <p className="font-bold text-emerald-900 text-sm mb-0.5">Payment received</p>
-            <p className="text-xs text-emerald-800 leading-relaxed">Credits usually post within a few seconds. If your balance hasn't updated in two minutes, contact <a className="underline" href="mailto:support@collegeready.io">support@collegeready.io</a> with your payment confirmation.</p>
+            <p className="text-xs text-emerald-800 leading-relaxed">Tokens usually post within a few seconds. If your balance hasn't updated in two minutes, contact <a className="underline" href="mailto:support@collegeready.io">support@collegeready.io</a> with your payment confirmation.</p>
           </div>
         </div>
       )}
       {returnStatus === "cancelled" && (
         <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-900">
-          Payment was cancelled — no credits charged. You can pick a pack again any time.
+          Payment was cancelled — no tokens charged. You can pick a pack again any time.
         </div>
       )}
 
@@ -1153,21 +1154,21 @@ function BillingTab({ credits, userId, isFounder }: { credits: number; userId: s
           <div>
             <h2 className="text-sm font-black tracking-widest text-slate-400 uppercase mb-2">Available Balance</h2>
             <div className="flex items-end gap-3">
-              <span className="text-7xl font-black leading-none">{isFounder ? "∞" : credits}</span>
-              <span className="text-xl font-bold text-slate-400 mb-2">Credits</span>
+              <span className="text-7xl font-black leading-none">{isFounder ? "∞" : formatTokens(credits)}</span>
+              <span className="text-xl font-bold text-slate-400 mb-2">Tokens</span>
             </div>
             {isFounder && (
-              <p className="text-xs text-primary-300 font-bold mt-2">Founder account — unlimited credits for product testing.</p>
+              <p className="text-xs text-primary-300 font-bold mt-2">Founder account — unlimited tokens for product testing.</p>
             )}
           </div>
           <div className="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/10 max-w-xs">
-            <p className="text-sm font-bold mb-1">How credits work:</p>
+            <p className="text-sm font-bold mb-1">How tokens work:</p>
             <p className="text-xs text-slate-400 leading-relaxed">
-              <span className="font-bold text-white">1 credit</span> = Match report unlock.
+              <span className="font-bold text-white">1,000 tokens</span> = Match report unlock.
               <br />
-              <span className="font-bold text-white">15 credits</span> = F-1 interview practice (live avatar).
+              <span className="font-bold text-white">15,000 tokens</span> = F-1 interview practice (live avatar).
               <br />
-              Credits never expire.
+              Tokens never expire.
             </p>
           </div>
         </div>
@@ -1176,8 +1177,8 @@ function BillingTab({ credits, userId, isFounder }: { credits: number; userId: s
       {/* Referral card — earn 5 credits per friend */}
       <ReferralCard userId={userId} />
 
-      <h3 className="text-xl font-black text-slate-900 mb-2">Top Up Credits</h3>
-      <p className="text-sm text-slate-500 mb-6">Secure checkout by Paystack. Credits post automatically once payment confirms.</p>
+      <h3 className="text-xl font-black text-slate-900 mb-2">Top Up Tokens</h3>
+      <p className="text-sm text-slate-500 mb-6">Secure checkout by Paystack. Tokens post automatically once payment confirms.</p>
 
       {error && (
         <div className="mb-4 bg-rose-50 border border-rose-200 rounded-2xl p-3 text-sm text-rose-700 flex items-start gap-2">
@@ -1217,12 +1218,12 @@ function BillingTab({ credits, userId, isFounder }: { credits: number; userId: s
                 )}
                 <h4 className={`text-lg font-black mb-1 ${pack.recommended ? "text-primary-900" : "text-slate-900"}`}>{pack.label}</h4>
                 <p className={`text-xs font-medium mb-5 ${pack.recommended ? "text-primary-700/80" : "text-slate-500"}`}>
-                  ${perCreditUsd} per credit
+                  ${perCreditUsd} per 1,000 tokens
                 </p>
                 <div className="mb-5">
                   <div>
                     <span className={`text-4xl font-black ${pack.recommended ? "text-primary-900" : "text-slate-900"}`}>${pack.priceUsd}</span>
-                    <span className={`font-bold ${pack.recommended ? "text-primary-700" : "text-slate-500"}`}> / {pack.credits} credits</span>
+                    <span className={`font-bold ${pack.recommended ? "text-primary-700" : "text-slate-500"}`}> / {formatTokens(pack.credits)} tokens</span>
                   </div>
                   <p className={`text-[11px] font-medium mt-1 ${pack.recommended ? "text-primary-700/80" : "text-slate-500"}`}>
                     Charged as {localGlyph}{pack.priceLocal} {pack.currency}
@@ -1370,7 +1371,7 @@ function DashboardHero({
 
         {/* Inline stat chips — quick at-a-glance */}
         <div className="flex flex-wrap gap-2 sm:flex-col sm:items-end">
-          <HeroChip label="Credits" value={isFounder ? "∞" : credits} />
+          <HeroChip label="Tokens" value={isFounder ? "∞" : formatTokens(credits)} />
           <HeroChip label="Reports" value={reportsCount} />
           <HeroChip label="Saved" value={savedCount} />
         </div>
@@ -1480,7 +1481,7 @@ function ReferralCard({ userId }: { userId: string | undefined }) {
                   <Gift size={19} strokeWidth={2.2} />
                 </div>
                 <div className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
-                  Earn 5 credits
+                  Earn 5,000 tokens
                 </div>
               </div>
 
@@ -1489,7 +1490,7 @@ function ReferralCard({ userId }: { userId: string | undefined }) {
                 Help a friend find their college fit.
               </h3>
               <p className="mt-3 max-w-md text-sm leading-6 text-slate-600">
-                Send your personal link. You’ll receive 5 free credits after their first credit purchase.
+                Send your personal link. You’ll receive 5,000 free tokens after their first token purchase.
               </p>
 
               <div className="mt-7 flex items-center gap-3">
@@ -1542,7 +1543,7 @@ function ReferralCard({ userId }: { userId: string | undefined }) {
             )}
 
             <p className="mt-5 text-xs leading-5 text-slate-400">
-              Credits are added automatically after the qualifying purchase.
+              Tokens are added automatically after the qualifying purchase.
             </p>
           </div>
         </div>

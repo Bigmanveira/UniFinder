@@ -86,7 +86,7 @@ export default function CvStudioBuildPage() {
             </Link>
             <div className="flex-1 min-w-0">
               <h1 className="text-[15px] font-bold leading-tight truncate">Build from scratch</h1>
-              <p className="text-xs text-slate-500 truncate">Guided intake · 8 credits to unlock the full CV</p>
+              <p className="text-xs text-slate-500 truncate">Guided intake · 8,000 tokens to unlock the full CV</p>
             </div>
           </div>
         </header>
@@ -100,7 +100,7 @@ export default function CvStudioBuildPage() {
               Tell us the facts. We'll do the formatting.
             </h2>
             <p className="text-base sm:text-[17px] text-slate-600 leading-relaxed max-w-2xl mx-auto">
-              Fill in only what applies — empty sections are skipped. The AI takes your raw facts and produces a polished CV that follows the standard template. Preview is free; unlock costs 8 credits.
+              Fill in only what applies — empty sections are skipped. The AI takes your raw facts and produces a polished CV that follows the standard template. Preview is free; unlock costs 8,000 tokens.
             </p>
           </section>
         )}
@@ -258,7 +258,7 @@ export default function CvStudioBuildPage() {
               </h2>
               <div className="flex items-center justify-between gap-3 mb-5">
                 <p className="text-sm text-slate-600 leading-relaxed">
-                  Built from your intake. Preview free; unlock for 8 credits.
+                  Built from your intake. Preview free; unlock for 8,000 tokens.
                 </p>
                 <button
                   onClick={cv.reset}

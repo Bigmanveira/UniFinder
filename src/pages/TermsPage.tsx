@@ -61,7 +61,7 @@ export default function TermsPage() {
               <li>You must be 13 or older to create an account.</li>
               <li>You're responsible for keeping your sign-in credentials secure.</li>
               <li>Don't share an account with another person — each user needs their own.</li>
-              <li>One free credit allowance per real human. We may revoke duplicate or fraudulent accounts.</li>
+              <li>One free token allowance per real human. We may revoke duplicate or fraudulent accounts.</li>
             </ul>
           </Block>
 
@@ -70,7 +70,7 @@ export default function TermsPage() {
             <ul className="list-disc ml-5 mt-3 space-y-1.5">
               <li>Use the service to commit fraud, harass others, or violate any law.</li>
               <li>Upload documents you don't have the right to upload, or that contain another person's data.</li>
-              <li>Attempt to bypass usage limits, abuse referral credits, or reverse-engineer the AI behaviour.</li>
+              <li>Attempt to bypass usage limits, abuse referral tokens, or reverse-engineer the AI behaviour.</li>
               <li>Scrape, mass-download, or build a competing product from data we provide.</li>
               <li>Submit content that's illegal, hateful, sexually explicit, or deliberately misleading.</li>
             </ul>
@@ -79,12 +79,12 @@ export default function TermsPage() {
             </p>
           </Block>
 
-          <Block title="Credits and billing">
+          <Block title="Tokens and billing">
             <ul className="list-disc ml-5 space-y-1.5">
-              <li>Some features cost credits (unlocking a full match report, running an interview practice).</li>
-              <li>New accounts receive 2 free credits. Successful referrals earn 5 more.</li>
-              <li>Purchased credits are non-refundable except where required by law, and don't expire.</li>
-              <li>Prices may change. If you've already bought a credit pack, that purchase is honoured at the price you paid.</li>
+              <li>Some features cost tokens (unlocking a full match report, running an interview practice).</li>
+              <li>New accounts receive 2,000 free tokens. Successful referrals earn 5,000 more.</li>
+              <li>Purchased tokens are non-refundable except where required by law, and don't expire.</li>
+              <li>Prices may change. If you've already bought a token pack, that purchase is honoured at the price you paid.</li>
             </ul>
           </Block>
 
@@ -115,7 +115,7 @@ export default function TermsPage() {
 
           <Block title="Service availability">
             <p>
-              We aim for high uptime but don't guarantee uninterrupted service. AI models can fail or return imperfect results. If a paid action (e.g. unlock report) fails because of an outage on our side, we'll refund the credit.
+              We aim for high uptime but don't guarantee uninterrupted service. AI models can fail or return imperfect results. If a paid action (e.g. unlock report) fails because of an outage on our side, we'll refund the tokens.
             </p>
           </Block>
 

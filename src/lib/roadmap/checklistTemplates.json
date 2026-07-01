@@ -13,7 +13,7 @@
     { "id": "sm_review",       "stage": "school_matching", "title": "Review recommended schools",       "description": "Look through the Reach / Target / Safety buckets. Are any unrealistic? Any missing?", "required": true,  "toolRoute": "/app" },
     { "id": "sm_save",         "stage": "school_matching", "title": "Save 5–10 preferred schools",      "description": "Use the heart icon to bookmark schools you want to dig deeper on.", "required": true,  "toolRoute": "/app" },
     { "id": "sm_compare",      "stage": "school_matching", "title": "Compare tuition + deadlines",      "description": "Open each saved school and weigh cost, location, and admission deadlines side by side.", "required": false, "toolRoute": "/app" },
-    { "id": "sm_unlock",       "stage": "school_matching", "title": "Unlock at least one match report", "description": "1 credit. Gets you a full AI-explained report — admission likelihood, fit, application tips.", "required": true,  "toolRoute": "/app" },
+    { "id": "sm_unlock",       "stage": "school_matching", "title": "Unlock at least one match report", "description": "1,000 tokens. Gets you a full AI-explained report — admission likelihood, fit, application tips.", "required": true,  "toolRoute": "/app" },
     { "id": "sm_shortlist",    "stage": "school_matching", "title": "Finalise a 6–10 school shortlist", "description": "Mix of Reach, Target, and Safety. This is what you'll actually apply to.", "required": true,  "toolRoute": "/app" }
   ],
   "application": [
@@ -44,7 +44,7 @@
     { "id": "v_admit_letter",  "stage": "visa_preparation", "title": "Print your admission letter",            "description": "Original or printed PDF. Some officers ask for it.", "required": false, "toolRoute": null },
     { "id": "v_financials",    "stage": "visa_preparation", "title": "Prepare financial documents",            "description": "Bank statements, sponsor letters, scholarship awards, employment letters if relevant.", "required": true,  "toolRoute": null },
     { "id": "v_sponsor_story", "stage": "visa_preparation", "title": "Prepare sponsor explanation",            "description": "Who is paying, how, and why they're willing. Practice saying it in one sentence.", "required": true,  "toolRoute": null },
-    { "id": "v_practice",      "stage": "visa_preparation", "title": "Practice with the AI visa interview",   "description": "15 credits. Run a live mock with Anna; get scored feedback across 9 dimensions.", "required": true,  "toolRoute": "/app/visa-interview" },
+    { "id": "v_practice",      "stage": "visa_preparation", "title": "Practice with the AI visa interview",   "description": "15,000 tokens. Run a live mock with Anna; get scored feedback across 9 dimensions.", "required": true,  "toolRoute": "/app/visa-interview" },
     { "id": "v_review",        "stage": "visa_preparation", "title": "Review your interview feedback",         "description": "Re-read the scored report; rework whichever answer scored lowest.", "required": false, "toolRoute": "/app/visa-interview" }
   ],
   "pre_departure": [

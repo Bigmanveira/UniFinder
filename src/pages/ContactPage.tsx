@@ -16,7 +16,7 @@ type Topic = "match-help" | "interview-help" | "billing" | "bug" | "feedback" | 
 const TOPIC_OPTIONS: { value: Topic; label: string }[] = [
   { value: "match-help",     label: "Help with my match report" },
   { value: "interview-help", label: "Help with the interview simulator" },
-  { value: "billing",        label: "Credits or billing" },
+  { value: "billing",        label: "Tokens or billing" },
   { value: "bug",            label: "Bug or technical issue" },
   { value: "feedback",       label: "Product feedback or suggestion" },
   { value: "press",          label: "Press / partnerships" },

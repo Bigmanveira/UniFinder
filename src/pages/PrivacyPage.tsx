@@ -47,7 +47,7 @@ export default function PrivacyPage() {
               <li><strong>Account basics:</strong> email, sign-in provider (Google, Apple, or password), and the display name and photo you add to your profile.</li>
               <li><strong>Match profile:</strong> the academic and funding information you enter in our wizard (GPA, test scores, intended field, level, budget, destination).</li>
               <li><strong>Practice interviews:</strong> the audio transcript of your F-1 visa practice sessions, the documents you upload (I-20, DS-160, supporting docs), and the AI score we generate.</li>
-              <li><strong>Usage:</strong> reports you generate, schools you save, credits you spend, and a minimal log of feature interactions to debug issues.</li>
+              <li><strong>Usage:</strong> reports you generate, schools you save, tokens you spend, and a minimal log of feature interactions to debug issues.</li>
             </ul>
           </Block>
 
@@ -59,7 +59,7 @@ export default function PrivacyPage() {
             <ul className="list-disc ml-5 space-y-1.5">
               <li>To match you with colleges and write personalised explanations.</li>
               <li>To simulate the F-1 visa interview using the documents you uploaded.</li>
-              <li>To bill you accurately for credits and prevent abuse of free credits.</li>
+              <li>To bill you accurately for tokens and prevent abuse of free tokens.</li>
               <li>To improve the product: aggregated, anonymised metrics on which features get used.</li>
             </ul>
           </Block>

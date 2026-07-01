@@ -45,7 +45,7 @@ interface SupportChatResult {
 
 const STORAGE_KEY = "college-ready-support-chat-v1";
 const DEFAULT_TEMPLATES = [
-  "How do credits work?",
+  "How do tokens work?",
   "How does school matching work?",
   "What do I need for the visa interview?",
   "How do I contact support?",
@@ -93,10 +93,10 @@ const ROUTE_TEMPLATES: Array<{ match: (path: string) => boolean; questions: stri
   {
     match: (path) => path === "/pricing" || path === "/app",
     questions: [
-      "Which credit pack should I choose?",
+      "Which token pack should I choose?",
       "What does each feature cost?",
-      "My purchased credits are missing. What should I do?",
-      "Do credits expire?",
+      "My purchased tokens are missing. What should I do?",
+      "Do tokens expire?",
     ],
   },
   {
@@ -121,7 +121,7 @@ const ROUTE_TEMPLATES: Array<{ match: (path: string) => boolean; questions: stri
     match: (path) => path.startsWith("/app/roadmap"),
     questions: [
       "How does the roadmap work?",
-      "Does the roadmap use credits?",
+      "Does the roadmap use tokens?",
       "Can I update my current stage?",
       "Will rerunning onboarding erase my progress?",
     ],
@@ -396,7 +396,7 @@ export default function SupportChatWidget() {
                 <span className="text-[11px] font-black uppercase tracking-wider">Grounded support</span>
               </div>
               <p className="text-[13px] font-medium leading-relaxed text-slate-600">
-                Ask about College Ready features, credits, billing, accounts, or troubleshooting.
+                Ask about College Ready features, tokens, billing, accounts, or troubleshooting.
                 I only answer from verified app information.
               </p>
               {!user && (
