@@ -111,7 +111,7 @@ export default function LoginPage() {
         // saved data overwritten by leftover guest data.
         const profileSnap = await getDoc(doc(db, "studentProfiles", uid));
         if (!profileSnap.exists()) {
-          await setDoc(doc(db, "studentProfiles", uid), JSON.parse(guestProfile));
+          await setDoc(doc(db, "studentProfiles", uid), { ...JSON.parse(guestProfile), updatedAt: serverTimestamp() });
         }
       }
     } catch (err) {

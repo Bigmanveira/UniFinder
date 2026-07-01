@@ -449,6 +449,17 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // lifecycleEmailState — per-user server-managed bookkeeping for lifecycle
+    // emails: the onboarding-nudge dedupe flag and the feedback-email cooldown
+    // timestamp. Written exclusively by the sendEngagementReminders scheduler
+    // and the feedback-request triggers via Admin SDK (which bypasses these
+    // rules). Doc id is the user's uid. No client access — the user's own
+    // opt-out lives on users/{uid}.emailPrefs, not here.
+    match /lifecycleEmailState/{userId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
     // Pending referrals — server-managed ledger for the deferred referral
     // payout flow (referrer's 5 credits only post after the referee's
     // first paid purchase, defeats self-referral fraud). Doc id is the

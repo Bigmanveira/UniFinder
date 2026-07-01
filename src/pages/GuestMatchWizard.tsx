@@ -4,7 +4,7 @@ import { GraduationCap, MapPin, BookOpen, Calculator, DollarSign, FileCheck, Arr
 import BrandLogo from "../components/BrandLogo";
 import { motion } from "framer-motion";
 import { useAuth } from "../hooks/useAuth";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { db } from "../lib/firebase";
 
 // Autocomplete suggestions for the "Intended Major" field. Curated from the
@@ -143,7 +143,10 @@ export default function GuestMatchWizard() {
         if (user) {
           // Logged-in user: save directly to their profile and go to dashboard
           try {
-            await setDoc(doc(db, "studentProfiles", user.uid), formData, { merge: true });
+            // updatedAt powers the "you left off matching" reminder sweep —
+            // it's how the daily scheduled function detects an idle profile
+            // that never got a match report unlocked.
+            await setDoc(doc(db, "studentProfiles", user.uid), { ...formData, updatedAt: serverTimestamp() }, { merge: true });
           } catch (e) {
             console.error(e);
           }

@@ -1,5 +1,6 @@
 import { onCall, onRequest, HttpsError, type CallableRequest } from "firebase-functions/v2/https";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineSecret } from "firebase-functions/params";
 import * as functionsV1 from "firebase-functions/v1";
 import * as admin from "firebase-admin";
@@ -61,6 +62,9 @@ import {
 import { logError } from "./errorLogger.js";
 import { createRateLimiter, extractClientIp } from "./rateLimiter.js";
 import { answerSupportQuestion, type SupportChatHistoryItem } from "./supportChat.js";
+import { sendEngagementReminder, type ReminderKind } from "./reminderEmails.js";
+import { sendFeedbackRequest, type FeedbackFeature } from "./feedbackRequestEmail.js";
+import { buildUnsubscribeUrl, verifyUnsubscribeToken, type EmailCategory } from "./emailTokens.js";
 
 admin.initializeApp();
 
@@ -68,6 +72,10 @@ const ANTHROPIC_API_KEY        = defineSecret("ANTHROPIC_API_KEY");
 const HEYGEN_API_KEY           = defineSecret("HEYGEN_API_KEY");
 const PAYSTACK_SECRET_KEY      = defineSecret("PAYSTACK_SECRET_KEY");
 const RESEND_API_KEY           = defineSecret("RESEND_API_KEY");
+// Signs one-click unsubscribe tokens for lifecycle emails (reminders +
+// feedback requests). Separate from RESEND_API_KEY: a leak only lets an
+// attacker unsubscribe users, never send mail. See emailTokens.ts.
+const EMAIL_TOKEN_SECRET       = defineSecret("EMAIL_TOKEN_SECRET");
 
 // ─── Instance caps ───────────────────────────────────────────────────────────
 // Audit 2026-05-15 surfaced that the project was running every callable with
@@ -6097,5 +6105,370 @@ export const setRolePermissions = onCall(
     }, { merge: true });
     await writeOpsAdminAudit(request, "role_permissions_updated", role, { pages });
     return { ok: true, role, pages };
+  },
+);
+
+// ============================================================
+// Lifecycle emails — engagement reminders + feedback requests
+// ============================================================
+//
+// Two flows, both LIFECYCLE (not transactional) email, so every send honours
+// a one-click unsubscribe:
+//
+//   A) sendEngagementReminders  — a daily scheduled sweep that finds users who
+//      STARTED something and went quiet, and nudges them to continue. Detects
+//      four abandonment shapes (visa > matching > roadmap > onboarding) and
+//      sends AT MOST ONE email per user per run (highest-priority shape wins).
+//      Deduped by stamping `reminderSentAt` on the relevant doc so a user is
+//      never re-nudged for the same stalled item.
+//
+//   B) onMatchReportCreated / onVisaReportCreated — fire when a user COMPLETES
+//      a feature that produces a report, and email them a link into the
+//      existing in-app FeedbackSurveyModal. Per-user 14-day cooldown so power
+//      users are not asked on every report.
+//
+// Opt-out state lives on users/{uid}.emailPrefs = { reminders?, feedback? }.
+// Missing field / missing doc => opted IN (default true). The public
+// unsubscribeEmail endpoint flips these to false via a signed token.
+
+const REMINDER_IDLE_DAYS           = 3;    // wait this long after last activity
+const REMINDER_LOOKBACK_DAYS       = 21;   // ...but ignore items idle longer than this
+const REMINDER_QUERY_LIMIT         = 500;  // per-collection scan cap per run
+const REMINDER_MAX_PER_RUN         = 300;  // hard cap on emails sent per daily run
+const FEEDBACK_EMAIL_COOLDOWN_DAYS = 14;   // do not ask the same user twice inside this window
+
+type LifecycleCategory = "reminders" | "feedback";
+
+/**
+ * Whether we may send a lifecycle email of `category` to this user. Missing
+ * pref / missing doc => allowed (default opt-in). On a read error we default
+ * to NOT sending — safer to skip than to mail someone who may have opted out.
+ */
+async function isLifecycleEmailAllowed(uid: string, category: LifecycleCategory): Promise<boolean> {
+  try {
+    const snap = await admin.firestore().collection("users").doc(uid).get();
+    const prefs = snap.exists ? (snap.data()?.emailPrefs ?? null) : null;
+    return !(prefs && prefs[category] === false);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Authoritative email + display name for a uid, straight from Firebase Auth.
+ * Returns null when the account has no email or is disabled/missing — those
+ * users cannot (or should not) be mailed.
+ */
+async function getUserContact(uid: string): Promise<{ email: string; displayName: string | null } | null> {
+  try {
+    const authUser = await admin.auth().getUser(uid);
+    if (!authUser.email || authUser.disabled) return null;
+    return { email: authUser.email, displayName: authUser.displayName ?? null };
+  } catch {
+    return null;
+  }
+}
+
+interface ReminderCandidate {
+  uid:      string;
+  kind:     ReminderKind;
+  priority: number;               // higher wins when a user matches several shapes
+  stamp:    () => Promise<void>;  // marks the correct dedupe field on success
+}
+
+export const sendEngagementReminders = onSchedule(
+  {
+    schedule:       "every day 14:00",
+    timeZone:       "Africa/Accra",
+    secrets:        [RESEND_API_KEY, EMAIL_TOKEN_SECRET],
+    timeoutSeconds: 540,
+    maxInstances:   1,   // a scheduled sweep never needs to fan out
+  },
+  async () => {
+    const db  = admin.firestore();
+    const now = Date.now();
+    const idleCutoff    = admin.firestore.Timestamp.fromMillis(now - REMINDER_IDLE_DAYS * 86_400_000);
+    const lookbackFloor = admin.firestore.Timestamp.fromMillis(now - REMINDER_LOOKBACK_DAYS * 86_400_000);
+    const FieldValue    = admin.firestore.FieldValue;
+
+    const candidates: ReminderCandidate[] = [];
+
+    // (4) Visa — an interview session left "active" and gone quiet.
+    try {
+      const snap = await db.collection("visaInterviewSessions")
+        .where("status", "==", "active")
+        .where("updatedAt", ">=", lookbackFloor)
+        .where("updatedAt", "<=", idleCutoff)
+        .limit(REMINDER_QUERY_LIMIT)
+        .get();
+      for (const doc of snap.docs) {
+        const d = doc.data();
+        if (d.reminderSentAt) continue;
+        const uid = typeof d.userId === "string" ? d.userId : "";
+        if (!uid) continue;
+        candidates.push({
+          uid, kind: "visa", priority: 4,
+          stamp: () => doc.ref.set({ reminderSentAt: FieldValue.serverTimestamp() }, { merge: true }).then(() => {}),
+        });
+      }
+    } catch (err: any) {
+      console.error("[reminders] visa scan failed", err?.message ?? err);
+    }
+
+    // (3) Matching — profile filled, but no match report ever unlocked.
+    try {
+      const snap = await db.collection("studentProfiles")
+        .where("updatedAt", ">=", lookbackFloor)
+        .where("updatedAt", "<=", idleCutoff)
+        .limit(REMINDER_QUERY_LIMIT)
+        .get();
+      for (const doc of snap.docs) {
+        const d = doc.data();
+        if (d.reminderSentAt) continue;
+        if (typeof d.field !== "string" || !d.field.trim()) continue;   // must have started matching
+        const uid = doc.id;                                             // studentProfiles keyed by uid
+        const rep = await db.collection("matchReports").where("userId", "==", uid).limit(1).get();
+        if (!rep.empty) continue;                                       // already unlocked → completed
+        candidates.push({
+          uid, kind: "matching", priority: 3,
+          stamp: () => doc.ref.set({ reminderSentAt: FieldValue.serverTimestamp() }, { merge: true }).then(() => {}),
+        });
+      }
+    } catch (err: any) {
+      console.error("[reminders] matching scan failed", err?.message ?? err);
+    }
+
+    // (2) Roadmap — checklist under way but stalled below 100%.
+    try {
+      const snap = await db.collection("studyRoadmaps")
+        .where("updatedAt", ">=", lookbackFloor)
+        .where("updatedAt", "<=", idleCutoff)
+        .limit(REMINDER_QUERY_LIMIT)
+        .get();
+      for (const doc of snap.docs) {
+        const d = doc.data();
+        if (d.reminderSentAt) continue;
+        const pct = typeof d.progressPercentage === "number" ? d.progressPercentage : 0;
+        if (pct >= 100) continue;
+        candidates.push({
+          uid: doc.id, kind: "roadmap", priority: 2,
+          stamp: () => doc.ref.set({ reminderSentAt: FieldValue.serverTimestamp() }, { merge: true }).then(() => {}),
+        });
+      }
+    } catch (err: any) {
+      console.error("[reminders] roadmap scan failed", err?.message ?? err);
+    }
+
+    // (1) Onboarding — signed up days ago, never touched any feature.
+    try {
+      const snap = await db.collection("users")
+        .where("createdAt", ">=", lookbackFloor)
+        .where("createdAt", "<=", idleCutoff)
+        .limit(REMINDER_QUERY_LIMIT)
+        .get();
+      for (const doc of snap.docs) {
+        const uid = doc.id;
+        const d = doc.data();
+        if (d.accountStatus && d.accountStatus !== "active") continue;
+        const stateSnap = await db.collection("lifecycleEmailState").doc(uid).get();
+        if (stateSnap.exists && stateSnap.data()?.onboardingReminderSentAt) continue;
+        const [prof, rm, visa] = await Promise.all([
+          db.collection("studentProfiles").doc(uid).get(),
+          db.collection("studyRoadmaps").doc(uid).get(),
+          db.collection("visaInterviewSessions").where("userId", "==", uid).limit(1).get(),
+        ]);
+        const hasProfile = prof.exists && typeof prof.data()?.field === "string" && !!prof.data()!.field.trim();
+        if (hasProfile || rm.exists || !visa.empty) continue;          // did SOMETHING → not idle-onboarding
+        candidates.push({
+          uid, kind: "onboarding", priority: 1,
+          stamp: () => db.collection("lifecycleEmailState").doc(uid)
+            .set({ onboardingReminderSentAt: FieldValue.serverTimestamp() }, { merge: true }).then(() => {}),
+        });
+      }
+    } catch (err: any) {
+      console.error("[reminders] onboarding scan failed", err?.message ?? err);
+    }
+
+    // One email per user — keep the highest-priority shape. Lower-priority
+    // stalls stay un-stamped and surface on a later run (once the higher one
+    // is resolved or its dedupe field is set), so we never double-mail in a run.
+    candidates.sort((a, b) => b.priority - a.priority);
+    const perUser = new Map<string, ReminderCandidate>();
+    for (const c of candidates) if (!perUser.has(c.uid)) perUser.set(c.uid, c);
+
+    let sent = 0, skipped = 0, failed = 0;
+    for (const c of perUser.values()) {
+      if (sent >= REMINDER_MAX_PER_RUN) {
+        console.warn("[reminders] hit per-run send cap; remaining users deferred to next run");
+        break;
+      }
+      if (!(await isLifecycleEmailAllowed(c.uid, "reminders"))) { skipped++; continue; }
+      const contact = await getUserContact(c.uid);
+      if (!contact) { skipped++; continue; }
+      try {
+        const unsubscribeUrl = buildUnsubscribeUrl(c.uid, "reminders", EMAIL_TOKEN_SECRET.value());
+        const { id } = await sendEngagementReminder({
+          apiKey: RESEND_API_KEY.value(),
+          to: contact.email,
+          kind: c.kind,
+          displayName: contact.displayName,
+          unsubscribeUrl,
+        });
+        await c.stamp();   // stamp AFTER a successful send so failures can retry
+        // Surface on the user's ops-portal activity timeline.
+        void logUserActivity({
+          userId:     c.uid,
+          action:     "engagement_reminder_sent",
+          targetType: "lifecycle_email",
+          metadata:   { kind: c.kind, category: "reminders", resendMessageId: id },
+        });
+        sent++;
+        await new Promise((r) => setTimeout(r, 80));   // stay polite to Resend
+      } catch (err: any) {
+        failed++;
+        void logError({
+          category: "email_send",
+          source:   "resend.engagement_reminder_failed",
+          severity: "warning",
+          message:  err?.message ?? String(err),
+          userId:   c.uid,
+          context:  { kind: c.kind },
+        });
+      }
+    }
+
+    console.log("[reminders] run complete", { candidates: perUser.size, sent, skipped, failed });
+  },
+);
+
+/**
+ * Shared body for the two feedback-request triggers. Fires an email that
+ * deep-links the user into the in-app FeedbackSurveyModal for `feature`.
+ * Idempotent (stamps `feedbackEmailSentAt` on the report) and rate-limited
+ * per user (14-day cooldown via lifecycleEmailState).
+ */
+async function maybeSendFeedbackEmail(
+  snap: FirebaseFirestore.DocumentSnapshot | undefined,
+  feature: FeedbackFeature,
+): Promise<void> {
+  if (!snap) return;
+  const data = snap.data() ?? {};
+  const uid = typeof data.userId === "string" ? data.userId : "";
+  if (!uid) return;
+  if (data.feedbackEmailSentAt) return;   // idempotent on Cloud Function retries
+
+  // Do not ask for feedback on a scoring run that failed — the user did not get
+  // a real result, so a "how was it?" would land badly.
+  if (feature === "visa_interview") {
+    const aiStatus = String(data.aiStatus ?? "");
+    if (/fail|error/i.test(aiStatus)) return;
+  }
+
+  if (!(await isLifecycleEmailAllowed(uid, "feedback"))) return;
+
+  const db = admin.firestore();
+  const stateRef  = db.collection("lifecycleEmailState").doc(uid);
+  const stateSnap = await stateRef.get();
+  const lastAt = stateSnap.exists ? stateSnap.data()?.lastFeedbackEmailAt : null;
+  const lastMs = lastAt?.toMillis?.() ?? 0;
+  if (Date.now() - lastMs < FEEDBACK_EMAIL_COOLDOWN_DAYS * 86_400_000) return;
+
+  const contact = await getUserContact(uid);
+  if (!contact) return;
+
+  try {
+    const unsubscribeUrl = buildUnsubscribeUrl(uid, "feedback", EMAIL_TOKEN_SECRET.value());
+    const { id } = await sendFeedbackRequest({
+      apiKey: RESEND_API_KEY.value(),
+      to: contact.email,
+      feature,
+      displayName: contact.displayName,
+      ref: snap.id,
+      unsubscribeUrl,
+    });
+    await Promise.all([
+      snap.ref.set({ feedbackEmailSentAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true }),
+      stateRef.set({ lastFeedbackEmailAt: admin.firestore.FieldValue.serverTimestamp() }, { merge: true }),
+    ]);
+    // Surface on the user's ops-portal activity timeline.
+    void logUserActivity({
+      userId:     uid,
+      action:     "feedback_request_sent",
+      targetType: "lifecycle_email",
+      targetId:   snap.id,
+      metadata:   { feature, category: "feedback", resendMessageId: id },
+    });
+  } catch (err: any) {
+    // Log but never throw — re-throwing triggers Cloud Function retries, which
+    // can spam the user if the failure is downstream (e.g. Resend hiccup).
+    void logError({
+      category: "email_send",
+      source:   "resend.feedback_request_failed",
+      severity: "warning",
+      message:  err?.message ?? String(err),
+      userId:   uid,
+      context:  { feature, reportId: snap.id },
+    });
+  }
+}
+
+export const onMatchReportCreated = onDocumentCreated(
+  { ...LIGHT_OPTS, document: "matchReports/{reportId}", secrets: [RESEND_API_KEY, EMAIL_TOKEN_SECRET] },
+  async (event) => { await maybeSendFeedbackEmail(event.data, "match_report"); },
+);
+
+export const onVisaReportCreated = onDocumentCreated(
+  { ...LIGHT_OPTS, document: "visaInterviewReports/{reportId}", secrets: [RESEND_API_KEY, EMAIL_TOKEN_SECRET] },
+  async (event) => { await maybeSendFeedbackEmail(event.data, "visa_interview"); },
+);
+
+// Simple confirmation page for the public unsubscribe endpoint. No app chrome —
+// it is a landing surface reached from an email, viewed once.
+function unsubscribePage(opts: { ok: boolean; category?: EmailCategory }): string {
+  const heading = opts.ok ? "You are unsubscribed" : "That link did not work";
+  const detail = opts.ok
+    ? (opts.category === "feedback"
+        ? "You will no longer receive feedback requests from College Ready."
+        : opts.category === "all"
+          ? "You will no longer receive reminder or feedback emails from College Ready."
+          : "You will no longer receive reminder emails from College Ready.")
+    : "This unsubscribe link is invalid or expired. If you keep getting emails you do not want, reply to any of them and we will sort it out.";
+  return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${heading}</title></head>
+<body style="margin:0;background:#f8fafc;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
+  <div style="max-width:520px;margin:80px auto;padding:0 20px;text-align:center;">
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:40px 32px;">
+      <p style="margin:0 0 6px 0;font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#1e3a8a;font-weight:700;">College Ready</p>
+      <h1 style="margin:0 0 12px 0;font-size:22px;">${heading}</h1>
+      <p style="margin:0 0 20px 0;color:#475569;font-size:15px;line-height:1.6;">${detail}</p>
+      <a href="https://collegeready.io" style="display:inline-block;background:#1e3a8a;color:#fff;text-decoration:none;font-weight:700;padding:11px 20px;border-radius:12px;font-size:14px;">Back to College Ready</a>
+    </div>
+  </div>
+</body></html>`;
+}
+
+export const unsubscribeEmail = onRequest(
+  { ...LIGHT_OPTS, secrets: [EMAIL_TOKEN_SECRET] },
+  async (req, res) => {
+    const token  = typeof req.query.token === "string" ? req.query.token : "";
+    const parsed = token ? verifyUnsubscribeToken(token, EMAIL_TOKEN_SECRET.value()) : null;
+    if (!parsed) {
+      res.status(400).send(unsubscribePage({ ok: false }));
+      return;
+    }
+    const cats: LifecycleCategory[] = parsed.category === "all"
+      ? ["reminders", "feedback"]
+      : [parsed.category];
+    try {
+      await admin.firestore().collection("users").doc(parsed.uid).set(
+        { emailPrefs: Object.fromEntries(cats.map((c) => [c, false])) },
+        { merge: true },
+      );
+    } catch (err: any) {
+      console.error("[unsubscribe] write failed", { uid: parsed.uid, err: err?.message ?? err });
+      res.status(500).send(unsubscribePage({ ok: false }));
+      return;
+    }
+    res.status(200).send(unsubscribePage({ ok: true, category: parsed.category }));
   },
 );

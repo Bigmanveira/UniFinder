@@ -17,8 +17,14 @@ import { collection, query, where } from "firebase/firestore";
 import { FadeIn, FadeInItem } from "../components/FadeIn";
 import { getOrCreateReferralCode, buildReferralUrl } from "../lib/referrals";
 import { isFounderEmail } from "../lib/founders";
+import FeedbackSurveyModal, { type SurveyTrigger } from "../components/FeedbackSurveyModal";
 
 const VALID_DASHBOARD_TABS = new Set(["matches", "saved", "billing", "profile", "interviews"]);
+// Feedback-request emails deep-link here as /app?survey=<trigger>&ref=<reportId>.
+// We honour the param by force-opening the FeedbackSurveyModal (bypassing the
+// usual probability gate — the user explicitly came to give feedback). The
+// server-side cooldown in submitFeedbackSurvey still applies gracefully.
+const VALID_SURVEY_TRIGGERS = new Set<SurveyTrigger>(["match_report", "visa_interview"]);
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -44,6 +50,24 @@ export default function DashboardPage() {
     if (searchParams.has("tab")) {
       const next = new URLSearchParams(searchParams);
       next.delete("tab");
+      setSearchParams(next, { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Feedback deep-link (from a feedback-request email). Consume the params
+  // once on mount, open the survey modal, then strip them so a refresh
+  // doesn't re-prompt.
+  const [surveyPrompt, setSurveyPrompt] = useState<{ trigger: SurveyTrigger; triggerId?: string } | null>(null);
+  useEffect(() => {
+    const requested = searchParams.get("survey") as SurveyTrigger | null;
+    if (requested && VALID_SURVEY_TRIGGERS.has(requested)) {
+      setSurveyPrompt({ trigger: requested, triggerId: searchParams.get("ref") ?? undefined });
+    }
+    if (searchParams.has("survey") || searchParams.has("ref")) {
+      const next = new URLSearchParams(searchParams);
+      next.delete("survey");
+      next.delete("ref");
       setSearchParams(next, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -649,6 +673,14 @@ export default function DashboardPage() {
         )}
       </AnimatePresence>
 
+      {surveyPrompt && (
+        <FeedbackSurveyModal
+          open
+          trigger={surveyPrompt.trigger}
+          triggerId={surveyPrompt.triggerId}
+          onClose={() => setSurveyPrompt(null)}
+        />
+      )}
     </div>
   );
 }

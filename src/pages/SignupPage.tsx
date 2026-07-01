@@ -180,7 +180,7 @@ export default function SignupPage() {
 
         const guestProfile = localStorage.getItem("unifinder_guest_profile");
         if (guestProfile) {
-          await setDoc(doc(db, "studentProfiles", uid), JSON.parse(guestProfile));
+          await setDoc(doc(db, "studentProfiles", uid), { ...JSON.parse(guestProfile), updatedAt: serverTimestamp() });
         }
       } catch (dbError) {
         console.warn("Could not save backend foundation records:", dbError);

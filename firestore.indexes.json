@@ -83,6 +83,14 @@
       ]
     },
     {
+      "collectionGroup": "visaInterviewSessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status",    "order": "ASCENDING" },
+        { "fieldPath": "updatedAt", "order": "ASCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "academicCvDocuments",
       "queryScope": "COLLECTION",
       "fields": [

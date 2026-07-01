@@ -38,7 +38,9 @@ export type UserActivityAction =
   | "visa_document_uploaded"    // I-20 / DS-160 uploaded + extracted
   | "referral_code_applied"     // Standard user referral applied (pending or paid-out)
   | "marketer_code_applied"     // Marketer code redeemed
-  | "credits_granted_manual";   // Founder manually granted credits (typically to recover from a failed webhook)
+  | "credits_granted_manual"    // Founder manually granted credits (typically to recover from a failed webhook)
+  | "engagement_reminder_sent"  // Lifecycle: "continue where you left off" nudge emailed
+  | "feedback_request_sent";    // Lifecycle: post-completion feedback request emailed
 
 export interface LogUserActivityArgs {
   /** The user the action belongs to. */
