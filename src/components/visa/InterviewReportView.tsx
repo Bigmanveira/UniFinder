@@ -1,5 +1,5 @@
-import { motion } from "framer-motion";
-import { Award, AlertTriangle, Wand2, RotateCcw, ArrowLeft, Lightbulb, Check } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
+import { AlertTriangle, ArrowLeft, Check, Lightbulb, RotateCcw, Target } from "lucide-react";
 import type { VisaInterviewReport } from "../../types";
 
 interface Props {
@@ -7,6 +7,11 @@ interface Props {
   onRetry:   () => void;
   onBack:    () => void;
 }
+
+/** The score a single dimension has to reach to count as interview-ready.
+ *  The whole profile chart is read against this one reference line, so it
+ *  lives here rather than being repeated as a magic number. */
+const READY_LINE = 60;
 
 const SCORE_LABELS: { key: keyof VisaInterviewReport; label: string }[] = [
   { key: "clarityScore",                  label: "Clarity" },
@@ -19,196 +24,314 @@ const SCORE_LABELS: { key: keyof VisaInterviewReport; label: string }[] = [
   { key: "documentReadinessScore",        label: "Document readiness" },
 ];
 
-function scoreColor(s: number): string {
-  if (s >= 80) return "text-emerald-700";
-  if (s >= 60) return "text-blue-700";
-  if (s >= 40) return "text-amber-700";
-  return "text-rose-700";
+/* Readiness bands, running warm (at risk) to cool (ready).
+ *
+ * NOTE: tailwind.config.js aliases emerald/green/lime/teal to brandBlue, so
+ * this palette contains no green at all — `text-emerald-700` resolves to the
+ * same blue as `text-blue-700`. The previous thresholds therefore painted
+ * 60-79 and 80+ in an identical colour, making the top two bands impossible
+ * to tell apart. Every colour below resolves to a genuinely distinct value. */
+interface Band {
+  fill:  string;  // bar fill on the profile chart
+  text:  string;  // numeral colour on light surfaces
+  onInk: string;  // numeral colour on the dark header
+  label: string;
 }
 
-function ringColor(s: number): string {
-  if (s >= 80) return "stroke-emerald-500";
-  if (s >= 60) return "stroke-blue-500";
-  if (s >= 40) return "stroke-amber-500";
-  return "stroke-rose-500";
+function bandFor(score: number): Band {
+  if (score >= 80)         return { fill: "bg-blue-600",   text: "text-blue-700",  onInk: "text-blue-200",  label: "Strong" };
+  if (score >= READY_LINE) return { fill: "bg-accent-500", text: "text-sky-600",   onInk: "text-sky-200",   label: "Steady" };
+  if (score >= 40)         return { fill: "bg-amber-400",  text: "text-amber-600", onInk: "text-amber-200", label: "Shaky"  };
+  return                          { fill: "bg-rose-500",   text: "text-rose-600",  onInk: "text-rose-200",  label: "Weak"   };
+}
+
+/* Describes the run that just happened. Deliberately worded as an account of
+ * this practice session and never as a prediction of a real visa outcome —
+ * the Terms commit to that distinction. */
+function verdictFor(overall: number, belowCount: number): { headline: string; detail: string } {
+  const headline =
+    overall >= 80         ? "Strong practice run"
+    : overall >= READY_LINE ? "Solid, with gaps"
+    : overall >= 40         ? "Uneven across the board"
+    :                         "Early days";
+
+  const detail =
+    belowCount === 0
+      ? `Every area cleared the ${READY_LINE} benchmark in this run.`
+      : belowCount === 1
+        ? `One area came in under the ${READY_LINE} benchmark in this run.`
+        : `${belowCount} of ${SCORE_LABELS.length} areas came in under the ${READY_LINE} benchmark in this run.`;
+
+  return { headline, detail };
 }
 
 export default function InterviewReportView({ report, onRetry, onBack }: Props) {
-  const overall = report.overallScore;
-  const ringR   = 56;
-  const circ    = 2 * Math.PI * ringR;
-  const offset  = circ - (Math.max(0, Math.min(100, overall)) / 100) * circ;
+  const reduceMotion = useReducedMotion();
+  const overall = Math.max(0, Math.min(100, report.overallScore));
+
+  const rows = SCORE_LABELS.map(({ key, label }) => {
+    const value = Math.max(0, Math.min(100, (report[key] as number) ?? 0));
+    return { key, label, value, band: bandFor(value) };
+  });
+
+  const below   = rows.filter((r) => r.value < READY_LINE);
+  const verdict = verdictFor(overall, below.length);
+
+  // The two weakest areas, surfaced as an explicit next step. The chart itself
+  // stays in canonical order so a returning user can compare runs at a glance;
+  // this callout is what turns the chart into a priority.
+  const focus = [...rows].sort((a, b) => a.value - b.value).slice(0, 2);
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-      className="space-y-6"
+      initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="space-y-4"
     >
-      {/* Hero — overall + meta scores */}
-      <section className="bg-slate-950 text-white rounded-3xl p-7 sm:p-8 relative overflow-hidden">
-        <div className="absolute -top-24 -right-24 w-72 h-72 bg-blue-500/15 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute -bottom-20 -left-20 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+      {/* ---- Verdict header -------------------------------------------- */}
+      <section className="overflow-hidden rounded-[26px] border border-[#22376d] bg-[#07142f] text-white">
+        <div className="flex items-center justify-between gap-3 border-b border-white/10 px-6 py-3 sm:px-8">
+          <p className="font-utility text-[10px] uppercase tracking-[0.22em] text-[#8fa6e8]">
+            F-1 practice assessment
+          </p>
+          {report.scoringVersion && (
+            <p className="font-utility text-[10px] uppercase tracking-[0.14em] text-white/35">
+              {report.scoringVersion}
+            </p>
+          )}
+        </div>
 
-        <div className="relative flex items-start gap-6 flex-wrap">
-          {/* Score ring */}
-          <div className="relative w-36 h-36 flex-shrink-0">
-            <svg className="absolute inset-0 -rotate-90" viewBox="0 0 144 144">
-              <circle cx="72" cy="72" r={ringR} className="stroke-white/10" strokeWidth="12" fill="none" />
-              <motion.circle
-                cx="72" cy="72" r={ringR}
-                className={ringColor(overall)}
-                strokeWidth="12"
-                strokeLinecap="round"
-                fill="none"
-                initial={{ strokeDasharray: circ, strokeDashoffset: circ }}
-                animate={{ strokeDasharray: circ, strokeDashoffset: offset }}
-                transition={{ duration: 1.0, ease: [0.21, 0.47, 0.32, 0.98] }}
-              />
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-4xl font-bold tabular-nums">{overall}</span>
-              <span className="text-[11px] text-white/60 mt-0.5">/ 100</span>
-            </div>
+        <div className="flex flex-wrap items-end gap-x-8 gap-y-4 px-6 py-7 sm:px-8">
+          <div className="flex items-start gap-1">
+            <span className="font-display text-[68px] font-bold leading-[0.85] tracking-tight tabular-nums sm:text-[84px]">
+              {overall}
+            </span>
+            <span className="font-utility mt-2 text-xs text-white/40">/100</span>
           </div>
 
-          <div className="flex-1 min-w-[220px]">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 backdrop-blur border border-white/15 text-[11px] font-semibold mb-3">
-              <Award size={11} className="text-amber-300" /> Practice score
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight leading-tight mb-2">Your interview feedback</h2>
-            <p className="text-sm text-white/70 leading-relaxed max-w-xl">{report.disclaimer}</p>
+          <div className="min-w-[220px] flex-1">
+            <h2 className="font-display text-xl font-bold tracking-tight sm:text-2xl">
+              {verdict.headline}
+            </h2>
+            <p className="mt-1.5 text-sm leading-relaxed text-white/65">{verdict.detail}</p>
           </div>
         </div>
 
-        {/* Sub-scores grid — show "score / 100" so the user reads each as a
-            fraction, not an opaque number. The dimmer "/100" suffix keeps
-            the headline number prominent while making the scale obvious. */}
-        <div className="relative mt-6 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          {SCORE_LABELS.map(({ key, label }) => {
-            const v = (report[key] as number) ?? 0;
-            return (
-              <div key={key} className="bg-white/[0.06] border border-white/10 rounded-xl px-3 py-2.5">
-                <p className="text-[11px] text-white/60 leading-none mb-1.5">{label}</p>
-                <p className={`leading-none ${scoreColor(v)} brightness-150`}>
-                  <span className="text-xl font-bold tabular-nums">{v}</span>
-                  <span className="text-[11px] font-medium opacity-60 ml-0.5">/100</span>
-                </p>
-              </div>
-            );
-          })}
-        </div>
+        {/* The disclaimer sits directly against the number it qualifies —
+            shown once here rather than repeated in the footer. */}
+        <p className="border-t border-white/10 px-6 py-3.5 text-[12.5px] leading-relaxed text-white/55 sm:px-8">
+          {report.disclaimer}
+        </p>
       </section>
 
-      {/* Strengths + weaknesses */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <FeedbackList
-          title="What went well"
-          tone="emerald"
-          icon={<Wand2 size={14} className="text-emerald-700" />}
-          items={report.strengths}
-        />
-        <FeedbackList
-          title="Areas to improve"
-          tone="rose"
-          icon={<AlertTriangle size={14} className="text-rose-700" />}
-          items={report.weaknesses}
-        />
+      {/* ---- Readiness profile ----------------------------------------- */}
+      <section className="rounded-[26px] border border-slate-200 bg-white p-5 sm:p-6">
+        <div className="mb-5 flex flex-wrap items-baseline justify-between gap-2">
+          <h3 className="font-display text-base font-bold tracking-tight text-slate-900">
+            Readiness profile
+          </h3>
+          <p className="font-utility text-[10px] uppercase tracking-[0.16em] text-slate-400">
+            Benchmark {READY_LINE}
+          </p>
+        </div>
+
+        <ul className="space-y-3">
+          {rows.map((row, i) => (
+            <li key={row.key as string}>
+              {/* Narrow screens: label and value ride above the full-width bar. */}
+              <div className="mb-1.5 flex items-baseline justify-between gap-3 sm:hidden">
+                <span className="text-[13px] font-semibold text-slate-700">{row.label}</span>
+                <span className={`font-utility text-[13px] font-semibold tabular-nums ${row.band.text}`}>
+                  {row.value}
+                </span>
+              </div>
+
+              <div className="sm:grid sm:grid-cols-[164px_1fr_60px] sm:items-center sm:gap-4">
+                <span className="hidden text-[13px] font-semibold text-slate-700 sm:block">
+                  {row.label}
+                </span>
+
+                <div className="relative h-2.5 overflow-hidden rounded-full bg-slate-100">
+                  <motion.div
+                    className={`h-full rounded-full ${row.band.fill}`}
+                    /* "0%" rather than 0: Framer Motion cannot interpolate a
+                       unitless number (read as px) to a percentage target, and
+                       silently pins the bar at 0px if the units differ. */
+                    initial={reduceMotion ? false : { width: "0%" }}
+                    animate={{ width: `${row.value}%` }}
+                    transition={{
+                      duration: 0.75,
+                      delay: reduceMotion ? 0 : 0.12 + i * 0.055,
+                      ease: [0.22, 1, 0.36, 1],
+                    }}
+                  />
+                  {/* The benchmark line — the one mark every bar is read
+                      against, and the reason the chart beats eight tiles. */}
+                  <span
+                    aria-hidden
+                    className="absolute inset-y-0 w-px bg-slate-900/25"
+                    style={{ left: `${READY_LINE}%` }}
+                  />
+                </div>
+
+                <span
+                  className={`hidden text-right font-utility text-[13px] font-semibold tabular-nums sm:block ${row.band.text}`}
+                >
+                  {row.value}
+                </span>
+              </div>
+            </li>
+          ))}
+        </ul>
+
+        <p className="mt-5 border-t border-slate-100 pt-3.5 text-xs leading-relaxed text-slate-500">
+          The line marks {READY_LINE}. Bars short of it are the areas this run left unproven.
+        </p>
+      </section>
+
+      {/* ---- Where to start next --------------------------------------- */}
+      {below.length > 0 && (
+        <section className="rounded-[26px] border border-[#c8d2f8] bg-[#f4f6ff] p-5 sm:p-6">
+          <h3 className="flex items-center gap-2 font-display text-base font-bold tracking-tight text-[#1b2f68]">
+            <Target size={15} className="text-[#5169c7]" /> Start here next time
+          </h3>
+          <p className="mt-1.5 text-[13px] leading-relaxed text-[#31437e]">
+            Your two lowest areas from this run. Rehearse these before booking anything.
+          </p>
+          <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
+            {focus.map((row) => (
+              <div
+                key={row.key as string}
+                className="flex items-baseline justify-between gap-3 rounded-2xl border border-[#ccd6fb] bg-white px-4 py-3"
+              >
+                <span className="text-sm font-bold text-slate-900">{row.label}</span>
+                <span className="flex items-baseline gap-1.5">
+                  <span className="font-utility text-[10px] uppercase tracking-[0.14em] text-slate-400">
+                    {row.band.label}
+                  </span>
+                  <span className={`font-utility text-base font-bold tabular-nums ${row.band.text}`}>
+                    {row.value}
+                  </span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ---- Strengths + weaknesses ------------------------------------ */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <FeedbackList title="What went well"    tone="blue" items={report.strengths} />
+        <FeedbackList title="Areas to improve"  tone="rose" items={report.weaknesses} />
       </div>
 
-      {/* Red flags */}
+      {/* ---- Red flags -------------------------------------------------- */}
       {report.redFlagsToImprove.length > 0 && (
-        <section className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
-          <h3 className="text-base font-bold text-amber-900 mb-3 flex items-center gap-2">
-            <AlertTriangle size={15} className="text-amber-700" /> Red flags to address before the real interview
+        <section className="rounded-[26px] border border-amber-200 bg-amber-50 p-5 sm:p-6">
+          <h3 className="flex items-center gap-2 font-display text-base font-bold tracking-tight text-amber-900">
+            <AlertTriangle size={15} className="text-amber-600" /> Fix before the real interview
           </h3>
-          <ul className="space-y-1.5">
+          <ul className="mt-3 space-y-2">
             {report.redFlagsToImprove.map((s, i) => (
-              <li key={i} className="text-sm text-amber-900 flex items-start gap-2 leading-relaxed">
-                <span className="mt-0.5 text-amber-700">•</span>{s}
+              <li key={i} className="flex items-start gap-2.5 text-sm leading-relaxed text-amber-900">
+                <span aria-hidden className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-amber-500" />
+                {s}
               </li>
             ))}
           </ul>
         </section>
       )}
 
-      {/* Recommended practice */}
+      {/* ---- Recommended practice --------------------------------------- */}
       {report.recommendedPractice.length > 0 && (
-        <section className="bg-white rounded-2xl border border-slate-200 p-5">
-          <h3 className="text-base font-bold text-slate-900 mb-3 flex items-center gap-2">
+        <section className="rounded-[26px] border border-slate-200 bg-white p-5 sm:p-6">
+          <h3 className="flex items-center gap-2 font-display text-base font-bold tracking-tight text-slate-900">
             <Lightbulb size={15} className="text-amber-500" /> Recommended practice
           </h3>
-          <ol className="space-y-2">
+          <ul className="mt-3 space-y-2.5">
             {report.recommendedPractice.map((s, i) => (
-              <li key={i} className="text-sm text-slate-700 flex items-start gap-2 leading-relaxed">
-                <span className="text-slate-400 font-bold tabular-nums w-4">{i + 1}.</span>{s}
+              <li key={i} className="flex items-start gap-3 text-sm leading-relaxed text-slate-700">
+                <span className="font-utility mt-px w-4 shrink-0 text-[11px] font-semibold tabular-nums text-slate-400">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                {s}
               </li>
             ))}
-          </ol>
+          </ul>
         </section>
       )}
 
-      {/* Sample improved answers */}
+      {/* ---- Sample improved answers ------------------------------------ */}
       {report.sampleImprovedAnswers.length > 0 && (
-        <section className="bg-white rounded-2xl border border-slate-200 p-5 space-y-4">
-          <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-            <Check size={15} className="text-emerald-700" /> Sample improved answers
+        <section className="rounded-[26px] border border-slate-200 bg-white p-5 sm:p-6">
+          <h3 className="flex items-center gap-2 font-display text-base font-bold tracking-tight text-slate-900">
+            <Check size={15} className="text-blue-600" /> Stronger versions of your answers
           </h3>
-          {report.sampleImprovedAnswers.map((s, i) => (
-            <div key={i} className="border-t border-slate-100 pt-4 first:border-0 first:pt-0">
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Q. {s.question}</p>
-              <p className="text-sm text-slate-900 leading-relaxed mb-2">{s.improvedAnswer}</p>
-              <p className="text-xs text-slate-500 italic leading-relaxed">{s.whyBetter}</p>
-            </div>
-          ))}
+          <div className="mt-4 space-y-4">
+            {report.sampleImprovedAnswers.map((s, i) => (
+              <div key={i} className="border-t border-slate-100 pt-4 first:border-0 first:pt-0">
+                <p className="font-utility text-[10px] uppercase tracking-[0.16em] text-slate-400">
+                  Asked
+                </p>
+                <p className="mt-1 text-[13px] font-semibold leading-relaxed text-slate-500">
+                  {s.question}
+                </p>
+                <p className="mt-2.5 border-l-2 border-blue-500 pl-3.5 text-sm leading-relaxed text-slate-900">
+                  {s.improvedAnswer}
+                </p>
+                <p className="mt-2 text-xs leading-relaxed text-slate-500">{s.whyBetter}</p>
+              </div>
+            ))}
+          </div>
         </section>
       )}
 
-      {/* Footer actions */}
-      <div className="flex flex-col sm:flex-row gap-2 pt-2">
+      {/* ---- Actions ----------------------------------------------------- */}
+      <div className="flex flex-col gap-2.5 pt-1 sm:flex-row">
         <button
           onClick={onBack}
-          className="flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold bg-white border border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50 transition-colors"
+          className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-3.5 text-sm font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6179d8] focus-visible:ring-offset-2"
         >
-          <ArrowLeft size={14} /> Back to dashboard
+          <ArrowLeft size={15} /> Back to dashboard
         </button>
         <button
           onClick={onRetry}
-          className="flex-1 inline-flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold bg-slate-900 hover:bg-slate-800 text-white transition-colors shadow-md shadow-slate-900/20"
+          className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#07142f] py-3.5 text-sm font-semibold text-white shadow-lg shadow-[#07142f]/20 transition-colors hover:bg-[#102454] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6179d8] focus-visible:ring-offset-2"
         >
-          <RotateCcw size={14} /> Practice again
+          <RotateCcw size={15} /> Practice again
         </button>
       </div>
-
-      <p className="text-[11px] text-slate-400 text-center pt-2 leading-relaxed max-w-xl mx-auto">
-        {report.disclaimer}
-      </p>
     </motion.div>
   );
 }
 
 function FeedbackList({
-  title, items, icon, tone,
+  title, items, tone,
 }: {
   title: string;
   items: string[];
-  icon:  React.ReactNode;
-  tone:  "emerald" | "rose";
+  tone:  "blue" | "rose";
 }) {
   if (items.length === 0) return null;
-  const cls =
-    tone === "emerald"
-      ? "bg-emerald-50/60 border-emerald-200 text-emerald-900"
-      : "bg-rose-50/60 border-rose-200 text-rose-900";
+
+  const surface = tone === "blue"
+    ? "border-[#c8d2f8] bg-[#f4f6ff]"
+    : "border-rose-200 bg-rose-50/70";
+  const heading = tone === "blue" ? "text-[#1b2f68]" : "text-rose-900";
+  const body    = tone === "blue" ? "text-[#31437e]" : "text-rose-900";
+  const marker  = tone === "blue" ? "bg-[#6078d5]"   : "bg-rose-400";
+
   return (
-    <div className={`rounded-2xl border p-4 ${cls}`}>
-      <h3 className="text-sm font-bold flex items-center gap-2 mb-2">{icon} {title}</h3>
-      <ul className="space-y-1.5">
+    <section className={`rounded-[26px] border p-5 ${surface}`}>
+      <h3 className={`font-display text-base font-bold tracking-tight ${heading}`}>{title}</h3>
+      <ul className="mt-3 space-y-2">
         {items.map((s, i) => (
-          <li key={i} className="text-[13px] flex items-start gap-2 leading-relaxed">
-            <span className="mt-1 opacity-70">•</span>{s}
+          <li key={i} className={`flex items-start gap-2.5 text-[13px] leading-relaxed ${body}`}>
+            <span aria-hidden className={`mt-[7px] h-1 w-1 shrink-0 rounded-full ${marker}`} />
+            {s}
           </li>
         ))}
       </ul>
-    </div>
+    </section>
   );
 }
