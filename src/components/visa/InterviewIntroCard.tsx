@@ -133,7 +133,7 @@ export default function InterviewIntroCard({
           <div className="border-t border-white/10 bg-white/[0.045] p-6 backdrop-blur-sm sm:border-l sm:border-t-0 sm:p-7">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">Session format</p>
             <div className="mt-5 space-y-4">
-              <SessionDetail icon={<Video size={16} />} label="Live avatar" value="Face-to-face simulation" />
+              <SessionDetail icon={<Video size={16} />} label="Live interviewer" value="Face-to-face simulation" />
               <SessionDetail icon={<Mic size={16} />} label="Voice answers" value="No typing during the mock" />
               <SessionDetail icon={<ClipboardCheck size={16} />} label="Feedback" value="Evidence-based scoring" />
             </div>

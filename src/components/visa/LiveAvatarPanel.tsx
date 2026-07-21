@@ -142,11 +142,11 @@ export default function LiveAvatarPanel({
       acceptSpeechEventsRef.current = true;
       speakStartTimeoutRef.current = setTimeout(() => {
         if (currentSpeechRef.current !== item || item.started || mediaInterruptedRef.current) return;
-        failCurrentSpeech("Avatar did not confirm speech start within 10 seconds.");
+        failCurrentSpeech("Interviewer did not confirm speech start within 10 seconds.");
       }, 10_000);
     } catch (error: any) {
       if (currentSpeechRef.current !== item || mediaInterruptedRef.current) return;
-      failCurrentSpeech(error?.message ?? "Could not send audio to the avatar.");
+      failCurrentSpeech(error?.message ?? "Could not send audio to the interviewer.");
     }
   }
 
@@ -203,7 +203,7 @@ export default function LiveAvatarPanel({
       return;
     }
     if (item.attempts >= 1) {
-      failCurrentSpeech("Avatar media was interrupted twice during the same question.");
+      failCurrentSpeech("Interviewer media was interrupted twice during the same question.");
       return;
     }
     item.attempts += 1;
@@ -248,7 +248,7 @@ export default function LiveAvatarPanel({
           onFallbackRef.current?.(msg);
           return;
         }
-        const msg = err?.message ?? "Could not start the avatar session.";
+        const msg = err?.message ?? "Could not start the interview session.";
         setPhase("failed");
         setReason(msg);
         onFallbackRef.current?.(msg);
@@ -256,7 +256,7 @@ export default function LiveAvatarPanel({
       }
       if (cancelled) return;
       if (!tokenData?.ready) {
-        const msg = tokenData?.reason ?? "Avatar service is not ready.";
+        const msg = tokenData?.reason ?? "The interview service is not ready.";
         setPhase("failed");
         setReason(msg);
         onFallbackRef.current?.(msg);
@@ -297,7 +297,7 @@ export default function LiveAvatarPanel({
             idleAfterLiveTimeoutRef.current = setTimeout(() => {
               if (cancelled) return;
               if (speakingRef.current || queueRef.current.length > 0) return;
-              const msg = "Avatar connected but no question arrived within 30s. Tearing down to save credits.";
+              const msg = "Interviewer connected but no question arrived within 30s. Tearing down to save credits.";
               console.warn("[avatar]", msg);
               setPhase("failed");
               setReason("No question arrived. Your interview tokens can be refunded — contact support.");
@@ -317,7 +317,7 @@ export default function LiveAvatarPanel({
             if (!handleRef.current) return;
             handleRef.current = null;
             clearSpeechTimers();
-            const msg = "The avatar connection ended unexpectedly. Please restart the interview.";
+            const msg = "The interview connection ended unexpectedly. Please restart the interview.";
             setPhase("failed");
             setReason(msg);
             setMediaNotice(null);
@@ -361,7 +361,7 @@ export default function LiveAvatarPanel({
         if (!handleRef.current) handleRef.current = handle;
       } catch (err: any) {
         if (cancelled) return;
-        const msg = err?.message ?? "Avatar SDK failed to connect.";
+        const msg = err?.message ?? "The interview video service failed to connect.";
         console.error("[avatar] connect error:", msg);
         setPhase("failed");
         setReason(msg);
@@ -477,7 +477,7 @@ export default function LiveAvatarPanel({
             )}
           </div>
           <p className="text-base font-semibold mb-1">
-            {phase === "failed" ? "Avatar unavailable" : "Connecting consular officer…"}
+            {phase === "failed" ? "Interviewer unavailable" : "Connecting consular officer…"}
           </p>
           {phase !== "failed" && (
             <p className="text-xs text-white/60 max-w-xs leading-relaxed">

@@ -1166,7 +1166,7 @@ function BillingTab({ credits, userId, isFounder }: { credits: number; userId: s
             <p className="text-xs text-slate-400 leading-relaxed">
               <span className="font-bold text-white">1,000 tokens</span> = Match report unlock.
               <br />
-              <span className="font-bold text-white">15,000 tokens</span> = F-1 interview practice (live avatar).
+              <span className="font-bold text-white">15,000 tokens</span> = F-1 interview practice (live interviewer).
               <br />
               Tokens never expire.
             </p>

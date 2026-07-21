@@ -71,7 +71,7 @@ export default function PrivacyPage() {
             <ul className="list-disc ml-5 mt-3 space-y-1.5">
               <li><strong>Google Firebase</strong> — authentication, database (Firestore), file storage, and serverless functions.</li>
               <li><strong>Anthropic</strong> — runs Claude, the AI model that ranks your matches, writes explanations, and scores your interview practice. Anthropic does not train on your data.</li>
-              <li><strong>HeyGen</strong> — provides the live avatar visual during F-1 interview practice. Audio and video are streamed only for the duration of the session.</li>
+              <li><strong>HeyGen</strong> — provides the live interviewer video during F-1 interview practice. Audio and video are streamed only for the duration of the session.</li>
               <li><strong>Google Cloud Text-to-Speech</strong> — synthesises Anna's voice from the question text.</li>
               <li><strong>Vercel</strong> — hosts the web application.</li>
             </ul>

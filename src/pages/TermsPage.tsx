@@ -48,7 +48,7 @@ export default function TermsPage() {
             </p>
             <ul className="list-disc ml-5 mt-3 space-y-1.5">
               <li>Match against a verified database of U.S. colleges based on their profile.</li>
-              <li>Rehearse the U.S. F-1 student visa interview with an AI avatar.</li>
+              <li>Rehearse the U.S. F-1 student visa interview with an AI interviewer.</li>
               <li>Build an application roadmap and save schools they're interested in.</li>
             </ul>
             <p className="mt-3 font-bold text-slate-900">
@@ -93,7 +93,7 @@ export default function TermsPage() {
               The "Live AI consular officer" is a <strong>simulation</strong> built for practice. Read this carefully:
             </p>
             <ul className="list-disc ml-5 mt-3 space-y-1.5">
-              <li>"Anna" is an AI avatar. She is not, and never claims to be, a real consular officer.</li>
+              <li>"Anna" is an AI interviewer. She is not, and never claims to be, a real consular officer.</li>
               <li>The score, feedback, and red flags she generates are <strong>practice feedback</strong> only — not a prediction of your real visa outcome.</li>
               <li>Real visa decisions are made by U.S. consular officers based on factors and policies we have no access to.</li>
               <li>Nothing in the simulator should be treated as legal advice. Consult a qualified immigration attorney for legal questions.</li>

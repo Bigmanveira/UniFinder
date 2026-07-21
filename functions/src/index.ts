@@ -2805,7 +2805,7 @@ export const createLiveAvatarSession = onCall(
       if (sinceLast < 60_000 && sessionData?.avatarStatus !== "ended" && sessionData?.avatarStatus !== "failed") {
         throw new HttpsError(
           "resource-exhausted",
-          "An avatar session was just created for this interview. Please wait a moment before retrying.",
+          "A live session was just created for this interview. Please wait a moment before retrying.",
         );
       }
     }

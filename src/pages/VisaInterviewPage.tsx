@@ -180,7 +180,7 @@ export default function VisaInterviewPage() {
         console.error("[visa] message snapshot error:", err.code, err.message);
         setError(`Could not load interview messages: ${err.message}`);
         setStage("failed");
-        setFatalReason("Lost connection to the interview backend. The avatar has been stopped — your interview tokens will need to be refunded manually for now.");
+        setFatalReason("Lost connection to the interview backend. The interview has been stopped — your interview tokens will need to be refunded manually for now.");
       },
     );
     return unsub;
@@ -407,13 +407,13 @@ export default function VisaInterviewPage() {
     // either keep talking or click the manual End button.
     if (pendingEndAfterSpeech) {
       setPendingEndAfterSpeech(false);
-      setError("Couldn't play the avatar's voice for that line. Click 'End interview & get feedback' to score now.");
+      setError("Couldn't play the interviewer's voice for that line. Click 'End interview & get feedback' to score now.");
       setStage("processing");
       return;
     }
     // Mid-interview TTS failure. Quietly arm the mic so the user can keep
     // going — they missed Anna's spoken question but the chat won't lock up.
-    setError("Audio for the avatar's last line failed. Please continue speaking.");
+    setError("Audio for the interviewer's last line failed. Please continue speaking.");
     setStage("listening");
     speech.start();
   };
@@ -819,7 +819,7 @@ function FullScreenInterview({
         {stage === "failed" && (
           <div className="pointer-events-auto max-w-md w-full bg-rose-500/15 backdrop-blur-md border border-rose-400/40 rounded-2xl px-5 py-4 text-sm text-rose-50 shadow-xl shadow-rose-900/30">
             <p className="font-bold mb-1.5">Interview cannot continue.</p>
-            <p className="leading-relaxed text-rose-100/90">{fatalReason ?? "The avatar service is unavailable. Try again in a few minutes; your tokens will be refunded if no answers were recorded."}</p>
+            <p className="leading-relaxed text-rose-100/90">{fatalReason ?? "The interview service is unavailable. Try again in a few minutes; your tokens will be refunded if no answers were recorded."}</p>
           </div>
         )}
 

@@ -20,7 +20,7 @@ export const SUPPORT_ARTICLES: SupportArticle[] = [
     id: "product-overview",
     title: "What College Ready does",
     content:
-      "College Ready helps prospective students research verified U.S. college programs, generate profile-based school matches, build an application roadmap, practice an F-1 visa interview with an AI avatar, and create or improve an academic CV. It is not a U.S. government, embassy, consular, law, or admissions service, and it cannot guarantee admission or a visa outcome.",
+      "College Ready helps prospective students research verified U.S. college programs, generate profile-based school matches, build an application roadmap, practice an F-1 visa interview with an AI interviewer, and create or improve an academic CV. It is not a U.S. government, embassy, consular, law, or admissions service, and it cannot guarantee admission or a visa outcome.",
     keywords: ["what is college ready", "what does this app do", "features", "services", "government", "embassy", "guarantee"],
     routes: ["/"],
     sourceLabel: "About College Ready",
@@ -150,7 +150,7 @@ export const SUPPORT_ARTICLES: SupportArticle[] = [
     id: "privacy",
     title: "Privacy, uploaded documents, and data requests",
     content:
-      `College Ready does not sell user data. Firebase provides authentication, database, storage, and functions; Anthropic processes supported AI tasks; HeyGen provides the live avatar; Google Cloud provides text-to-speech; and Vercel hosts the web app. Uploaded visa documents are stored privately for the user and Cloud Functions. Users can request access, correction, export, or deletion by emailing ${SUPPORT_EMAIL}; the privacy policy says requests are handled within 30 days. Do not paste document contents or highly sensitive personal data into support chat.`,
+      `College Ready does not sell user data. Firebase provides authentication, database, storage, and functions; Anthropic processes supported AI tasks; HeyGen provides the live interviewer video; Google Cloud provides text-to-speech; and Vercel hosts the web app. Uploaded visa documents are stored privately for the user and Cloud Functions. Users can request access, correction, export, or deletion by emailing ${SUPPORT_EMAIL}; the privacy policy says requests are handled within 30 days. Do not paste document contents or highly sensitive personal data into support chat.`,
     keywords: ["privacy", "data", "sell data", "delete account", "delete data", "export data", "uploaded documents", "storage", "anthropic", "heygen", "firebase", "personal information"],
     routes: ["/privacy", "/contact"],
     sourceLabel: "Privacy policy",
