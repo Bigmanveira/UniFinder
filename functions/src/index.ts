@@ -305,6 +305,7 @@ const VISA_PREVIEW_DURATION_SEC = 180;
 const VISA_PAID_DURATION_SEC    = 300;
 const VISA_PREVIEW_COOLDOWN_DAYS = 7;
 const VISA_APPLICANT_CONTEXTS = new Set([
+  "first_time_applicant",
   "previous_refusal",
   "changed_school_or_program",
   "changed_funding_or_sponsor",

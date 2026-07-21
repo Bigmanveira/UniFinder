@@ -11,6 +11,7 @@ import {
   Plane,
   RotateCw,
   ShieldAlert,
+  UserPlus,
   Video,
   WalletCards,
 } from "lucide-react";
@@ -29,6 +30,12 @@ const CONTEXT_OPTIONS: Array<{
   description: string;
   icon: ReactNode;
 }> = [
+  {
+    id: "first_time_applicant",
+    label: "First time applicant",
+    description: "This is my first U.S. visa application.",
+    icon: <UserPlus size={17} />,
+  },
   {
     id: "previous_refusal",
     label: "Returning after refusal",
@@ -61,6 +68,14 @@ const CONTEXT_OPTIONS: Array<{
   },
 ];
 
+// "First time applicant" and "Returning after refusal" describe mutually
+// exclusive histories. Selecting one clears the other so the question
+// retriever never receives contradictory pre-interview context.
+const CONFLICTING_CONTEXT: Partial<Record<VisaApplicantContext, VisaApplicantContext>> = {
+  first_time_applicant: "previous_refusal",
+  previous_refusal:     "first_time_applicant",
+};
+
 export default function InterviewIntroCard({
   onStart,
   starting,
@@ -83,7 +98,7 @@ export default function InterviewIntroCard({
     setApplicantContexts((current) =>
       current.includes(context)
         ? current.filter((value) => value !== context)
-        : [...current, context],
+        : [...current.filter((value) => value !== CONFLICTING_CONTEXT[context]), context],
     );
   };
 

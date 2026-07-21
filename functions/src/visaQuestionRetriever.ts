@@ -462,6 +462,16 @@ export function retrieveVisaQuestions(args: {
         applicantContexts.has("international_travel_history") &&
         question.categoryId === "travel_history_and_refusals"
       ) score += 26;
+      // A first-time applicant has no refusal history to probe, so this
+      // category is worth less airtime than for a returning applicant.
+      // Only a de-prioritisation, not an exclusion: the category also holds
+      // ordinary travel-history questions a first-timer is still asked.
+      // Skipped when they explicitly asked for travel-history practice above.
+      if (
+        applicantContexts.has("first_time_applicant") &&
+        !applicantContexts.has("international_travel_history") &&
+        question.categoryId === "travel_history_and_refusals"
+      ) score -= 18;
       return toRetrievedQuestion(
         question,
         "new_topic",

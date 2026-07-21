@@ -79,6 +79,7 @@ export type VisaDocumentType =
   | "transcript";
 
 export type VisaApplicantContext =
+  | "first_time_applicant"
   | "previous_refusal"
   | "changed_school_or_program"
   | "changed_funding_or_sponsor"
