@@ -1,6 +1,6 @@
 # UniFinder React + Vite App
 
-## 🚀 Firebase Setup Instructions
+## Firebase Setup Instructions
 To run this application properly, you must configure your Firebase project.
 
 ### 1. Enable Firebase Authentication
@@ -22,10 +22,10 @@ To run this application properly, you must configure your Firebase project.
 
 *(Development Sample Data Note: If you are seeding mock universities later, ensure you are only seeding to a dev environment and not writing to a live production database.)*
 
-## 🏫 Importing School Data (Developer Only)
+## Importing School Data (Developer Only)
 The application relies on a curated database of U.S. University programs. To bootstrap your Firestore database with real data, we have provided an automated import script that pulls from the official U.S. Department of Education College Scorecard API.
 
-**⚠️ WARNING: This script is for developer use only. It interacts directly with production Firebase environments and external APIs.**
+**WARNING: This script is for developer use only. It interacts directly with production Firebase environments and external APIs.**
 
 ### 1. Get an API Key
 1. Go to [College Scorecard API documentation](https://collegescorecard.ed.gov/data/api-documentation/).
@@ -51,7 +51,7 @@ node scripts/importCollegeScorecardSchools.js
 
 ---
 
-## 🎓 Importing Program Data (Developer Only)
+## Importing Program Data (Developer Only)
 
 The `programs` Firestore collection is the **single source of truth** for "does
 school X actually offer field Y at level Z?". Without it, the matcher would have to
@@ -207,7 +207,7 @@ on re-import.
 
 ---
 
-## ✅ Manual test cases for the program gate
+## Manual test cases for the program gate
 
 Run these three end-to-end tests through the live app after each
 significant change to the gate logic.
