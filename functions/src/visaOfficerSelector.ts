@@ -72,7 +72,9 @@ NEVER STEER TOWARD PENALISING THESE — the FAM forbids refusing on them:
 SELECTION RULES:
 - Pick the single question that a real officer would most plausibly ask next, given what the student just said.
 - Never re-ask something the student has already answered. If they already named their school, do not ask which school.
-- If the last answer was vague, evasive, or raised one of the follow-up triggers above, prefer a follow_up candidate over opening a new topic.
+- Judge the last answer yourself before choosing. An answer is THIN if it names no specifics — no figure, employer, role, place, or document — or hedges ("something like that", "business, contracts and things", "we'll see", "I'm not sure"). Length alone does not make an answer strong.
+- When the last answer was thin, evasive, inconsistent, or raised one of the follow-up triggers above, and a follow_up candidate on that same topic is offered, PICK IT. Do not move to a new topic while the previous one is still unproven — that is the single most common way a mock interview fails to feel real.
+- Only open a new topic when the previous answer actually settled the point.
 - Prefer the wording that reads as the tersest, most natural spoken question for this moment.
 - Early in the interview, cover purpose, school/programme and funding before secondary topics.
 
@@ -192,6 +194,12 @@ export async function selectQuestionWithClaude(args: {
     additionalProperties: false,
   } as const;
 
+  // Red flags the retriever matched against the last answer, if any. Surfaced
+  // so the model can press on a specific concern rather than guessing.
+  const redFlagHint = [
+    ...new Set(retrieval.candidates.flatMap((c) => c.matchedRedFlags ?? [])),
+  ].slice(0, 4).join(" | ");
+
   try {
     const anthropic = new Anthropic({ apiKey, timeout: SELECTOR_TIMEOUT_MS });
     const response = await anthropic.messages.create({
@@ -215,8 +223,14 @@ export async function selectQuestionWithClaude(args: {
         {
           role: "user",
           content:
-            `Questions asked so far: ${questionCount}\n\n` +
-            `TRANSCRIPT (most recent last):\n${renderTranscript(transcript) || "(nothing yet — this is the opening question)"}\n\n` +
+            `Questions asked so far: ${questionCount}\n` +
+            // The retriever's own read of the last answer. It is a crude
+            // word-count-plus-hedge-phrase heuristic, so it is passed as a
+            // hint rather than a verdict — it misses answers that are long
+            // but empty. The model is told above to judge for itself.
+            `Retriever flagged the last answer as thin: ${retrieval.lastAnswerWasVague ? "YES" : "no"}\n` +
+            (redFlagHint ? `Possible red flags matched in the last answer: ${redFlagHint}\n` : "") +
+            `\nTRANSCRIPT (most recent last):\n${renderTranscript(transcript) || "(nothing yet — this is the opening question)"}\n\n` +
             `APPROVED CANDIDATES:\n${renderOptions(options)}\n\n` +
             `Choose the next question.`,
         },
