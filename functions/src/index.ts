@@ -1959,6 +1959,7 @@ export const sendVisaInterviewAnswer = onCall(
       maxDurationSec: typeof session.previewDurationSec === "number" ? session.previewDurationSec : 300,
       isReturningApplicant: session.isReturningApplicant === true,
       applicantContexts: Array.isArray(session.applicantContexts) ? session.applicantContexts : [],
+      apiKey: ANTHROPIC_API_KEY.value(),
     });
     assertGroundedVisaOfficerTurn(officer, sessionId);
 
@@ -2232,6 +2233,7 @@ export const recordVisaInterviewDocument = onCall(
         maxDurationSec: typeof session.previewDurationSec === "number" ? session.previewDurationSec : 300,
         isReturningApplicant: session.isReturningApplicant === true,
         applicantContexts: Array.isArray(session.applicantContexts) ? session.applicantContexts : [],
+        apiKey: ANTHROPIC_API_KEY.value(),
       });
       assertGroundedVisaOfficerTurn(officer, sessionId);
       nextOfficerText = officer.text;

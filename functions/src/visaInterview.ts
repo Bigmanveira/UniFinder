@@ -9,6 +9,7 @@ import {
   retrieveVisaQuestions,
   selectVisaQuestion,
 } from "./visaQuestionRetriever.js";
+import { selectQuestionWithClaude } from "./visaOfficerSelector.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Disclaimer attached to every Claude response. Must never be removed.
@@ -83,6 +84,10 @@ export async function generateOfficerTurn(args: {
   unavailableDocumentTypes?: VisaDocumentType[];
   /** Pre-interview context only changes ranking inside the approved bank. */
   applicantContexts?: string[];
+  /** Enables the Claude selector. Without it we fall back to the purely
+   *  deterministic pick, so a missing key degrades quality but never breaks
+   *  the interview. */
+  apiKey?: string | null;
 }): Promise<OfficerTurnResult> {
   const {
     transcript, questionCount, extractedDocuments,
@@ -105,11 +110,14 @@ export async function generateOfficerTurn(args: {
     };
   }
 
-  // Interview turns are selected deterministically from the approved RAG
-  // bank. Claude is intentionally not called here: allowing free-form text
-  // caused out-of-bank and repeated questions, and added avoidable latency.
-  // Adaptation still happens through answer-quality, red-flag, document, and
-  // applicant-context ranking in the retriever.
+  // Interview turns come from the approved bank. Claude now chooses WHICH
+  // approved question comes next (see visaOfficerSelector) rather than
+  // writing one — the heuristic ranking alone could not tell that a student
+  // had already answered something, so the officer repeated itself and
+  // changed subject at odd moments. The selector returns an id + an index
+  // into approved wording, so out-of-bank text is unrepresentable, which was
+  // the original reason for keeping the model out of this path. Any failure
+  // falls through to the deterministic pick below.
   const studentTurnCount = transcript.filter((turn) => turn.role === "student").length;
   const remainingSec = maxDurationSec - elapsedSec;
   if (remainingSec <= 45 || studentTurnCount >= 7) {
@@ -131,7 +139,14 @@ export async function generateOfficerTurn(args: {
     isReturningApplicant,
     applicantContexts,
   });
-  const selected = selectVisaQuestion(retrieval, transcript);
+  const selected =
+    (await selectQuestionWithClaude({
+      apiKey: args.apiKey ?? null,
+      retrieval,
+      transcript,
+      questionCount,
+    })) ?? selectVisaQuestion(retrieval, transcript);
+
   if (!selected) {
     return {
       text: "Thank you. That's all I need from you today.",
@@ -171,6 +186,17 @@ CRITICAL RULES
 
 - Every strength, weakness, red flag, and practice recommendation must refer to a topic or detail actually present in this transcript. Do not return generic completion praise.
 - Sample improved answers must use questions that were actually asked and may only reorganize facts the student actually provided.
+
+NEVER PENALISE THESE — 9 FAM 402.5-5 forbids consular officers from refusing on them, so marking them down teaches the student to fix something that is not a problem:
+- Attending a lesser-known school, or planning to start at a community college and transfer.
+- Missing or low standardised test scores, or a low GPA. Do not re-litigate the school's admission decision.
+- A course of study that looks impractical in the home country, or one that is also offered there.
+- Lacking property, payroll, or dependants. Students are expected to lack the ties an older applicant would have.
+- Being unable to lay out a detailed long-range career plan. Young applicants are not expected to have one, and intent is assessed as of today — a plan that may later change is not a problem.
+
+HOME TIES — CALIBRATE CAREFULLY. The bar is a credible, specific, PRESENT intention to leave the U.S. at the end of the course, not proof of permanent return and not a promise to return to their own country specifically. Score homeTiesScore low only when the student signals intent to remain or cannot name any concrete post-study step at all — never merely because they own nothing.
+
+FINANCES CARRY THE MOST WEIGHT. Funds must be readily available for the first year and credible for later years. Treat as genuine red flags: an intention to obtain a loan that is not yet approved, a plan to fund the first year from CPT/OPT earnings, a sponsor whose stated income cannot plausibly produce the stated balance, and a large unexplained recent deposit.
 
 CALIBRATION ANCHORS
 - 90-100: specific, internally consistent, concise, and supported by concrete details across the answers.
