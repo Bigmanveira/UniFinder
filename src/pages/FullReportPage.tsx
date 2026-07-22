@@ -108,61 +108,57 @@ function budgetTone(v: string): "good" | "warn" | "bad" | "neutral" {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// AI hero — clean dark feature card with deep blue tones
+// AI insight — a compact read-after card.
+//
+// This used to be a full-bleed dark hero sitting above the shortlist, so the
+// schools the user actually asked for were pushed below the fold behind a
+// headline, a summary paragraph and two panels. It now runs after the list as
+// a light secondary card, and `ai.summary` is intentionally not rendered: the
+// headline already carries the framing, and the strengths / quick wins are
+// the only parts that are actionable. The field is still generated and stored,
+// so restoring it is a one-line change.
 // ─────────────────────────────────────────────────────────────────────────────
-function AiHero({ ai }: { ai: AiReportExplanation }) {
+function AiInsight({ ai }: { ai: AiReportExplanation }) {
   return (
-    <motion.section
-      initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
-      className="relative overflow-hidden rounded-[28px] bg-slate-950 text-white"
-    >
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-900 via-slate-900 to-slate-950" />
-      <div className="absolute -top-32 -right-32 w-80 h-80 bg-blue-500/15 rounded-full blur-3xl" />
-      <div className="absolute -bottom-24 -left-24 w-72 h-72 bg-cyan-500/10 rounded-full blur-3xl" />
+    <section className="rounded-[28px] border border-slate-200 bg-white p-6 sm:p-7">
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+        <Wand2 size={11} className="text-blue-500" /> AI insight
+      </span>
+      <h2 className="mt-2 max-w-3xl text-lg font-bold leading-snug tracking-tight text-slate-900 sm:text-xl">
+        {ai.headline}
+      </h2>
 
-      <div className="relative p-7 sm:p-8">
-        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 backdrop-blur-md border border-white/15 text-[11px] font-semibold mb-4">
-          <Wand2 size={11} className="text-amber-300" /> AI Insight
-        </span>
-        <h2 className="text-2xl sm:text-[28px] font-bold tracking-tight leading-[1.15] mb-3 max-w-3xl">{ai.headline}</h2>
-        <p className="text-[14px] sm:text-[15px] text-white/75 leading-relaxed max-w-2xl mb-6">{ai.summary}</p>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="bg-white/[0.06] border border-white/10 rounded-2xl p-4 backdrop-blur-md">
-            <div className="flex items-center gap-1.5 mb-3">
-              <div className="w-7 h-7 rounded-full bg-amber-400/20 flex items-center justify-center">
-                <Star size={11} className="text-amber-300" />
-              </div>
-              <p className="text-[11px] font-semibold text-white/60 tracking-wide">YOUR STRENGTHS</p>
-            </div>
-            <ul className="space-y-1.5">
-              {ai.topStrengths.map((s, i) => (
-                <li key={i} className="flex items-start gap-2 text-[13px] text-white/90 leading-relaxed">
-                  <Check size={11} className="text-emerald-300 flex-shrink-0 mt-1" />
-                  <span>{s}</span>
-                </li>
-              ))}
-            </ul>
+      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+          <div className="mb-2.5 flex items-center gap-1.5">
+            <Star size={11} className="text-amber-500" />
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Your strengths</p>
           </div>
-          <div className="bg-white/[0.06] border border-white/10 rounded-2xl p-4 backdrop-blur-md">
-            <div className="flex items-center gap-1.5 mb-3">
-              <div className="w-7 h-7 rounded-full bg-amber-400/20 flex items-center justify-center">
-                <Lightbulb size={12} className="text-amber-300" />
-              </div>
-              <p className="text-[11px] font-semibold text-white/60 tracking-wide">QUICK WINS</p>
-            </div>
-            <ol className="space-y-1.5">
-              {ai.quickWins.map((w, i) => (
-                <li key={i} className="flex items-start gap-2 text-[13px] text-white/90 leading-relaxed">
-                  <span className="text-white/40 flex-shrink-0 tabular-nums w-3 font-semibold">{i + 1}</span>
-                  <span>{w}</span>
-                </li>
-              ))}
-            </ol>
+          <ul className="space-y-1.5">
+            {ai.topStrengths.map((s, i) => (
+              <li key={i} className="flex items-start gap-2 text-[13px] leading-relaxed text-slate-700">
+                <Check size={11} className="mt-1 flex-shrink-0 text-blue-600" />
+                <span>{s}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+          <div className="mb-2.5 flex items-center gap-1.5">
+            <Lightbulb size={12} className="text-amber-500" />
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Quick wins</p>
           </div>
+          <ol className="space-y-1.5">
+            {ai.quickWins.map((w, i) => (
+              <li key={i} className="flex items-start gap-2 text-[13px] leading-relaxed text-slate-700">
+                <span className="w-3 flex-shrink-0 font-semibold tabular-nums text-slate-400">{i + 1}</span>
+                <span>{w}</span>
+              </li>
+            ))}
+          </ol>
         </div>
       </div>
-    </motion.section>
+    </section>
   );
 }
 
@@ -761,8 +757,6 @@ export default function FullReportPage() {
       </header>
 
       <main className="relative max-w-6xl mx-auto px-5 py-7 space-y-9">
-        {ai && <AiHero ai={ai} />}
-
         {/* Pill filters + bucket sections */}
         <FadeIn delay={0.1}>
           <div className="flex items-center justify-between mb-4">
@@ -819,6 +813,14 @@ export default function FullReportPage() {
             </div>
           );
         })()}
+
+        {/* AI insight — deliberately after the shortlist. The schools are what
+            the user ran the match for; the write-up is context on top. */}
+        {ai && (
+          <FadeIn>
+            <AiInsight ai={ai} />
+          </FadeIn>
+        )}
 
         {/* Next stage — roadmap CTA */}
         <FadeIn>
