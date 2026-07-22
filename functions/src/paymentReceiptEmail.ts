@@ -12,7 +12,7 @@
 // auto-receipt covers that side. Tone is warm and product-focused.
 //
 // Wallet values arrive as CREDITS; the copy renders the user-facing TOKEN
-// figures (1 credit = 1,000 tokens) via tokens.ts. The `credits`/`newBalance`
+// figures (1 credit = 100 tokens) via tokens.ts. The `credits`/`newBalance`
 // params stay in credits so the caller doesn't have to know about the factor.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -77,8 +77,8 @@ const htmlBody = (opts: {
 
                 <p style="margin:0 0 10px 0;font-size:14px;color:#475569;"><strong style="color:#0f172a;">What tokens unlock:</strong></p>
                 <ul style="margin:0 0 18px 0;padding-left:20px;font-size:14px;color:#475569;">
-                  <li style="margin-bottom:6px;"><strong style="color:#0f172a;">1,000 tokens</strong> — unlock an AI-matched school report</li>
-                  <li style="margin-bottom:6px;"><strong style="color:#0f172a;">15,000 tokens</strong> — full F-1 visa interview practice with a live AI consular officer</li>
+                  <li style="margin-bottom:6px;"><strong style="color:#0f172a;">100 tokens</strong> — unlock an AI-matched school report</li>
+                  <li style="margin-bottom:6px;"><strong style="color:#0f172a;">1,500 tokens</strong> — full F-1 visa interview practice with a live AI consular officer</li>
                 </ul>
 
                 <p style="margin:0 0 14px 0;">
@@ -120,8 +120,8 @@ const textBody = (opts: {
     `  New balance: ${formatTokens(opts.newBalance)} tokens`,
     ``,
     `What tokens unlock:`,
-    `  • 1,000 tokens  — unlock an AI-matched school report`,
-    `  • 15,000 tokens — full F-1 visa interview practice with a live AI consular officer`,
+    `  • 100 tokens  — unlock an AI-matched school report`,
+    `  • 1,500 tokens — full F-1 visa interview practice with a live AI consular officer`,
     ``,
     `Dashboard: https://collegeready.io/app`,
     ``,

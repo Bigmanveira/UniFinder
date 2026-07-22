@@ -83,7 +83,7 @@ export const BULK_EMAIL_TEMPLATES: BulkEmailTemplate[] = [
     body: [
       "Hey,",
       "",
-      "[Describe the offer — e.g., 20% off any token pack through Sunday, or a bonus 5,000 tokens on the Plus pack.]",
+      "[Describe the offer — e.g., 20% off any token pack through Sunday, or a bonus 500 tokens on the Plus pack.]",
       "",
       "Use code [CODE] at checkout. Offer ends [date].",
       "",

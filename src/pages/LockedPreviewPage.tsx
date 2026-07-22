@@ -484,12 +484,12 @@ function UnlockDock({
               {unlockError && <UnlockErrorBanner kind={unlockError} />}
               <button onClick={onUnlock}
                 className="flex items-center justify-center gap-2 w-full bg-slate-900 hover:bg-slate-800 text-white text-base font-semibold py-4 rounded-2xl transition-all active:scale-[0.99]">
-                {user ? <>Unlock report · 1,000 tokens <Send size={15} /></>
+                {user ? <>Unlock report · 100 tokens <Send size={15} /></>
                       : <>Create free account <ArrowRight size={15} /></>}
               </button>
               {!user && (
                 <p className="mt-3 text-center text-[11px] text-slate-500">
-                  Includes 2,000 free tokens · Save schools · No card required
+                  Includes 200 free tokens · Save schools · No card required
                 </p>
               )}
             </div>

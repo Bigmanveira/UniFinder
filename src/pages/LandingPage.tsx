@@ -108,7 +108,7 @@ export default function LandingPage() {
                 </div>
 
                 <div className="mt-7 flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs font-semibold text-white/48 sm:text-sm lg:justify-start">
-                  <TrustItem text="2,000 free tokens" />
+                  <TrustItem text="200 free tokens" />
                   <TrustItem text="No subscription" />
                   <span className="hidden sm:inline-flex"><TrustItem text="Verified programmes" /></span>
                 </div>
@@ -228,14 +228,14 @@ export default function LandingPage() {
             <Reveal delay={100} className="grid gap-4 sm:grid-cols-2">
               <PricingCard
                 eyebrow="Included"
-                title="2,000 free tokens"
+                title="200 free tokens"
                 body="Build your roadmap and generate your first match reports before paying."
                 tone="light"
               />
               <PricingCard
                 eyebrow="Pay as you go"
                 title="From $2"
-                body="6,000 tokens to start. Larger packs are available when you need them."
+                body="600 tokens to start. Larger packs are available when you need them."
                 tone="dark"
                 href="/pricing"
               />

@@ -82,7 +82,7 @@ export default function TermsPage() {
           <Block title="Tokens and billing">
             <ul className="list-disc ml-5 space-y-1.5">
               <li>Some features cost tokens (unlocking a full match report, running an interview practice).</li>
-              <li>New accounts receive 2,000 free tokens. Successful referrals earn 5,000 more.</li>
+              <li>New accounts receive 200 free tokens. Successful referrals earn 500 more.</li>
               <li>Purchased tokens are non-refundable except where required by law, and don't expire.</li>
               <li>Prices may change. If you've already bought a token pack, that purchase is honoured at the price you paid.</li>
             </ul>

@@ -7,14 +7,14 @@
 // Never use these values for wallet math or Firestore writes.
 // ─────────────────────────────────────────────────────────────────────────────
 
-export const TOKENS_PER_CREDIT = 1000;
+export const TOKENS_PER_CREDIT = 100;
 
 /** Credits → raw token count (display only). Null/undefined → 0. */
 export function toTokens(credits: number | null | undefined): number {
   return Math.round((credits ?? 0) * TOKENS_PER_CREDIT);
 }
 
-/** Credits → localized token string, e.g. 15 → "15,000". */
+/** Credits → localized token string, e.g. 15 → "1,500". */
 export function formatTokens(credits: number | null | undefined): string {
   return toTokens(credits).toLocaleString("en-US");
 }

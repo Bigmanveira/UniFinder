@@ -40,7 +40,7 @@ export const SUPPORT_ARTICLES: SupportArticle[] = [
     id: "match-report-credits",
     title: "Match report tokens and category reveals",
     content:
-      "A full match report costs 1,000 tokens. After that unlock, the Reach category is available immediately. Target and Safety are optional additional categories and each costs 5,000 tokens to reveal. If the system cannot find eligible verified programs, it should not charge for an unlock. A report is guidance only and does not guarantee admission.",
+      "A full match report costs 100 tokens. After that unlock, the Reach category is available immediately. Target and Safety are optional additional categories and each costs 500 tokens to reveal. If the system cannot find eligible verified programs, it should not charge for an unlock. A report is guidance only and does not guarantee admission.",
     keywords: ["match report cost", "unlock report", "reach unlocked", "target locked", "safety locked", "reveal category", "bucket", "charged for report"],
     routes: ["/results", "/app/reports", "/pricing"],
     sourceLabel: "Match reports and tokens",
@@ -50,7 +50,7 @@ export const SUPPORT_ARTICLES: SupportArticle[] = [
     id: "credits",
     title: "Tokens, free tokens, and expiration",
     content:
-      "New accounts receive 2,000 free tokens. Tokens are pay as you go and do not expire. Current feature costs are: match report 1,000 tokens; reveal Target or Safety in an existing report 5,000 tokens per category; full F-1 interview practice 15,000 tokens; Academic CV review 5,000 tokens; Academic CV build 8,000 tokens; professional-to-academic CV conversion 8,000 tokens. The assistant cannot see a user's wallet balance; signed-in users can view it on the dashboard Billing section.",
+      "New accounts receive 200 free tokens. Tokens are pay as you go and do not expire. Current feature costs are: match report 100 tokens; reveal Target or Safety in an existing report 500 tokens per category; full F-1 interview practice 1,500 tokens; Academic CV review 500 tokens; Academic CV build 800 tokens; professional-to-academic CV conversion 800 tokens. The assistant cannot see a user's wallet balance; signed-in users can view it on the dashboard Billing section.",
     keywords: ["tokens", "credits", "token balance", "credit balance", "free tokens", "free credits", "expire", "cost", "price per feature", "wallet", "how many tokens", "how many credits"],
     routes: ["/pricing", "/app"],
     sourceLabel: "Tokens and feature costs",
@@ -60,7 +60,7 @@ export const SUPPORT_ARTICLES: SupportArticle[] = [
     id: "credit-packs",
     title: "Token packs and Paystack checkout",
     content:
-      "Token packs are charged by Paystack in Ghanaian cedis, with a USD display price for reference. Current packs are Try: 6,000 tokens for GHS 24, shown as USD 2; Starter: 15,000 for GHS 60, shown as USD 5; Plus: 45,000 for GHS 180, shown as USD 15; Pro: 120,000 for GHS 480, shown as USD 40; Power: 300,000 for GHS 1200, shown as USD 100. The server, not the browser, determines the pack price and tokens.",
+      "Token packs are charged by Paystack in Ghanaian cedis, with a USD display price for reference. Current packs are Try: 600 tokens for GHS 24, shown as USD 2; Starter: 1,500 for GHS 60, shown as USD 5; Plus: 4,500 for GHS 180, shown as USD 15; Pro: 12,000 for GHS 480, shown as USD 40; Power: 30,000 for GHS 1200, shown as USD 100. The server, not the browser, determines the pack price and tokens.",
     keywords: ["token pack", "credit pack", "paystack", "checkout", "ghana cedi", "ghs", "usd", "try pack", "starter", "plus", "pro", "power", "buy tokens", "buy credits"],
     routes: ["/pricing", "/app"],
     sourceLabel: "Token packs",
@@ -80,8 +80,8 @@ export const SUPPORT_ARTICLES: SupportArticle[] = [
     id: "referrals",
     title: "Referral tokens",
     content:
-      "A personal referral rewards the referrer with 5,000 tokens only after the referred user completes their first paid purchase. Applying a referral code or merely creating an account does not trigger the referrer's reward. Campaign or marketer codes can have different new-user bonus rules.",
-    keywords: ["referral", "refer friend", "referral reward", "referral code", "5,000 tokens", "5 credits", "first purchase", "marketer code"],
+      "A personal referral rewards the referrer with 500 tokens only after the referred user completes their first paid purchase. Applying a referral code or merely creating an account does not trigger the referrer's reward. Campaign or marketer codes can have different new-user bonus rules.",
+    keywords: ["referral", "refer friend", "referral reward", "referral code", "500 tokens", "5 credits", "first purchase", "marketer code"],
     routes: ["/signup", "/login", "/app"],
     sourceLabel: "Referral program",
     sourcePath: "/app",
@@ -90,7 +90,7 @@ export const SUPPORT_ARTICLES: SupportArticle[] = [
     id: "visa-overview",
     title: "F-1 visa interview practice",
     content:
-      "Anna is an AI practice consular officer, not a real officer. A full practice session costs 15,000 tokens, lasts up to 5 minutes, and includes a scored feedback report. The simulation and score are practice feedback only, not a prediction, legal advice, or a guarantee of a visa result. Real visa decisions are made by U.S. consular officers.",
+      "Anna is an AI practice consular officer, not a real officer. A full practice session costs 1,500 tokens, lasts up to 5 minutes, and includes a scored feedback report. The simulation and score are practice feedback only, not a prediction, legal advice, or a guarantee of a visa result. Real visa decisions are made by U.S. consular officers.",
     keywords: ["visa interview", "f1", "f-1", "anna", "consular officer", "score", "visa guarantee", "legal advice", "interview report"],
     routes: ["/app/visa-interview", "/app/interview-reports"],
     sourceLabel: "F-1 interview practice",
@@ -100,8 +100,8 @@ export const SUPPORT_ARTICLES: SupportArticle[] = [
     id: "visa-preview",
     title: "Free visa interview preview",
     content:
-      "A signed-in user with fewer than 15,000 tokens can use a free 3-minute interview preview once every 7 days. The preview does not charge tokens and does not include a scored report. A user with at least 15,000 tokens starts the full 5-minute paid session instead.",
-    keywords: ["free interview", "preview interview", "3 minute", "three minute", "7 days", "cooldown", "no report", "15,000 tokens", "15 credits"],
+      "A signed-in user with fewer than 1,500 tokens can use a free 3-minute interview preview once every 7 days. The preview does not charge tokens and does not include a scored report. A user with at least 1,500 tokens starts the full 5-minute paid session instead.",
+    keywords: ["free interview", "preview interview", "3 minute", "three minute", "7 days", "cooldown", "no report", "1,500 tokens", "15 credits"],
     routes: ["/app/visa-interview"],
     sourceLabel: "Interview preview",
     sourcePath: "/app/visa-interview",
@@ -130,7 +130,7 @@ export const SUPPORT_ARTICLES: SupportArticle[] = [
     id: "cv-studio",
     title: "Academic CV Studio",
     content:
-      "Academic CV Studio has three tools. Review and revamp costs 5,000 tokens to unlock the full result. Build a new academic CV costs 8,000 tokens. Convert a professional CV to academic format costs 8,000 tokens. Each generation shows roughly the first 30 percent as a free preview before unlock, and each tool limits free generations to protect the service.",
+      "Academic CV Studio has three tools. Review and revamp costs 500 tokens to unlock the full result. Build a new academic CV costs 800 tokens. Convert a professional CV to academic format costs 800 tokens. Each generation shows roughly the first 30 percent as a free preview before unlock, and each tool limits free generations to protect the service.",
     keywords: ["cv", "resume", "academic cv", "review cv", "build cv", "convert cv", "30 percent", "free preview", "download cv"],
     routes: ["/app/cv-studio"],
     sourceLabel: "Academic CV Studio",

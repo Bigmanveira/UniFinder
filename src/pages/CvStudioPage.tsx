@@ -83,7 +83,7 @@ export default function CvStudioPage() {
             to="/app/cv-studio/review"
             icon={<RefreshCw size={22} />}
             iconBg="from-blue-500 to-blue-700"
-            chip={{ text: "5,000 tokens", color: "bg-blue-50 text-blue-700 border-blue-200" }}
+            chip={{ text: "500 tokens", color: "bg-blue-50 text-blue-700 border-blue-200" }}
             title="Review & revamp"
             blurb="Drop in your current academic CV. We point at what's weak, then rewrite it sharper."
             sample={[
@@ -97,7 +97,7 @@ export default function CvStudioPage() {
             to="/app/cv-studio/build"
             icon={<Wrench size={20} />}
             iconBg="from-violet-500 to-fuchsia-600"
-            chip={{ text: "8,000 tokens", color: "bg-violet-50 text-violet-700 border-violet-200" }}
+            chip={{ text: "800 tokens", color: "bg-violet-50 text-violet-700 border-violet-200" }}
             title="Build from scratch"
             blurb="A guided intake produces a polished CV in the standard template."
           />
@@ -106,7 +106,7 @@ export default function CvStudioPage() {
             to="/app/cv-studio/convert"
             icon={<FileText size={20} />}
             iconBg="from-emerald-500 to-teal-600"
-            chip={{ text: "8,000 tokens", color: "bg-emerald-50 text-emerald-700 border-emerald-200" }}
+            chip={{ text: "800 tokens", color: "bg-emerald-50 text-emerald-700 border-emerald-200" }}
             title="Pro → Academic"
             blurb="Industry CV in, academic format out — research up front, jargon out."
           />

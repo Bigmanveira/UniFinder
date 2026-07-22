@@ -439,7 +439,7 @@ export default function DashboardPage() {
                         Rehearse with Anna<span className="hidden sm:inline">, your AI consular officer</span>
                       </h3>
                       <div className="flex items-center gap-2 text-[11px] sm:text-xs text-white/65 font-semibold">
-                        <span>15,000 tokens</span>
+                        <span>1,500 tokens</span>
                         <span className="opacity-50">·</span>
                         <span>~5 min</span>
                         <span className="opacity-50">·</span>
@@ -1164,9 +1164,9 @@ function BillingTab({ credits, userId, isFounder }: { credits: number; userId: s
           <div className="bg-white/10 backdrop-blur-md rounded-2xl p-5 border border-white/10 max-w-xs">
             <p className="text-sm font-bold mb-1">How tokens work:</p>
             <p className="text-xs text-slate-400 leading-relaxed">
-              <span className="font-bold text-white">1,000 tokens</span> = Match report unlock.
+              <span className="font-bold text-white">100 tokens</span> = Match report unlock.
               <br />
-              <span className="font-bold text-white">15,000 tokens</span> = F-1 interview practice (live interviewer).
+              <span className="font-bold text-white">1,500 tokens</span> = F-1 interview practice (live interviewer).
               <br />
               Tokens never expire.
             </p>
@@ -1218,7 +1218,7 @@ function BillingTab({ credits, userId, isFounder }: { credits: number; userId: s
                 )}
                 <h4 className={`text-lg font-black mb-1 ${pack.recommended ? "text-primary-900" : "text-slate-900"}`}>{pack.label}</h4>
                 <p className={`text-xs font-medium mb-5 ${pack.recommended ? "text-primary-700/80" : "text-slate-500"}`}>
-                  ${perCreditUsd} per 1,000 tokens
+                  ${perCreditUsd} per 100 tokens
                 </p>
                 <div className="mb-5">
                   <div>
@@ -1481,7 +1481,7 @@ function ReferralCard({ userId }: { userId: string | undefined }) {
                   <Gift size={19} strokeWidth={2.2} />
                 </div>
                 <div className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">
-                  Earn 5,000 tokens
+                  Earn 500 tokens
                 </div>
               </div>
 
@@ -1490,7 +1490,7 @@ function ReferralCard({ userId }: { userId: string | undefined }) {
                 Help a friend find their college fit.
               </h3>
               <p className="mt-3 max-w-md text-sm leading-6 text-slate-600">
-                Send your personal link. You’ll receive 5,000 free tokens after their first token purchase.
+                Send your personal link. You’ll receive 500 free tokens after their first token purchase.
               </p>
 
               <div className="mt-7 flex items-center gap-3">

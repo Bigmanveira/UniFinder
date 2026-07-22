@@ -21,7 +21,7 @@ export default function CvStudioConvertPage() {
             </Link>
             <div className="flex-1 min-w-0">
               <h1 className="text-[15px] font-bold leading-tight truncate">Professional → Academic</h1>
-              <p className="text-xs text-slate-500 truncate">Restructure a corporate CV into academic format · 8,000 tokens to unlock</p>
+              <p className="text-xs text-slate-500 truncate">Restructure a corporate CV into academic format · 800 tokens to unlock</p>
             </div>
           </div>
         </header>
@@ -51,7 +51,7 @@ export default function CvStudioConvertPage() {
             <CvDocumentIntake
               busy={cv.generating}
               submitLabel="Convert to academic format (free preview)"
-              helpText="The first ~30% of your converted CV is free to preview. Unlock the rest for 8,000 tokens."
+              helpText="The first ~30% of your converted CV is free to preview. Unlock the rest for 800 tokens."
               onSubmit={(payload) => void cv.generate(payload)}
             />
           </section>
@@ -72,7 +72,7 @@ export default function CvStudioConvertPage() {
               </h2>
               <div className="flex items-center justify-between gap-3 mb-5">
                 <p className="text-sm text-slate-600 leading-relaxed">
-                  Restructured for academic review. Preview free; unlock for 8,000 tokens.
+                  Restructured for academic review. Preview free; unlock for 800 tokens.
                 </p>
                 <button
                   onClick={cv.reset}

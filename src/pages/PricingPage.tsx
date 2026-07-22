@@ -256,7 +256,7 @@ export default function PricingPage() {
                     <p className={`text-xs font-bold mt-2 ${
                       pack.recommended ? "text-slate-300" : "text-slate-700"
                     }`}>
-                      {formatTokens(pack.credits)} tokens · ${perCreditUsd} per 1,000 tokens
+                      {formatTokens(pack.credits)} tokens · ${perCreditUsd} per 100 tokens
                     </p>
                     <p className={`text-[11px] font-medium mt-1 ${
                       pack.recommended ? "text-slate-400" : "text-slate-400"
@@ -308,17 +308,17 @@ export default function PricingPage() {
           <p className="text-[11px] font-black tracking-[0.2em] uppercase text-slate-500 mb-4">How tokens are spent</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <CreditSpend
-              cost="1,000 tokens"
+              cost="100 tokens"
               title="Unlock a match report"
               body="Generates your full AI shortlist + roadmap. Reach schools are visible right away."
             />
             <CreditSpend
-              cost="5,000 tokens"
+              cost="500 tokens"
               title="Reveal a category"
               body="Unlocks Target or Safety schools inside an existing report. Optional — only if you want the wider list."
             />
             <CreditSpend
-              cost="15,000 tokens"
+              cost="1,500 tokens"
               title="F-1 visa interview"
               body="One live AI mock interview with feedback. Practice until you're confident."
             />

@@ -11,7 +11,7 @@ const FAQS = [
   },
   {
     question: "What are Tokens and how do I use them?",
-    answer: "College Ready uses a simple pay-as-you-go token system. 1,000 tokens unlock a full personalised match report — your Reach schools are visible right away. 5,000 tokens reveal a Target or Safety category inside that report if you want the wider list (optional — Reach alone is enough for most users). 15,000 tokens unlock a live F-1 visa interview practice session. You get 2,000 free tokens just for signing up."
+    answer: "College Ready uses a simple pay-as-you-go token system. 100 tokens unlock a full personalised match report — your Reach schools are visible right away. 500 tokens reveal a Target or Safety category inside that report if you want the wider list (optional — Reach alone is enough for most users). 1,500 tokens unlock a live F-1 visa interview practice session. You get 200 free tokens just for signing up."
   },
   {
     question: "Does College Ready guarantee my admission?",
