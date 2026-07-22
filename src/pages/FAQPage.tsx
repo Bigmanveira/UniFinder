@@ -127,7 +127,7 @@ export default function FAQPage() {
             <Link to="/contact" className="hover:text-primary-600 transition-colors">Contact</Link>
           </div>
           <p className="text-xs font-medium text-slate-400">
-            Â© 2026 College Ready. Not affiliated with the U.S. Government.
+            © 2026 College Ready. Not affiliated with the U.S. Government.
           </p>
         </div>
       </footer>

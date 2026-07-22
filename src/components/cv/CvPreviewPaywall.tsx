@@ -158,7 +158,7 @@ export default function CvPreviewPaywall({
             <Wand2 size={18} />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-black text-emerald-900">Unlocked Â· ready to download</p>
+            <p className="text-sm font-black text-emerald-900">Unlocked · ready to download</p>
             <p className="text-xs text-emerald-800/80">Your full document is below. Copy or download as Markdown.</p>
           </div>
         </div>
@@ -201,7 +201,7 @@ export default function CvPreviewPaywall({
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
           </div>
           <span className="inline-flex items-center gap-1 text-[10px] font-black tracking-widest uppercase text-slate-500 ml-2">
-            <FileText size={10} /> {theme.label} Â· Draft preview
+            <FileText size={10} /> {theme.label} · Draft preview
           </span>
         </div>
 
@@ -239,7 +239,7 @@ export default function CvPreviewPaywall({
           {/* Left — message */}
           <div className="flex-1 text-center lg:text-left">
             <span className={`inline-flex items-center gap-1.5 text-[10px] font-black tracking-[0.18em] uppercase ${theme.chipBg} ${theme.chipText} border ${theme.chipBorder} rounded-full px-2.5 py-1 mb-4`}>
-              <Lock size={10} /> Locked Â· unlock to read in full
+              <Lock size={10} /> Locked · unlock to read in full
             </span>
             <h3 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-[1.1] mb-3">
               Want the rest of your CV?
@@ -274,7 +274,7 @@ export default function CvPreviewPaywall({
                   {busy ? "Unlocking…" : `Unlock — ${formatTokens(creditCost)} tokens`}
                 </button>
                 <p className="text-[11px] text-slate-500 text-center lg:text-right">
-                  You have {formatTokens(walletCredits)} Â· {formatTokens((walletCredits ?? 0) - creditCost)} left after
+                  You have {formatTokens(walletCredits)} · {formatTokens((walletCredits ?? 0) - creditCost)} left after
                 </p>
               </>
             ) : (
@@ -286,7 +286,7 @@ export default function CvPreviewPaywall({
                   Get tokens to unlock <ArrowRight size={16} />
                 </Link>
                 <p className="text-[11px] text-slate-500 text-center lg:text-right">
-                  {formatTokens(creditCost)} tokens needed Â· you have {formatTokens(walletCredits ?? 0)}
+                  {formatTokens(creditCost)} tokens needed · you have {formatTokens(walletCredits ?? 0)}
                 </p>
               </>
             )}

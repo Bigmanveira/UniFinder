@@ -39,7 +39,7 @@ function fmtDate(d: Date | null): string {
   if (!d) return "—";
   const day = d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
   const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
-  return `${day} Â· ${time}`;
+  return `${day} · ${time}`;
 }
 
 export default function CvStudioHistoryPage() {
@@ -170,7 +170,7 @@ export default function CvStudioHistoryPage() {
                           )}
                         </div>
                         <p className="text-xs text-slate-500 truncate">
-                          {fmtDate(row.createdAt)}{row.unlocked ? "" : ` Â· ${formatTokens(row.creditCost)} tokens to unlock`}
+                          {fmtDate(row.createdAt)}{row.unlocked ? "" : ` · ${formatTokens(row.creditCost)} tokens to unlock`}
                         </p>
                       </div>
                       <ChevronRight size={16} className="text-slate-400 group-hover:text-slate-700 transition-colors flex-shrink-0" />
