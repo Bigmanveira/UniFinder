@@ -90,7 +90,7 @@ export const VISA_INTERVIEW_QUESTION_BANK = {
         },
         {
           "id": "study_purpose_004",
-          "question": "Why canâ€™t you continue this education in your home country?",
+          "question": "Why can’t you continue this education in your home country?",
           "intent": "Test whether the applicant can justify international study without disrespecting home-country options.",
           "follow_ups": [
             "Are there similar programs in Ghana?",
@@ -335,7 +335,7 @@ export const VISA_INTERVIEW_QUESTION_BANK = {
           "question": "Who is paying for your education?",
           "intent": "Determine whether the applicant has credible financial support.",
           "follow_ups": [
-            "What is your sponsorâ€™s relationship to you?",
+            "What is your sponsor’s relationship to you?",
             "What does your sponsor do?",
             "Why is your sponsor willing to pay for your studies?"
           ],
@@ -353,11 +353,11 @@ export const VISA_INTERVIEW_QUESTION_BANK = {
         {
           "id": "finances_002",
           "question": "What does your sponsor do for a living?",
-          "intent": "Assess sponsorâ€™s capacity to fund the education.",
+          "intent": "Assess sponsor’s capacity to fund the education.",
           "follow_ups": [
             "How long has your sponsor been doing that work?",
             "Does your sponsor have other dependents?",
-            "What evidence do you have of your sponsorâ€™s income?"
+            "What evidence do you have of your sponsor’s income?"
           ],
           "good_answer_signals": [
             "Clear sponsor occupation or business.",
@@ -365,7 +365,7 @@ export const VISA_INTERVIEW_QUESTION_BANK = {
             "Shows sustainable funding."
           ],
           "red_flags": [
-            "Cannot explain sponsorâ€™s work.",
+            "Cannot explain sponsor’s work.",
             "Sponsor profile does not support the cost.",
             "Bank balance appears sudden or unexplained."
           ]
@@ -616,7 +616,7 @@ export const VISA_INTERVIEW_QUESTION_BANK = {
           "good_answer_signals": [
             "Names relevant industry or career path.",
             "Shows practical value of degree.",
-            "Connects program to Ghanaâ€™s needs."
+            "Connects program to Ghana’s needs."
           ],
           "red_flags": [
             "Only mentions U.S. job market.",
@@ -714,7 +714,7 @@ export const VISA_INTERVIEW_QUESTION_BANK = {
         },
         {
           "id": "travel_003",
-          "question": "Have you applied for any other countryâ€™s visa recently?",
+          "question": "Have you applied for any other country’s visa recently?",
           "intent": "Understand broader migration or study pattern.",
           "follow_ups": [
             "What was the outcome?",
@@ -992,7 +992,7 @@ export const VISA_INTERVIEW_QUESTION_BANK = {
           ],
           "good_answer_signals": [
             "Honest and direct answer.",
-            "Answer is consistent with the applicantâ€™s stated temporary study purpose.",
+            "Answer is consistent with the applicant’s stated temporary study purpose.",
             "Applicant does not use the F-1 visa as a substitute for another immigration pathway."
           ],
           "red_flags": [
@@ -1006,7 +1006,7 @@ export const VISA_INTERVIEW_QUESTION_BANK = {
         {
           "id": "asylum_002",
           "question": "Do you fear harm or mistreatment in returning to your country of nationality or permanent residence?",
-          "intent": "Assess whether the applicantâ€™s stated fear of return conflicts with the temporary intent required for most nonimmigrant visa categories, including F-1.",
+          "intent": "Assess whether the applicant’s stated fear of return conflicts with the temporary intent required for most nonimmigrant visa categories, including F-1.",
           "follow_ups": [
             "Why do you feel that way?",
             "How does that affect your plan after graduation?",
@@ -1030,7 +1030,7 @@ export const VISA_INTERVIEW_QUESTION_BANK = {
     {
       "category_id": "integrity_and_consistency",
       "category_label": "Integrity and Consistency",
-      "description": "Questions that test whether the applicantâ€™s story is coherent, honest, natural, and consistent with documents.",
+      "description": "Questions that test whether the applicant’s story is coherent, honest, natural, and consistent with documents.",
       "questions": [
         {
           "id": "integrity_001",
