@@ -1,19 +1,25 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// RoadmapOnboardingPage — 6-question diagnostic.
+// RoadmapOnboardingModal — 6-question diagnostic, presented as a popup.
+//
+// This used to be a full-screen route (/app/roadmap/onboarding) with no way
+// out except the browser Back button. It is now a dismissible modal rendered
+// over the roadmap page; the old route redirects here so existing links, the
+// signup `next=` deep link and bookmarks all still land in the right place.
 //
 // Behaviour (P0 safe-rewrite, 2026-06-09):
 //   - First-time onboarding → createRoadmap (refuses if doc exists).
-//   - Re-running with `?update=1` → updateRoadmapDiagnostic. Preserves
+//   - Re-running with `isReonboarding` → updateRoadmapDiagnostic. Preserves
 //     every checklist status, completion timestamp, and note. Surfaces
-//     a confirmation modal explaining what does/doesn't change.
+//     a confirmation step explaining what does/doesn't change.
 //   - The submit dispatches via upsertRoadmapFromOnboarding so the
 //     fallback never accidentally destroys data even on a stale
 //     `?update=1` URL bookmark.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Check, Loader2, MapPin, Compass, ShieldCheck } from "lucide-react";
+import Modal from "../components/Modal";
 import { useAuth } from "../hooks/useAuth";
 import {
   getStudyRoadmap,
@@ -96,11 +102,21 @@ const Q6_OPTIONS: { value: Q6; label: string }[] = [
 
 const TOTAL_STEPS = 6;
 
-export default function RoadmapOnboardingPage() {
+export default function RoadmapOnboardingModal({
+  open,
+  isReonboarding,
+  onClose,
+  onComplete,
+}: {
+  open: boolean;
+  /** True when re-running the diagnostic over an existing roadmap. */
+  isReonboarding: boolean;
+  onClose: () => void;
+  /** Fired after a successful write, so the host can refresh + close. */
+  onComplete: () => void;
+}) {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const isReonboarding = searchParams.get("update") === "1";
 
   const [step, setStep] = useState(1);
   const [answers, setAnswers] = useState<Partial<OnboardingAnswers>>({});
@@ -121,7 +137,7 @@ export default function RoadmapOnboardingPage() {
   //     hasExistingRoadmap so submit goes through the safe-update path
   //     with a confirmation modal.
   useEffect(() => {
-    if (!user) return;
+    if (!open || !user) return;
     let cancelled = false;
     (async () => {
       try {
@@ -131,7 +147,9 @@ export default function RoadmapOnboardingPage() {
           if (isReonboarding) {
             setHasExistingRoadmap(true);
           } else {
-            navigate("/app/roadmap", { replace: true });
+            // A roadmap already exists and this wasn't an explicit re-run —
+            // close rather than silently rebuild it.
+            onClose();
           }
         }
       } catch {
@@ -139,7 +157,17 @@ export default function RoadmapOnboardingPage() {
       }
     })();
     return () => { cancelled = true; };
-  }, [user, isReonboarding, navigate]);
+  }, [open, user, isReonboarding, onClose]);
+
+  // Reset on the way out rather than in an effect on `open`, so reopening
+  // starts at question one without a setState-inside-effect cascade.
+  const resetAndClose = (done: boolean) => {
+    setStep(1);
+    setError(null);
+    setConfirmingUpdate(false);
+    setAnswers({});
+    if (done) onComplete(); else onClose();
+  };
 
   const setAnswer = <K extends keyof OnboardingAnswers>(key: K, value: OnboardingAnswers[K]) => {
     setAnswers((prev) => ({ ...prev, [key]: value }));
@@ -184,7 +212,7 @@ export default function RoadmapOnboardingPage() {
         uid: user.uid,
         answers: answers as OnboardingAnswers,
       });
-      navigate("/app/roadmap", { replace: true });
+      resetAndClose(true);
     } catch (err: unknown) {
       reportClientError(err, {
         source: "client.roadmap_onboarding.submit",
@@ -217,30 +245,19 @@ export default function RoadmapOnboardingPage() {
   })();
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 antialiased flex flex-col">
-      <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none" aria-hidden>
-        <div className="absolute -top-32 left-1/4 w-[560px] h-[560px] bg-gradient-to-br from-blue-300/25 via-violet-300/15 to-transparent rounded-full blur-[140px] animate-pulse" style={{ animationDuration: "9s" }} />
-        <div className="absolute top-1/2 -right-32 w-[480px] h-[480px] bg-gradient-to-br from-emerald-300/20 via-cyan-200/10 to-transparent rounded-full blur-[140px] animate-pulse" style={{ animationDuration: "11s", animationDelay: "2s" }} />
-      </div>
-
-      <header className="sticky top-0 z-40 border-b border-slate-200/60 bg-white/75 backdrop-blur-xl supports-[backdrop-filter]:bg-white/65">
-        <div className="max-w-6xl mx-auto px-5 h-14 flex items-center gap-3">
-          <Link to="/app" className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 transition-colors" aria-label="Back to dashboard">
-            <ArrowLeft size={15} />
-          </Link>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-[15px] font-bold leading-tight truncate">Build your roadmap</h1>
-            <p className="text-xs text-slate-500 truncate">{isReonboarding ? "Updating your study-abroad answers" : "Six quick questions — about a minute"}</p>
-          </div>
-          <span className="hidden sm:inline-block text-[11px] font-black tracking-widest uppercase text-slate-500">
-            Step {step} / {TOTAL_STEPS}
-          </span>
-        </div>
-      </header>
-
-      <main className="relative flex-1 max-w-2xl mx-auto px-5 py-10 sm:py-14 w-full">
+    <Modal
+      open={open}
+      onClose={() => resetAndClose(false)}
+      width="lg"
+      title={isReonboarding ? "Update your answers" : "Build your roadmap"}
+      subtitle={`Step ${step} of ${TOTAL_STEPS} · ${isReonboarding ? "Updating your study-abroad answers" : "about a minute"}`}
+      /* A stray backdrop click part-way through six questions would throw
+         away the user's answers, so only the X and Escape dismiss it. */
+      closeOnBackdrop={false}
+    >
+      <div className="relative">
         {/* Progress dots — visual cue of how far through the user is. */}
-        <div className="flex items-center justify-center gap-1.5 mb-10" aria-hidden>
+        <div className="flex items-center justify-center gap-1.5 mb-8" aria-hidden>
           {Array.from({ length: TOTAL_STEPS }).map((_, i) => {
             const idx = i + 1;
             const done   = idx < step;
@@ -354,7 +371,7 @@ export default function RoadmapOnboardingPage() {
         )}
 
         {/* Footer controls */}
-        <div className="mt-10 flex items-center justify-between gap-3">
+        <div className="mt-8 flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={handleBack}
@@ -387,15 +404,15 @@ export default function RoadmapOnboardingPage() {
             </button>
           )}
         </div>
-      </main>
+      </div>
 
-      {/* Confirmation modal — only shown when re-running the diagnostic
+      {/* Confirmation step — only shown when re-running the diagnostic
           on a roadmap that already exists. Spells out exactly what
           will and will not change so the user can't accidentally
           believe progress is being wiped. */}
       {confirmingUpdate && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/60 backdrop-blur-sm"
+          className="fixed inset-0 z-[70] flex items-center justify-center px-4 bg-slate-900/60 backdrop-blur-sm"
           onClick={() => setConfirmingUpdate(false)}
         >
           <div
@@ -441,7 +458,7 @@ export default function RoadmapOnboardingPage() {
           </div>
         </div>
       )}
-    </div>
+    </Modal>
   );
 }
 

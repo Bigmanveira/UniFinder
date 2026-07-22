@@ -15,12 +15,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import RoadmapOnboardingModal from "./RoadmapOnboardingModal";
+import Modal from "../components/Modal";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft, ArrowRight, Check, ChevronDown, Loader2,
   AlertTriangle, RotateCw, Pencil, Plus,
-  CheckCircle2, Hourglass, Ban, Circle, Construction,
+  CheckCircle2, Hourglass, Ban, Circle, Construction, MapPin,
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 import {
@@ -64,6 +66,27 @@ export default function RoadmapPage() {
   const [error, setError]                   = useState<string | null>(null);
   const [comingSoonOpen, setComingSoonOpen] = useState<RoadmapStageId | null>(null);
 
+  // The diagnostic is a modal on this page rather than its own screen.
+  // ?onboarding=1 (set by the old /app/roadmap/onboarding route) opens it, and
+  // so does having no roadmap yet.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const wantsOnboarding = searchParams.get("onboarding") === "1";
+  const isReonboarding  = searchParams.get("update") === "1";
+  // Derived rather than an effect + setState: the modal is open whenever the
+  // URL asked for it or there is no roadmap yet, until the user dismisses it.
+  const [dismissed, setDismissed] = useState(false);
+  const onboardingOpen =
+    !dismissed &&
+    !authLoading &&
+    roadmap !== "loading" &&
+    (wantsOnboarding || roadmap === null);
+
+  const closeOnboarding = () => {
+    setDismissed(true);
+    // Drop the query params so a refresh doesn't reopen the modal.
+    if (wantsOnboarding || isReonboarding) setSearchParams({}, { replace: true });
+  };
+
   useEffect(() => {
     if (!user) return;
     const unsub = subscribeStudyRoadmap(
@@ -93,11 +116,6 @@ export default function RoadmapPage() {
     });
   }, [user, roadmap]);
 
-  // No-doc → onboarding.
-  useEffect(() => {
-    if (authLoading || roadmap === "loading") return;
-    if (roadmap === null) navigate("/app/roadmap/onboarding", { replace: true });
-  }, [roadmap, authLoading, navigate]);
 
   const handleChecklistChange = async (item: ChecklistItem, next: ChecklistItemStatus) => {
     if (!user) return;
@@ -144,7 +162,42 @@ export default function RoadmapPage() {
       </div>
     );
   }
-  if (roadmap === null) return null;
+  // No roadmap yet: the diagnostic opens over this, and closing it leaves a
+  // real screen with a way back in rather than a blank page.
+  if (roadmap === null) {
+    return (
+      <>
+        <div className="flex min-h-screen items-center justify-center bg-slate-50 px-6">
+          <div className="max-w-sm text-center">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white">
+              <MapPin size={20} />
+            </div>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900">Build your roadmap</h1>
+            <p className="mt-2 text-sm leading-relaxed text-slate-600">
+              Six quick questions and we'll map out where you are and what to do next.
+            </p>
+            <button
+              onClick={() => setDismissed(false)}
+              className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6179d8] focus-visible:ring-offset-2"
+            >
+              Start <ArrowRight size={15} />
+            </button>
+            <div className="mt-3">
+              <Link to="/app" className="text-xs font-semibold text-slate-500 hover:text-slate-800">
+                Back to dashboard
+              </Link>
+            </div>
+          </div>
+        </div>
+        <RoadmapOnboardingModal
+          open={onboardingOpen}
+          isReonboarding={false}
+          onClose={closeOnboarding}
+          onComplete={closeOnboarding}
+        />
+      </>
+    );
+  }
 
   return (
     <>
@@ -160,6 +213,12 @@ export default function RoadmapPage() {
         onStageCtaClick={handleStageCtaClick}
       />
       <ComingSoonModal stage={comingSoonOpen} onClose={() => setComingSoonOpen(null)} />
+      <RoadmapOnboardingModal
+        open={onboardingOpen}
+        isReonboarding={isReonboarding || roadmap !== null}
+        onClose={closeOnboarding}
+        onComplete={closeOnboarding}
+      />
     </>
   );
 }
@@ -214,8 +273,21 @@ function Dashboard({
           <div className="flex-1 min-w-0">
             <h1 className="text-[14px] font-bold leading-tight">My Roadmap</h1>
           </div>
+          {/* Persistent stage marker. Sticky, so the user can always see which
+              stage they are on and how far through it they are — including
+              while the diagnostic modal is open over this page. */}
+          <span
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${currentMeta.accentChipBg} ${currentMeta.accentText} border-current/20`}
+            title={`Stage ${currentStageIndex + 1} of ${ROADMAP_STAGE_ORDER.length}: ${currentMeta.title}`}
+          >
+            <span className="font-utility tabular-nums opacity-70">
+              {currentStageIndex + 1}/{ROADMAP_STAGE_ORDER.length}
+            </span>
+            <span className="max-w-[9rem] truncate">{currentMeta.short}</span>
+            <span className="tabular-nums opacity-70">{roadmap.progressPercentage}%</span>
+          </span>
           <Link
-            to="/app/roadmap/onboarding?update=1"
+            to="/app/roadmap?onboarding=1&update=1"
             className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
             title="Refresh your diagnostic answers. Your checklist progress is preserved."
           >
@@ -240,26 +312,25 @@ function Dashboard({
         {/* ── Stepper ── */}
         <Stepper currentStage={roadmap.currentStage} />
 
-        {/* ── Stage picker ── */}
-        <AnimatePresence>
-          {stageOpen && (
-            <motion.div
-              initial={{ opacity: 0, y: -4, height: 0 }}
-              animate={{ opacity: 1, y: 0, height: "auto" }}
-              exit={{ opacity: 0, y: -4, height: 0 }}
-              transition={{ duration: 0.18, ease: "easeOut" }}
-              style={{ overflow: "hidden" }}
-            >
-              <StagePicker
-                current={roadmap.currentStage}
-                currentStatus={roadmap.currentProcessStatus}
-                disabled={updatingStage}
-                onPick={onStageChange}
-                onClose={() => setStageOpen(false)}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* ── Stage picker ──
+            A popup rather than an inline expander: it used to push the whole
+            checklist down the page, so changing stage meant losing your place
+            in the thing you were reading. */}
+        <Modal
+          open={stageOpen}
+          onClose={() => setStageOpen(false)}
+          title="Where are you now?"
+          subtitle="Pick the stage that matches where you've actually got to."
+          width="md"
+        >
+          <StagePicker
+            current={roadmap.currentStage}
+            currentStatus={roadmap.currentProcessStatus}
+            disabled={updatingStage}
+            onPick={onStageChange}
+            onClose={() => setStageOpen(false)}
+          />
+        </Modal>
 
         {error && (
           <div className="bg-rose-50 border border-rose-200 text-rose-700 text-[13px] font-medium rounded-2xl px-4 py-3 flex items-start gap-2">
