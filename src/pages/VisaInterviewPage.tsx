@@ -724,29 +724,7 @@ function FullScreenInterview({
       <div className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80vmin] h-[80vmin] bg-blue-500/10 rounded-full blur-[120px]" aria-hidden />
       <div className="pointer-events-none absolute bottom-0 right-0 w-[40vmin] h-[40vmin] bg-cyan-500/10 rounded-full blur-[100px]" aria-hidden />
 
-      {ending && (
-        <div
-          className="absolute inset-0 z-30 flex items-center justify-center bg-slate-950/88 px-5 backdrop-blur-xl"
-          role="status"
-          aria-live="polite"
-        >
-          <div className="w-full max-w-sm rounded-[28px] border border-white/15 bg-white/[0.08] p-7 text-center shadow-2xl shadow-black/50">
-            <div className="relative mx-auto mb-5 flex h-16 w-16 items-center justify-center">
-              <span className="absolute inset-0 rounded-full border border-blue-300/25" />
-              <span className="absolute inset-1 animate-spin rounded-full border-2 border-transparent border-t-blue-300 border-r-violet-300" />
-              <Loader2 size={22} className="animate-spin text-white" />
-            </div>
-            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-blue-200">Interview complete</p>
-            <h2 className="mt-2 text-xl font-bold tracking-tight text-white">Building your feedback report</h2>
-            <p className="mt-2 text-sm leading-relaxed text-slate-300">
-              Reviewing each answer against the question bank and calculating your performance scores.
-            </p>
-            <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-white/10">
-              <div className="h-full w-2/3 animate-pulse rounded-full bg-gradient-to-r from-blue-400 to-violet-400" />
-            </div>
-          </div>
-        </div>
-      )}
+      {ending && <ReportBuildingOverlay />}
 
       {/* ── Avatar — centered, sized to fit the viewport. The internal
             LiveAvatarPanel maintains its own aspect ratio (3:4 on mobile,
@@ -924,6 +902,67 @@ function BeautifulStatusPill({ stage }: { stage: ActiveStage }) {
 // hasn't lost anything. The copy mirrors the user's preferred wording.
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// ReportBuildingOverlay — the wait between the last answer and the report.
+//
+// Exported so it can be rendered in isolation for visual review; the page
+// only ever shows it while `ending` is true.
+//
+// Contrast was the actual problem here, not decoration. The card used
+// bg-white/[0.08] over a slate-950/88 backdrop, which measured 1.06:1
+// against its own overlay — the panel was effectively invisible as a
+// surface and leaned entirely on a 1.60:1 border to exist. A solid navy
+// card on a near-black overlay gets the border to 1.96:1 and reads as a
+// thing sitting above the video. Text sits far above AA: heading 15.9:1,
+// body 7.3:1, eyebrow 6.7:1.
+//
+// It also borrows the report's own type — Bricolage display, Plex Mono for
+// the eyebrow — so this screen and the one it hands off to look related.
+// ─────────────────────────────────────────────────────────────────────────────
+export function ReportBuildingOverlay() {
+  return (
+    <div
+      className="absolute inset-0 z-30 flex items-center justify-center bg-[#01060f]/95 px-5 backdrop-blur-xl"
+      role="status"
+      aria-live="polite"
+    >
+      <div className="w-full max-w-md overflow-hidden rounded-[28px] border border-[#2f4c96] bg-[#0e2049] shadow-2xl shadow-black/70">
+        <div className="h-px w-full bg-gradient-to-r from-transparent via-[#6f86e8] to-transparent" aria-hidden />
+
+        <div className="px-7 py-8 text-center sm:px-9 sm:py-9">
+          {/* One ring, one travelling arc. The previous version stacked three
+              spinners — a static ring, a spinning border, and a Loader2 —
+              turning at different rates inside the same 64px. */}
+          <div className="relative mx-auto mb-6 h-14 w-14" aria-hidden>
+            <span className="absolute inset-0 rounded-full border-2 border-white/10" />
+            <span className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-[#8fa6e8]" />
+            <span className="absolute inset-[9px] rounded-full bg-[#6078d5]/15" />
+          </div>
+
+          <p className="font-utility text-[10px] uppercase tracking-[0.22em] text-[#8fa6e8]">
+            Interview complete
+          </p>
+          <h2 className="mt-2.5 font-display text-[22px] font-bold leading-tight tracking-tight text-white">
+            Building your feedback report
+          </h2>
+          <p className="mx-auto mt-2.5 max-w-[19rem] text-[13.5px] leading-relaxed text-white/65">
+            Reviewing each answer against the question bank and calculating your performance scores.
+          </p>
+
+          {/* Indeterminate sweep. Scoring reports no progress, so a bar that
+              sits at two-thirds and pulses claims a number it does not have. */}
+          <div className="relative mt-7 h-1 overflow-hidden rounded-full bg-white/10">
+            <div className="animate-report-sweep absolute inset-y-0 left-0 w-1/3 rounded-full bg-gradient-to-r from-[#6078d5] via-[#aebeff] to-[#6078d5]" />
+          </div>
+          <p className="font-utility mt-3.5 text-[10px] uppercase tracking-[0.16em] text-white/35">
+            This usually takes a few seconds
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // PreviewEndModal — shown when a free 2-minute preview session ends. Used
 // in place of the scored-report view (preview sessions never get scored).
 // Routes the user to /pricing for the 15-credit top-up that unlocks both

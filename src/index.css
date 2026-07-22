@@ -359,6 +359,26 @@
     .animate-fade-up, .animate-fade-up-slow { animation: none; }
   }
 
+  /* Indeterminate sweep for the "building your report" card. Replaces a
+     static two-thirds-width bar that merely pulsed — that read as determinate
+     progress frozen at 66%, which is worse than showing no number at all,
+     because scoring has no progress signal to report. */
+  @keyframes report-sweep {
+    0%   { transform: translateX(-120%); }
+    100% { transform: translateX(340%); }
+  }
+  .animate-report-sweep {
+    animation: report-sweep 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .animate-report-sweep {
+      animation: none;
+      transform: none;
+      width: 100%;
+      opacity: 0.45;
+    }
+  }
+
   @keyframes feature-float {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(-5px); }
