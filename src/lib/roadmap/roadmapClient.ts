@@ -142,10 +142,20 @@ export async function updateRoadmapDiagnostic(args: {
     if (!snap.exists()) throw new RoadmapMissingError(uid);
     const existing = snap.data() as StudyRoadmap;
     const next = applyDiagnosticUpdate({ existing, answers });
+    // merge:true is defensive. `next` spreads `...existing`, so today it
+    // already carries server-owned fields (e.g. `reminderSentAt`, stamped by
+    // the engagement-reminder sweep through the Admin SDK) back into the
+    // write — which is what the update rule's hasAll(resource.data.keys())
+    // demands. Merging keeps that true even if `existing` is ever narrowed to
+    // the typed StudyRoadmap shape and silently drops unknown server fields,
+    // which would otherwise resurface as permission-denied.
+    //
+    // The rules side of this pairing matters just as much: any such field
+    // must also be listed in roadmapKeysHaveOnly, or hasOnly rejects it.
     tx.set(ref, {
       ...next,
       updatedAt: serverTimestamp(),
-    });
+    }, { merge: true });
     return next;
   });
 }

@@ -289,13 +289,17 @@ service cloud.firestore {
     // Full doc-shape allowlist + required keys. Re-used by create and
     // update validators so an update can't smuggle in unknown fields
     // OR drop a required one.
+    // `reminderSentAt` is Admin-SDK-written by sendEngagementReminders and
+    // must be tolerated here (but NOT required in roadmapKeysHaveAll). See
+    // the fuller explanation in firestore.rules — omitting it deadlocked
+    // every roadmap update for users who had received a reminder email.
     function roadmapKeysHaveOnly(d) {
       return d.keys().hasOnly([
         'userId', 'originCountry', 'completedAcademicLevel',
         'targetAcademicLevel', 'currentProcessStatus', 'primaryNeed',
         'preferredStartTerm', 'currentStage', 'progressPercentage',
         'recommendedTool', 'checklist', 'createdAt', 'updatedAt',
-        'completedOnboarding', 'version'
+        'completedOnboarding', 'version', 'reminderSentAt'
       ]);
     }
     function roadmapKeysHaveAll(d) {

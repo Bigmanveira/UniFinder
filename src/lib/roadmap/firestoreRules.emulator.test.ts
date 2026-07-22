@@ -85,7 +85,15 @@ beforeAll(async () => {
     firestore: {
       host: "127.0.0.1",
       port: 8080,
-      rules: readFileSync(resolve(__dirname, "../../../firestore.rules.draft"), "utf-8"),
+      // Defaults to the draft (the managed-region source), but RULES_FILE
+      // lets the same suite run against the file that is actually deployed:
+      //   RULES_FILE=firestore.rules npm run test:emulator
+      // The two have diverged before, and a rules bug that only exists in the
+      // deployed copy is invisible to a suite that only ever reads the draft.
+      rules: readFileSync(
+        resolve(__dirname, "../../../", process.env.RULES_FILE ?? "firestore.rules.draft"),
+        "utf-8",
+      ),
     },
   });
 });
@@ -166,6 +174,47 @@ D("studyRoadmaps Firestore rules — emulator", () => {
     });
     const adminCtx = testEnv.authenticatedContext("ops", { admin: true });
     await assertSucceeds(getDoc(doc(adminCtx.firestore(), "studyRoadmaps/alice")));
+  });
+
+  // ── reminderSentAt regression ──────────────────────────────────────
+  // sendEngagementReminders stamps `reminderSentAt` on this doc through the
+  // Admin SDK, which bypasses rules. Before the fix, that permanently broke
+  // the owner's ability to update their own roadmap: `update` requires
+  // hasAll(resource.data.keys()) so the field had to be sent back, while
+  // hasOnly rejected it as unknown. Both directions are asserted here.
+  it("owner CAN update a roadmap that a Cloud Function stamped with reminderSentAt", async () => {
+    // One object reused for seed and update: createdAt is immutable under the
+    // update rule, so a second validRoadmap() call would fail on that instead
+    // and mask what this test is actually checking.
+    const seeded = { ...validRoadmap("alice"), reminderSentAt: new Date() };
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "studyRoadmaps/alice"), seeded);
+    });
+    const alice = testEnv.authenticatedContext("alice").firestore();
+    // Mirrors the real client: applyDiagnosticUpdate spreads the existing doc
+    // (carrying reminderSentAt back) and writes with merge:true.
+    await assertSucceeds(
+      setDoc(
+        doc(alice, "studyRoadmaps/alice"),
+        { ...seeded, progressPercentage: 42 },
+        { merge: true },
+      ),
+    );
+  });
+
+  it("rejects an update that DROPS reminderSentAt (hasAll guard still holds)", async () => {
+    const seeded = { ...validRoadmap("alice"), reminderSentAt: new Date() };
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "studyRoadmaps/alice"), seeded);
+    });
+    const alice = testEnv.authenticatedContext("alice").firestore();
+    // Deleting the server-owned field must stay rejected — hasAll is what
+    // stops a client wiping fields it does not own.
+    const withoutServerField = { ...seeded } as Partial<typeof seeded>;
+    delete withoutServerField.reminderSentAt;
+    await assertFails(
+      setDoc(doc(alice, "studyRoadmaps/alice"), withoutServerField),
+    );
   });
 
   it("rejects create with invalid stage id", async () => {
