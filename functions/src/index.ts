@@ -288,12 +288,12 @@ const FREE_CREDITS_ON_SIGNUP   = 2;
 // new revenue funnel.
 const REVEAL_BUCKET_CREDIT_COST = 5;
 
-// Visa interview preview: free 3-minute taste of the live avatar so
+// Visa interview preview: free 2-minute taste of the live interviewer so
 // users without 15 credits still experience the USP and convert
 // because the credit ask now buys a known-good experience rather than
 // a black-box "is it worth $5?" gamble. Guardrails:
-//   - Hard 3-minute server-side cap (enforced in generateOfficerTurn
-//     via maxDurationSec — client trust would let someone open devtools
+//   - Hard server-side cap (enforced in generateOfficerTurn via
+//     maxDurationSec — client trust would let someone open devtools
 //     and stretch the session).
 //   - 7-day per-user cooldown so a single account can't burn HeyGen
 //     minutes on repeated previews.
@@ -301,8 +301,14 @@ const REVEAL_BUCKET_CREDIT_COST = 5;
 //     the only path to the report.
 //   - Founder accounts skip the preview path entirely (they always
 //     get the full paid flow with no charge).
-const VISA_PREVIEW_DURATION_SEC = 180;
-const VISA_PAID_DURATION_SEC    = 300;
+//
+// Durations are set to what real F-1 interviews actually run, not to what
+// feels generous: reported length is 90 seconds to 3 minutes, covering 3-8
+// questions, with the officer terse throughout. A 5-minute mock trained
+// students for a pace they will never meet. Paid sits at the top of the real
+// range; preview stays below it so the paid session is still the longer one.
+const VISA_PREVIEW_DURATION_SEC = 120;
+const VISA_PAID_DURATION_SEC    = 180;
 const VISA_PREVIEW_COOLDOWN_DAYS = 7;
 const VISA_APPLICANT_CONTEXTS = new Set([
   "first_time_applicant",
@@ -1477,8 +1483,8 @@ async function loadLatestDocument(args: {
  * happens whenever Claude's stage transition skips "introduction" and
  * jumps straight to e.g. "study_plan", which the previous narrow set
  * condition didn't catch. Without this fallback, elapsedSinceInterviewStart
- * could return 0 forever and the preview's 3-minute cap would never fire,
- * letting a 2-credit user run the full 5-minute Claude budget.
+ * could return 0 forever and the preview's duration cap would never fire,
+ * letting a 2-credit user run the full paid Claude budget.
  */
 function elapsedSinceInterviewStart(session: any): number {
   const ts = session?.interviewStartedAt ?? session?.startedAt ?? session?.createdAt;
@@ -1707,7 +1713,7 @@ export const startVisaInterviewSession = onCall(
     // 7-day preview cooldown — protects HeyGen minutes from a single
     // account burning previews on loop. Founders bypass the cooldown
     // (they're on the paid path anyway). Failure to enforce here =
-    // a user could refresh and start a new preview every 3 minutes,
+    // a user could refresh and start a new preview every 2 minutes,
     // running our HeyGen bill on someone who'll never convert.
     if (wantsPreview) {
       const cooldownMs = VISA_PREVIEW_COOLDOWN_DAYS * 24 * 60 * 60 * 1000;

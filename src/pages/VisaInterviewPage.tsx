@@ -924,10 +924,10 @@ function BeautifulStatusPill({ stage }: { stage: ActiveStage }) {
 // hasn't lost anything. The copy mirrors the user's preferred wording.
 
 // ─────────────────────────────────────────────────────────────────────────────
-// PreviewEndModal — shown when a free 3-minute preview session ends. Used
+// PreviewEndModal — shown when a free 2-minute preview session ends. Used
 // in place of the scored-report view (preview sessions never get scored).
 // Routes the user to /pricing for the 15-credit top-up that unlocks both
-// the full 5-minute interview AND the report.
+// the full 3-minute interview AND the report.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function PreviewEndModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -946,7 +946,7 @@ function PreviewEndModal({ open, onClose }: { open: boolean; onClose: () => void
         </div>
         <h2 className="text-lg font-black text-slate-900 mb-2">Your preview is up</h2>
         <p className="text-sm text-slate-600 leading-relaxed mb-5">
-          You just experienced a live AI consular interview. Top up 1,500 tokens to run a full 5-minute mock — Anna will probe deeper and you'll get your scored feedback across nine dimensions.
+          You just experienced a live AI consular interview. Top up 1,500 tokens to run a full 3-minute mock — Anna will probe deeper and you'll get your scored feedback across nine dimensions.
         </p>
         <Link
           to="/pricing"
@@ -987,7 +987,7 @@ function PreviewCooldownModal({ open, onClose }: { open: boolean; onClose: () =>
         </div>
         <h2 className="text-lg font-black text-slate-900 mb-2">Preview already used</h2>
         <p className="text-sm text-slate-600 leading-relaxed mb-5">
-          You've already run your free preview in the last 7 days. Top up 1,500 tokens to start a full 5-minute mock interview with scored feedback.
+          You've already run your free preview in the last 7 days. Top up 1,500 tokens to start a full 3-minute mock interview with scored feedback.
         </p>
         <Link
           to="/pricing"

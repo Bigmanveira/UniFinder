@@ -195,14 +195,20 @@ export async function selectQuestionWithClaude(args: {
   try {
     const anthropic = new Anthropic({ apiKey, timeout: SELECTOR_TIMEOUT_MS });
     const response = await anthropic.messages.create({
-      model: "claude-opus-4-8",
+      model: "claude-haiku-4-5",
       max_tokens: 300,
       system: OFFICER_BRIEF,
-      // Thinking is omitted deliberately: on Opus 4.8 that runs the request
-      // without thinking, and this is a live turn where latency is the
-      // binding constraint. Low effort suits a bounded pick-one task.
+      // Haiku 4.5 keeps the per-turn cost near a tenth of an Opus call, which
+      // matters on a per-session margin this thin, and it is faster on a live
+      // turn. Picking one id from a shortlist is a bounded task that does not
+      // need a frontier model.
+      //
+      // NOTE: no `effort` here. Haiku 4.5 REJECTS output_config.effort with a
+      // 400 (it is an Opus-4.5+/Sonnet-4.6+ parameter), and a 400 would send
+      // every turn down the deterministic fallback — silently undoing this
+      // whole path. Thinking is likewise omitted, so the model answers
+      // directly.
       output_config: {
-        effort: "low",
         format: { type: "json_schema", schema },
       },
       messages: [

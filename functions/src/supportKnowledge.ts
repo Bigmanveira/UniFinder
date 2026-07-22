@@ -90,7 +90,7 @@ export const SUPPORT_ARTICLES: SupportArticle[] = [
     id: "visa-overview",
     title: "F-1 visa interview practice",
     content:
-      "Anna is an AI practice consular officer, not a real officer. A full practice session costs 1,500 tokens, lasts up to 5 minutes, and includes a scored feedback report. The simulation and score are practice feedback only, not a prediction, legal advice, or a guarantee of a visa result. Real visa decisions are made by U.S. consular officers.",
+      "Anna is an AI practice consular officer, not a real officer. A full practice session costs 1,500 tokens, lasts up to 3 minutes, and includes a scored feedback report. The simulation and score are practice feedback only, not a prediction, legal advice, or a guarantee of a visa result. Real visa decisions are made by U.S. consular officers.",
     keywords: ["visa interview", "f1", "f-1", "anna", "consular officer", "score", "visa guarantee", "legal advice", "interview report"],
     routes: ["/app/visa-interview", "/app/interview-reports"],
     sourceLabel: "F-1 interview practice",
@@ -100,8 +100,8 @@ export const SUPPORT_ARTICLES: SupportArticle[] = [
     id: "visa-preview",
     title: "Free visa interview preview",
     content:
-      "A signed-in user with fewer than 1,500 tokens can use a free 3-minute interview preview once every 7 days. The preview does not charge tokens and does not include a scored report. A user with at least 1,500 tokens starts the full 5-minute paid session instead.",
-    keywords: ["free interview", "preview interview", "3 minute", "three minute", "7 days", "cooldown", "no report", "1,500 tokens", "15 credits"],
+      "A signed-in user with fewer than 1,500 tokens can use a free 2-minute interview preview once every 7 days. The preview does not charge tokens and does not include a scored report. A user with at least 1,500 tokens starts the full 3-minute paid session instead.",
+    keywords: ["free interview", "preview interview", "2 minute", "two minute", "3 minute", "three minute", "7 days", "cooldown", "no report", "1,500 tokens", "15 credits"],
     routes: ["/app/visa-interview"],
     sourceLabel: "Interview preview",
     sourcePath: "/app/visa-interview",

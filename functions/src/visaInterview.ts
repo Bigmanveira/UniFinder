@@ -91,7 +91,7 @@ export async function generateOfficerTurn(args: {
 }): Promise<OfficerTurnResult> {
   const {
     transcript, questionCount, extractedDocuments,
-    elapsedMs = 0, maxDurationSec = 300, isReturningApplicant = false,
+    elapsedMs = 0, maxDurationSec = 180, isReturningApplicant = false,
     unavailableDocumentTypes = [], applicantContexts = [],
   } = args;
   const elapsedSec = elapsedMs / 1000;
@@ -120,7 +120,10 @@ export async function generateOfficerTurn(args: {
   // falls through to the deterministic pick below.
   const studentTurnCount = transcript.filter((turn) => turn.role === "student").length;
   const remainingSec = maxDurationSec - elapsedSec;
-  if (remainingSec <= 45 || studentTurnCount >= 7) {
+  // Wrap-up gates, both set to real-interview shape: officers cover 3-8
+  // questions and stop. The 25s reserve is enough for the closing line
+  // without eating a quarter of a 3-minute session, which the old 45s did.
+  if (remainingSec <= 25 || studentTurnCount >= 8) {
     return {
       text: "Thank you. That's all I need from you today.",
       stage: "wrap_up",
