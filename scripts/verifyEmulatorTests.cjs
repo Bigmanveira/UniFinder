@@ -48,76 +48,103 @@ if (!process.env.FIRESTORE_EMULATOR_HOST) {
   process.exit(1);
 }
 
-const reportPath = path.join(os.tmpdir(), `vitest-emulator-report-${process.pid}.json`);
 const target = "src/lib/roadmap/firestoreRules.emulator.test.ts";
 const vitestEntry = path.resolve("node_modules", "vitest", "vitest.mjs");
 
-console.log(`Running emulator suite: ${target}`);
+// Run the suite once per rules file.
+//
+// The draft is the authoring surface for the marked region; firestore.rules
+// is what actually ships. Certifying only one of them is how a rules bug
+// reaches production unnoticed — the reminderSentAt deadlock (2026-07-22)
+// sat in the deployed file while a green suite was reading the draft. If the
+// two are in sync the second run is redundant and cheap; if they have drifted
+// it is the only thing that catches it.
+const RULES_FILES = ["firestore.rules.draft", "firestore.rules"];
+
 console.log(`Emulator host: ${process.env.FIRESTORE_EMULATOR_HOST}`);
 
-const result = spawnSync(
-  process.execPath,
-  [vitestEntry, "run", target,
-   "--reporter=default",
-   "--reporter=json",
-   `--outputFile=${reportPath}`],
-  {
-    stdio: ["ignore", "inherit", "inherit"],
-    env: { ...process.env, FIRESTORE_EMULATOR_REQUIRED: "1" },
-  },
-);
+function runSuite(rulesFile) {
+  const reportPath = path.join(
+    os.tmpdir(),
+    `vitest-emulator-report-${process.pid}-${rulesFile.replace(/[^a-z]/gi, "")}.json`,
+  );
 
-if (result.error) {
-  console.error("ERROR: could not start vitest:", result.error.message);
-  process.exit(5);
+  console.log(`\n── Running emulator suite against ${rulesFile} ──`);
+
+  const result = spawnSync(
+    process.execPath,
+    [vitestEntry, "run", target,
+     "--reporter=default",
+     "--reporter=json",
+     `--outputFile=${reportPath}`],
+    {
+      stdio: ["ignore", "inherit", "inherit"],
+      env: {
+        ...process.env,
+        FIRESTORE_EMULATOR_REQUIRED: "1",
+        RULES_FILE: rulesFile,
+      },
+    },
+  );
+
+  if (result.error) {
+    console.error("ERROR: could not start vitest:", result.error.message);
+    process.exit(5);
+  }
+  if (!fs.existsSync(reportPath)) {
+    console.error("ERROR: vitest did not produce a JSON report.");
+    process.exit(5);
+  }
+
+  let report;
+  try {
+    report = JSON.parse(fs.readFileSync(reportPath, "utf-8"));
+  } catch (err) {
+    console.error("ERROR: could not parse vitest JSON report:", err && err.message);
+    process.exit(5);
+  } finally {
+    // Best-effort cleanup; don't fail the verifier over a temp file.
+    try { fs.unlinkSync(reportPath); } catch { /* ignore */ }
+  }
+
+  // Vitest JSON reporter v4 schema: { numTotalTests, numPassedTests,
+  // numFailedTests, numPendingTests, startTime, ... }
+  const total   = Number(report.numTotalTests   || 0);
+  const passed  = Number(report.numPassedTests  || 0);
+  const failed  = Number(report.numFailedTests  || 0);
+  const pending = Number(report.numPendingTests || 0);
+  const skipped = Number(report.numTodoTests    || 0); // some Vitest builds use numTodoTests
+  const startTime = Number(report.startTime || 0);
+  const endTime   = Number((report.testResults || []).reduce((acc, r) => Math.max(acc, Number(r.endTime || 0)), 0));
+  const durationMs = endTime > startTime ? endTime - startTime : 0;
+
+  console.log();
+  console.log(`Report summary (${rulesFile}): total=${total} passed=${passed} failed=${failed} pending=${pending} skipped=${skipped}`);
+
+  if (result.status !== 0) {
+    console.error(`ERROR: vitest exited ${result.status} for ${rulesFile}. Suite did not pass.`);
+    process.exit(2);
+  }
+  if (total === 0) {
+    console.error(`ERROR: zero tests executed for ${rulesFile}. Refusing to certify the rules.`);
+    process.exit(3);
+  }
+  if (pending > 0 || skipped > 0) {
+    console.error(`ERROR: ${pending + skipped} test(s) skipped for ${rulesFile}. Release gate forbids skips.`);
+    process.exit(4);
+  }
+  if (failed > 0) {
+    console.error(`ERROR: ${failed} test(s) failed for ${rulesFile}.`);
+    process.exit(2);
+  }
+
+  console.log(`OK · ${rulesFile}: ${passed}/${total} tests in ${durationMs} ms`);
+  return { passed, total };
 }
 
-if (!fs.existsSync(reportPath)) {
-  console.error("ERROR: vitest did not produce a JSON report.");
-  process.exit(5);
-}
-
-let report;
-try {
-  report = JSON.parse(fs.readFileSync(reportPath, "utf-8"));
-} catch (err) {
-  console.error("ERROR: could not parse vitest JSON report:", err && err.message);
-  process.exit(5);
-} finally {
-  // Best-effort cleanup; don't fail the verifier over a temp file.
-  try { fs.unlinkSync(reportPath); } catch { /* ignore */ }
-}
-
-// Vitest JSON reporter v4 schema: { numTotalTests, numPassedTests,
-// numFailedTests, numPendingTests, startTime, ... }
-const total   = Number(report.numTotalTests   || 0);
-const passed  = Number(report.numPassedTests  || 0);
-const failed  = Number(report.numFailedTests  || 0);
-const pending = Number(report.numPendingTests || 0);
-const skipped = Number(report.numTodoTests    || 0); // some Vitest builds use numTodoTests
-const startTime = Number(report.startTime || 0);
-const endTime   = Number((report.testResults || []).reduce((acc, r) => Math.max(acc, Number(r.endTime || 0)), 0));
-const durationMs = endTime > startTime ? endTime - startTime : 0;
+const results = RULES_FILES.map((f) => [f, runSuite(f)]);
 
 console.log();
-console.log(`Report summary: total=${total} passed=${passed} failed=${failed} pending=${pending} skipped=${skipped}`);
-
-if (result.status !== 0) {
-  console.error(`ERROR: vitest exited ${result.status}. Suite did not pass.`);
-  process.exit(2);
-}
-if (total === 0) {
-  console.error("ERROR: zero tests executed. Refusing to certify the rules.");
-  process.exit(3);
-}
-if (pending > 0 || skipped > 0) {
-  console.error(`ERROR: ${pending + skipped} test(s) were skipped. Release gate forbids skips.`);
-  process.exit(4);
-}
-if (failed > 0) {
-  console.error(`ERROR: ${failed} test(s) failed.`);
-  process.exit(2);
-}
-
-console.log(`OK · Emulator suite passed: ${passed}/${total} tests in ${durationMs} ms`);
+for (const [file, r] of results) console.log(`OK · ${file}: ${r.passed}/${r.total}`);
+console.log(`OK · Emulator suite passed against ${results.length} rules file(s).`);
 process.exit(0);
