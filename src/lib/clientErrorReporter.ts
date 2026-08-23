@@ -1,5 +1,8 @@
-import { httpsCallable } from "firebase/functions";
-import { functions } from "./firebase";
+// Firebase is imported DYNAMICALLY in the send path. This module is loaded
+// from main.tsx before anything renders, so a static firebase import here
+// would drag the whole Firebase SDK into the entry bundle and delay first
+// paint on slow mobile networks. Errors are rare; paying the import cost
+// only when one actually happens is the right trade.
 
 export type ClientErrorSeverity = "error" | "warning";
 
@@ -90,9 +93,12 @@ export function reportClientError(error: unknown, options: ReportClientErrorOpti
   recentFingerprints.set(fingerprint, now);
   reportsSent += 1;
 
-  const fn = httpsCallable<ClientErrorPayload, { ok: boolean }>(functions, "logClientError");
   reportingInFlight = true;
-  void fn(payload)
+  void Promise.all([import("firebase/functions"), import("./firebase")])
+    .then(([{ httpsCallable }, { functions }]) => {
+      const fn = httpsCallable<ClientErrorPayload, { ok: boolean }>(functions, "logClientError");
+      return fn(payload);
+    })
     .catch(() => {
       // Logging must never create a second user-visible failure.
     })

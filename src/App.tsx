@@ -1,10 +1,10 @@
 import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
-import { ProtectedRoute } from "./components/ProtectedRoute";
-import { MaintenanceGate } from "./components/MaintenanceGate";
-import { AccountStatusGate } from "./components/AccountStatusGate";
-import SupportChatWidget from "./components/SupportChatWidget";
+
+
+
+const SupportChatWidget = lazy(() => import("./components/SupportChatWidget"));
 import SplashScreen from "./components/SplashScreen";
 import BrandLogo from "./components/BrandLogo";
 
@@ -17,6 +17,9 @@ import LandingPage from "./pages/LandingPage";
 // loads when the user navigates to that path. Cuts the landing-page JS
 // from ~980 KB to roughly the size of LandingPage + framework — material
 // on slow mobile networks.
+const ProtectedRoute     = lazy(() => import("./components/ProtectedRoute").then(m => ({ default: m.ProtectedRoute })));
+const MaintenanceGate    = lazy(() => import("./components/MaintenanceGate").then(m => ({ default: m.MaintenanceGate })));
+const AccountStatusGate  = lazy(() => import("./components/AccountStatusGate").then(m => ({ default: m.AccountStatusGate })));
 const GuestMatchWizard   = lazy(() => import("./pages/GuestMatchWizard"));
 const LockedPreviewPage  = lazy(() => import("./pages/LockedPreviewPage"));
 const LoginPage          = lazy(() => import("./pages/LoginPage"));
@@ -181,7 +184,7 @@ function App() {
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
-        <SupportChatWidget />
+        <Suspense fallback={null}><SupportChatWidget /></Suspense>
       </BrowserRouter>
     </AuthProvider>
   );
