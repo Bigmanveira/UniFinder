@@ -3805,6 +3805,14 @@ export const onUserCreated = onDocumentCreated(
       console.log("[users] welcome email already sent for", uid, "skipping");
       return;
     }
+    // Backfilled docs (created months after the real signup by the
+    // reconcile/backfill path) must NOT trigger a months-late welcome
+    // email. The wallet materialisation above still runs — those users
+    // are entitled to their signup credits — only the email is skipped.
+    if (data.welcomeEmailSuppressed === true) {
+      console.log("[users] welcome email suppressed for backfilled doc", uid);
+      return;
+    }
 
     // Authoritative email comes from Firebase Auth, NOT the Firestore doc.
     let authUser: admin.auth.UserRecord;
@@ -3907,6 +3915,34 @@ export const onAuthUserDeleted = functionsV1
       userAgent:  null,
       createdAt:  now,
     });
+  });
+
+// Server-side mirror of the client-side /users bootstrap. The client write
+// is best-effort — and was silently REJECTED for months because it included
+// the rules-protected `role` key — which left Firebase Auth accounts with no
+// /users doc: invisible to the ops portal, no wallet, no welcome email.
+// Creating the doc here with the Admin SDK (bypasses rules) guarantees every
+// new Auth account materialises in Firestore with its TRUE signup time from
+// Auth metadata. The existing onDocumentCreated("users/{uid}") trigger then
+// handles wallet materialisation + welcome email exactly once.
+//
+// Existence check first: the client fast-path may have created the doc
+// already (that's fine — it now writes the same shape), and we must never
+// clobber a doc that carries state.
+export const onAuthUserCreated = functionsV1
+  .region("us-central1")
+  .auth.user()
+  .onCreate(async (user) => {
+    const db = admin.firestore();
+    const ref = db.collection("users").doc(user.uid);
+    const snap = await ref.get();
+    if (snap.exists) return;
+    await ref.set({
+      email:       user.email ?? null,
+      displayName: user.displayName ?? null,
+      photoURL:    user.photoURL ?? null,
+      createdAt:   admin.firestore.Timestamp.fromDate(new Date(user.metadata.creationTime)),
+    }, { merge: true });
   });
 
 export const backfillCreditWallets = onCall(
@@ -5909,6 +5945,49 @@ export const reconcileUserAuthDirectory = onCall(
       }
     }
 
+    // ── Missing /users docs ──────────────────────────────────────────────
+    // The client-side bootstrap was rejected by security rules for months
+    // (it sent the protected `role` key), so a chunk of real Auth accounts
+    // never got a Firestore doc — invisible to every ops metric. Backfill
+    // them here with the TRUE signup time from Auth metadata. Ops-admin
+    // accounts (admin custom claim) are skipped: they're operators, not
+    // customers, and would pollute user analytics. welcomeEmailSuppressed
+    // stops onUserCreated from sending a months-late welcome email; the
+    // wallet materialisation in that trigger still runs (those users are
+    // entitled to their signup credits).
+    const existingDocIds = new Set(usersSnap.docs.map((d) => d.id));
+    const missingDocs: Array<{ uid: string; email: string | null; createdAt: Date }> = [];
+    for (const [uid, authUser] of authUsers) {
+      if (existingDocIds.has(uid)) continue;
+      if (authUser.customClaims?.admin === true) continue;
+      missingDocs.push({
+        uid,
+        email: authUser.email ?? null,
+        createdAt: new Date(authUser.metadata.creationTime),
+      });
+    }
+
+    // ── createdAt drift repair ───────────────────────────────────────────
+    // A long-standing client bug re-stamped createdAt with serverTimestamp()
+    // on EVERY sign-in, so returning users kept showing up as brand-new
+    // signups. Firebase Auth's creationTime is the authoritative signup
+    // moment; realign any doc that's missing createdAt or off by >1h.
+    const ONE_HOUR_MS = 60 * 60 * 1000;
+    const createdAtRepairs: Array<{ uid: string; authCreatedAt: Date }> = [];
+    for (const userDoc of usersSnap.docs) {
+      const authUser = authUsers.get(userDoc.id);
+      if (!authUser) continue;   // orphan doc (auth deleted) — leave history as-is
+      const authCreatedAt = new Date(authUser.metadata.creationTime);
+      const raw = userDoc.data().createdAt;
+      const currentMs =
+        raw instanceof admin.firestore.Timestamp ? raw.toMillis()
+        : typeof raw === "number" ? raw
+        : null;
+      if (currentMs === null || Math.abs(currentMs - authCreatedAt.getTime()) > ONE_HOUR_MS) {
+        createdAtRepairs.push({ uid: userDoc.id, authCreatedAt });
+      }
+    }
+
     if (apply) {
       for (let offset = 0; offset < changes.length; offset += 400) {
         const batch = db.batch();
@@ -5934,6 +6013,36 @@ export const reconcileUserAuthDirectory = onCall(
         await batch.commit();
       }
 
+      // Backfill missing docs. Individual set() calls (not batched with the
+      // status pass) so each creation fires onUserCreated for wallet
+      // materialisation; welcomeEmailSuppressed keeps the email path quiet.
+      for (let offset = 0; offset < missingDocs.length; offset += 400) {
+        const batch = db.batch();
+        for (const row of missingDocs.slice(offset, offset + 400)) {
+          const authUser = authUsers.get(row.uid);
+          batch.set(db.collection("users").doc(row.uid), {
+            email:                  row.email,
+            displayName:            authUser?.displayName ?? null,
+            photoURL:               authUser?.photoURL ?? null,
+            createdAt:              admin.firestore.Timestamp.fromDate(row.createdAt),
+            welcomeEmailSuppressed: true,
+            backfilledFromAuthAt:   admin.firestore.FieldValue.serverTimestamp(),
+          }, { merge: true });
+        }
+        await batch.commit();
+      }
+
+      // Repair drifted createdAt values back to the Auth signup moment.
+      for (let offset = 0; offset < createdAtRepairs.length; offset += 400) {
+        const batch = db.batch();
+        for (const row of createdAtRepairs.slice(offset, offset + 400)) {
+          batch.set(db.collection("users").doc(row.uid), {
+            createdAt: admin.firestore.Timestamp.fromDate(row.authCreatedAt),
+          }, { merge: true });
+        }
+        await batch.commit();
+      }
+
       await writeUserAccountAudit(request, "user_auth_directory_reconciled", "users", {
         scannedFirestoreUsers: usersSnap.size,
         scannedAuthUsers: authUsers.size,
@@ -5941,6 +6050,8 @@ export const reconcileUserAuthDirectory = onCall(
         deleted: changes.filter((change) => change.status === "deleted").length,
         deactivated: changes.filter((change) => change.status === "deactivated").length,
         reactivated: changes.filter((change) => change.status === "active").length,
+        docsCreated: missingDocs.length,
+        createdAtRepaired: createdAtRepairs.length,
       });
     }
 
@@ -5953,6 +6064,8 @@ export const reconcileUserAuthDirectory = onCall(
       deleted: changes.filter((change) => change.status === "deleted").length,
       deactivated: changes.filter((change) => change.status === "deactivated").length,
       reactivated: changes.filter((change) => change.status === "active").length,
+      docsCreated: missingDocs.length,
+      createdAtRepaired: createdAtRepairs.length,
       changes: changes.slice(0, 200),
     };
   },

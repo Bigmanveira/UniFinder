@@ -19,7 +19,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { signInWithPopup, getAdditionalUserInfo, GoogleAuthProvider } from "firebase/auth";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { doc, getDoc, setDoc, serverTimestamp } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { auth, googleProvider, db, functions } from "../lib/firebase";
 import { ArrowRight, Check, Loader2, Tag, ChevronDown, ChevronUp } from "lucide-react";
@@ -174,11 +174,23 @@ export default function SignupPage() {
         const uid = userCredential.user.uid;
         const userEmail = userCredential.user.email;
 
-        await setDoc(doc(db, "users", uid), {
-          email: userEmail,
-          createdAt: serverTimestamp(),
-          role: "student",
-        }, { merge: true });
+        // Create-only bootstrap. `role` must NOT be sent (firestore.rules
+        // rejects client writes touching protected keys — that rejection
+        // silently killed doc creation for every new signup), and
+        // `createdAt` must never be re-stamped for an existing doc (it was
+        // resetting the signup date on every sign-in, corrupting ops
+        // analytics). onAuthUserCreated server-side is the authoritative
+        // fallback creator.
+        const userRef = doc(db, "users", uid);
+        const existing = await getDoc(userRef);
+        if (!existing.exists()) {
+          await setDoc(userRef, {
+            email: userEmail,
+            createdAt: serverTimestamp(),
+          });
+        } else if (userEmail && existing.data()?.email !== userEmail) {
+          await setDoc(userRef, { email: userEmail }, { merge: true });
+        }
 
         const guestProfile = localStorage.getItem("unifinder_guest_profile");
         if (guestProfile) {

@@ -100,11 +100,26 @@ export default function LoginPage() {
   // the user from landing in the app.
   const bootstrapUser = async (uid: string, userEmail: string | null): Promise<void> => {
     try {
-      await setDoc(doc(db, "users", uid), {
-        email:     userEmail,
-        createdAt: serverTimestamp(),
-        role:      "student",
-      }, { merge: true });
+      // Create-only bootstrap. Two hard-won rules here:
+      //   1. NEVER include `role` — firestore.rules rejects any /users
+      //      create/update touching the protected role/accountStatus keys,
+      //      which silently killed this write (and with it the welcome
+      //      email + eager wallet) for every new signup.
+      //   2. NEVER re-send `createdAt` for an existing doc — merge:true
+      //      was stamping serverTimestamp() on every sign-in, so returning
+      //      users kept showing up as brand-new signups in ops analytics.
+      // The onAuthUserCreated Cloud Function is the authoritative doc
+      // creator; this client write is just a fast-path for the same thing.
+      const userRef = doc(db, "users", uid);
+      const existing = await getDoc(userRef);
+      if (!existing.exists()) {
+        await setDoc(userRef, {
+          email:     userEmail,
+          createdAt: serverTimestamp(),
+        });
+      } else if (userEmail && existing.data()?.email !== userEmail) {
+        await setDoc(userRef, { email: userEmail }, { merge: true });
+      }
 
       const guestProfile = localStorage.getItem("unifinder_guest_profile");
       if (guestProfile) {
