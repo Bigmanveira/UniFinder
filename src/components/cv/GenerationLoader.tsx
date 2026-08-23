@@ -10,7 +10,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useState } from "react";
-import { Wand2 } from "lucide-react";
+import { PenLine } from "lucide-react";
 import { Eyebrow } from "../ui/Eyebrow";
 import { IconChip } from "../ui/IconChip";
 
@@ -71,14 +71,21 @@ export default function GenerationLoader({ mode }: { mode: CvMode }) {
   return (
     <div className="relative bg-white rounded-card-lg border border-slate-200/70 shadow-card overflow-hidden">
       <div className="relative px-8 py-14 sm:py-16 flex flex-col items-center text-center">
-        {/* Primary icon chip with a soft halo */}
+        {/* Modern orbital loader: a rotating ring segment orbits a steady
+            pen icon — motion carries the "working" signal, the icon stays
+            calm. Halo pulse kept for depth. */}
         <div className="relative mb-7">
           <div className="absolute inset-[-12px] rounded-full bg-primary-500/15 blur-2xl animate-pulse" aria-hidden />
+          <div
+            aria-hidden
+            className="absolute inset-[-7px] rounded-full border-[3px] border-primary-100 border-t-primary-500 animate-spin"
+            style={{ animationDuration: "1.1s" }}
+          />
           <IconChip
-            icon={<Wand2 size={28} className="animate-pulse" style={{ animationDuration: "1.8s" }} />}
+            icon={<PenLine size={26} />}
             tint="primary"
             size="lg"
-            className="relative w-16 h-16 rounded-full shadow-xl shadow-primary-600/10 ring-8 ring-primary-500/10"
+            className="relative w-16 h-16 rounded-full shadow-xl shadow-primary-600/10"
           />
         </div>
 

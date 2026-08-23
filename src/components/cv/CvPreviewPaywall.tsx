@@ -23,7 +23,7 @@ import { useState } from "react";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "../../lib/firebase";
 import {
-  Lock, Loader2, Wand2, ArrowRight, Copy, Check, Download,
+  Lock, Loader2, PenLine, Unlock, ArrowRight, Copy, Check, Download,
   GraduationCap, Briefcase, Award, Wrench, Users, ScrollText, FileText,
 } from "lucide-react";
 import CvMarkdown from "./CvMarkdown";
@@ -135,7 +135,7 @@ export default function CvPreviewPaywall({
       <div className="space-y-5">
         {/* Status bar */}
         <div className="bg-white border border-slate-200/70 rounded-card shadow-card px-5 py-4 flex items-center gap-3">
-          <IconChip icon={<Wand2 size={18} />} tint="primary" size="md" />
+          <IconChip icon={<PenLine size={18} />} tint="primary" size="md" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-black tracking-tight text-slate-900">Unlocked · ready to download</p>
             <p className="text-xs text-slate-500">Your full document is below. Copy or download as Markdown.</p>
@@ -232,7 +232,7 @@ export default function CvPreviewPaywall({
                   disabled={busy}
                   className="inline-flex items-center justify-center gap-2 px-7 py-4 rounded-full text-sm font-bold text-white bg-primary-500 hover:bg-primary-600 shadow-glow active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap"
                 >
-                  {busy ? <Loader2 size={16} className="animate-spin" /> : <Wand2 size={16} />}
+                  {busy ? <Loader2 size={16} className="animate-spin" /> : <Unlock size={16} />}
                   {busy ? "Unlocking…" : "Unlock — free for you"}
                 </button>
                 <p className="text-[11px] text-white/50 text-center lg:text-right">Founder account — no tokens charged.</p>

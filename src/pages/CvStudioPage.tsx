@@ -15,7 +15,7 @@
 import { Link } from "react-router-dom";
 import {
   ArrowRight, FileText, Wrench, RefreshCw,
-  Eye, ShieldCheck, History, Lock, Bot, Wand2,
+  Eye, ShieldCheck, History, Lock, Bot, PenLine,
   GraduationCap, Briefcase, Award, Languages,
 } from "lucide-react";
 import CvStudioFooter from "../components/cv/CvStudioFooter";
@@ -82,7 +82,7 @@ export default function CvStudioPage() {
             blurb="Drop in your current academic CV. We point at what's weak, then rewrite it sharper."
             sample={[
               { icon: <Eye size={11} />,        label: "10-bullet critique" },
-              { icon: <Wand2 size={11} />,      label: "Full rewrite" },
+              { icon: <PenLine size={11} />,      label: "Full rewrite" },
               { icon: <ShieldCheck size={11} />, label: "AI-detector safe" },
             ]}
           />

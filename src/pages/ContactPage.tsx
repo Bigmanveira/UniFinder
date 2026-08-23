@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, MessageCircleQuestion, Send, ShieldAlert, Wand2 } from "lucide-react";
+import { ArrowLeft, Lightbulb, MessageCircleQuestion, Send, ShieldAlert } from "lucide-react";
 import BrandLogo from "../components/BrandLogo";
 import { Eyebrow } from "../components/ui/Eyebrow";
 import { IconChip } from "../components/ui/IconChip";
@@ -155,7 +155,7 @@ export default function ContactPage() {
               body="Anna's feedback is practice only — not legal advice. For visa law questions, contact a qualified immigration attorney."
             />
             <InfoCard
-              icon={<IconChip icon={<Wand2 size={18} />} tint="primary" size="md" />}
+              icon={<IconChip icon={<Lightbulb size={18} />} tint="primary" size="md" />}
               title="Press & partnerships"
               body="Building something complementary or writing about us? Pick the 'Press / partnerships' topic and we'll get back fast."
             />

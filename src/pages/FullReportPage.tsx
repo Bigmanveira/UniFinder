@@ -5,7 +5,7 @@ import { db, functions } from "../lib/firebase";
 import { doc, getDoc, setDoc, updateDoc, arrayUnion, onSnapshot } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import {
-  MapPin, Globe, Heart, ArrowLeft, ArrowRight, AlertTriangle, Wand2,
+  MapPin, Globe, Heart, ArrowLeft, ArrowRight, AlertTriangle, Unlock,
   Check, ChevronDown, ChevronUp, Lightbulb, DollarSign,
   Star, Loader2, Target, Percent, Send, BookOpen, RefreshCw, Lock, Map,
 } from "lucide-react";
@@ -130,7 +130,7 @@ function AiInsight({ ai }: { ai: AiReportExplanation }) {
   return (
     <section className="rounded-card border border-slate-100 bg-white shadow-card p-6 sm:p-7">
       <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-eyebrow text-slate-400">
-        <Wand2 size={11} className="text-primary-500" /> AI insight
+        <Lightbulb size={11} className="text-primary-500" /> AI insight
       </span>
       <h2 className="mt-2 max-w-3xl text-lg font-black leading-snug tracking-tight text-slate-900 sm:text-xl">
         {ai.headline}
@@ -1023,7 +1023,7 @@ function LockedBucketCard({
                 disabled={busy}
                 className={`inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full text-sm font-bold transition-all active:scale-95 text-white ${theme.cta} ${theme.ctaRing} disabled:opacity-60 disabled:cursor-not-allowed`}
               >
-                {busy ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
+                {busy ? <Loader2 size={14} className="animate-spin" /> : <Unlock size={14} />}
                 {busy ? "Revealing…" : `Reveal ${meta.title} — free for you`}
               </button>
               <p className="text-[11px] text-slate-500 mt-2.5">

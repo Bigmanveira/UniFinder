@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Plus, Wand2 } from "lucide-react";
+import { ArrowLeft, GraduationCap, Plus } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import BrandLogo from "../components/BrandLogo";
 import { Eyebrow } from "../components/ui/Eyebrow";
@@ -130,7 +130,7 @@ export default function FAQPage() {
               to="/intake"
               className="inline-flex items-center gap-2 rounded-full bg-primary-500 hover:bg-primary-600 text-white font-bold px-7 py-3.5 text-sm shadow-glow transition-all active:scale-95"
             >
-              <Wand2 size={16} /> Start Free Match Wizard
+              <GraduationCap size={16} /> Start Free Match Wizard
             </Link>
           </div>
         </div>

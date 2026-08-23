@@ -10,7 +10,7 @@ import { collection, onSnapshot, orderBy, query, where, limit } from "firebase/f
 import { db } from "../lib/firebase";
 import { useAuth } from "../hooks/useAuth";
 import {
-  FileText, Wrench, RefreshCw, Lock, Wand2,
+  FileText, Wrench, RefreshCw, Lock, Unlock,
   Loader2, ChevronRight, Inbox,
 } from "lucide-react";
 import CvStudioFooter from "../components/cv/CvStudioFooter";
@@ -146,7 +146,7 @@ export default function CvStudioHistoryPage() {
                           <p className="text-[15px] font-black tracking-tight text-slate-900 truncate">{meta.label}</p>
                           {row.unlocked ? (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-50 text-primary-700 border border-primary-200 text-[10px] font-semibold uppercase tracking-eyebrow">
-                              <Wand2 size={9} /> Unlocked
+                              <Unlock size={9} /> Unlocked
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-semibold uppercase tracking-eyebrow">

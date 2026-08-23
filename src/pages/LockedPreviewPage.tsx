@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import {
-  Lock, ArrowRight, Wand2, AlertTriangle, Info,
+  Lock, ArrowRight, GraduationCap, Zap, AlertTriangle, Info,
   MapPin, Star, ChevronRight, Send,
 } from "lucide-react";
 import BrandLogo from "../components/BrandLogo";
@@ -351,7 +351,7 @@ function PageLoader({ label }: { label: string }) {
         <div className="relative w-16 h-16 mx-auto mb-5">
           <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
           <div className="absolute inset-0 rounded-full border-4 border-t-primary-600 border-r-transparent border-b-transparent border-l-transparent animate-spin" />
-          <Wand2 size={20} className="absolute inset-0 m-auto text-primary-600" />
+          <GraduationCap size={20} className="absolute inset-0 m-auto text-primary-600" />
         </div>
         <p className="text-base font-semibold text-slate-900 mb-1">{label}</p>
         <p className="text-xs text-slate-500">This usually takes 10–20 seconds.</p>
@@ -540,7 +540,7 @@ function UnlockDock({
                 <div className="absolute inset-1 rounded-full border-[3px] border-white/15" />
                 <div className="absolute inset-1 rounded-full border-[3px] border-t-primary-400 border-r-transparent border-b-transparent border-l-transparent animate-spin" style={{ animationDuration: "1.4s" }} />
                 <div className="absolute inset-0 m-auto w-10 h-10 flex items-center justify-center">
-                  <Wand2 size={26} className="text-primary-300" />
+                  <GraduationCap size={26} className="text-primary-300" />
                 </div>
               </div>
 
@@ -579,7 +579,7 @@ function UnlockDock({
               {/* Did you know card */}
               <div className="bg-white/5 border border-white/10 rounded-xl p-4 text-left min-h-[96px]">
                 <div className="flex items-center gap-1.5 mb-1.5">
-                  <Wand2 size={11} className="text-amber-300" />
+                  <Zap size={11} className="text-amber-300" />
                   <p className="text-[10px] font-bold tracking-widest text-amber-200 uppercase">Did you know</p>
                 </div>
                 <AnimatePresence mode="wait">
