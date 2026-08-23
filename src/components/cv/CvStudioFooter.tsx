@@ -9,7 +9,7 @@ import BrandLogo from "../BrandLogo";
 
 export default function CvStudioFooter() {
   return (
-    <footer className="bg-white py-12 border-t border-slate-100 mt-16">
+    <footer className="bg-white py-12 border-t border-slate-200/70 mt-16">
       <div className="max-w-6xl mx-auto px-6 flex flex-col gap-8">
         <div className="flex flex-col items-center md:flex-row md:justify-between gap-6">
           <BrandLogo size="sm" />
@@ -23,7 +23,7 @@ export default function CvStudioFooter() {
             <Link to="/contact" className="hover:text-primary-600 transition-colors">Contact</Link>
           </nav>
         </div>
-        <p className="text-xs font-medium text-slate-400 text-center md:text-left border-t border-slate-100 pt-6">
+        <p className="text-xs font-medium text-slate-400 text-center md:text-left border-t border-slate-200/70 pt-6">
           © 2026 College Ready. AI tools for academic CV preparation. Outputs are drafts — review and edit before submitting.
         </p>
       </div>

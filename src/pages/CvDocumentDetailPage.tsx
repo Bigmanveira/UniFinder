@@ -9,16 +9,17 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { doc, getDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import { ArrowLeft, Loader2, AlertTriangle } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
 import { db, functions } from "../lib/firebase";
 import { useAuth } from "../hooks/useAuth";
 import { isFounderEmail } from "../lib/founders";
 import { doc as docRef, onSnapshot as walletSnapshot } from "firebase/firestore";
 import CvPreviewPaywall from "../components/cv/CvPreviewPaywall";
 import CvStudioFooter from "../components/cv/CvStudioFooter";
+import { AppHeader } from "../components/AppHeader";
 
 interface DocState {
   documentId:      string;
@@ -103,26 +104,14 @@ export default function CvDocumentDetailPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 antialiased flex flex-col">
-      <div className="relative overflow-hidden">
-        <div className="pointer-events-none absolute top-[-160px] right-[-120px] w-[480px] h-[480px] bg-gradient-to-br from-slate-300/40 via-blue-200/20 to-transparent rounded-full blur-[140px]" aria-hidden />
-
-        <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/85 backdrop-blur supports-[backdrop-filter]:bg-white/70">
-          <div className="max-w-6xl mx-auto px-5 h-14 flex items-center gap-3">
-            <Link to="/app/cv-studio/history" className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 transition-colors" aria-label="Back to history">
-              <ArrowLeft size={15} />
-            </Link>
-            <div className="flex-1 min-w-0">
-              <h1 className="text-[15px] font-bold leading-tight truncate">
-                {state ? (state.mode === "review" ? "Review & revamp" : state.mode === "build" ? "Built from scratch" : "Professional → Academic") : "CV document"}
-              </h1>
-              <p className="text-xs text-slate-500 truncate">
-                {state?.unlocked ? "Unlocked" : "Preview · unlock to read in full"}
-              </p>
-            </div>
-          </div>
-        </header>
-      </div>
+    <div className="min-h-screen bg-surface text-slate-900 antialiased flex flex-col">
+      <AppHeader
+        title={state ? (state.mode === "review" ? "Review & revamp" : state.mode === "build" ? "Built from scratch" : "Professional → Academic") : "CV document"}
+        subtitle={state?.unlocked ? "Unlocked" : "Preview · unlock to read in full"}
+        backTo="/app/cv-studio/history"
+        backLabel="Back to history"
+        maxWidth="max-w-6xl"
+      />
 
       <main className="relative max-w-3xl mx-auto px-5 py-8 w-full flex-1">
         {!state && !error && (

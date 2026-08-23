@@ -1,11 +1,13 @@
 import { lazy, Suspense, useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
-import { Loader2 } from "lucide-react";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { MaintenanceGate } from "./components/MaintenanceGate";
 import { AccountStatusGate } from "./components/AccountStatusGate";
 import SupportChatWidget from "./components/SupportChatWidget";
+import SplashScreen from "./components/SplashScreen";
+import StartupSplash from "./components/StartupSplash";
+import BrandLogo from "./components/BrandLogo";
 
 // Landing is eager so the very first paint doesn't wait on an extra
 // round-trip — it's by far the most common entry point and we don't want
@@ -20,7 +22,16 @@ const GuestMatchWizard   = lazy(() => import("./pages/GuestMatchWizard"));
 const LockedPreviewPage  = lazy(() => import("./pages/LockedPreviewPage"));
 const LoginPage          = lazy(() => import("./pages/LoginPage"));
 const SignupPage         = lazy(() => import("./pages/SignupPage"));
-const DashboardPage      = lazy(() => import("./pages/DashboardPage"));
+const AppShell           = lazy(() => import("./components/layout/AppShell"));
+const HomeScreen         = lazy(() => import("./pages/app/HomeScreen"));
+const DiscoverScreen     = lazy(() => import("./pages/app/DiscoverScreen"));
+const MatchesScreen      = lazy(() => import("./pages/app/MatchesScreen"));
+const VisaHubScreen      = lazy(() => import("./pages/app/VisaHubScreen"));
+const SavedSchoolsPage   = lazy(() => import("./pages/app/SavedSchoolsPage"));
+const BillingPage        = lazy(() => import("./pages/app/BillingPage"));
+const ProfilePage        = lazy(() => import("./pages/app/ProfilePage"));
+const InterviewHistoryPage = lazy(() => import("./pages/app/InterviewHistoryPage"));
+const NotFoundPage       = lazy(() => import("./pages/NotFoundPage"));
 const FAQPage            = lazy(() => import("./pages/FAQPage"));
 const BrowseSchoolsPage  = lazy(() => import("./pages/BrowseSchoolsPage"));
 const FullReportPage     = lazy(() => import("./pages/FullReportPage"));
@@ -47,10 +58,15 @@ const WaitlistPage       = lazy(() => import("./pages/WaitlistPage"));
 // Flip to false (or remove the env var) to go public.
 const WAITLIST_MODE = import.meta.env.VITE_WAITLIST_MODE === "true";
 
+// Lightweight Suspense fallback for lazy route chunks after startup. The
+// full branded splash (StartupSplash) only plays once at cold start; this
+// stays minimal so in-app navigations never replay a 1.2s hold.
 function PageLoader() {
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center">
-      <Loader2 size={20} className="text-slate-400 animate-spin" />
+    <div className="min-h-screen bg-surface flex items-center justify-center">
+      <div className="animate-pulse-slow">
+        <BrandLogo size="md" iconOnly asLink={false} />
+      </div>
     </div>
   );
 }
@@ -71,11 +87,7 @@ function HomeGate() {
   const { user, loading } = useAuth();
   if (!WAITLIST_MODE) return <LandingPage />;
   if (loading) {
-    return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <Loader2 size={20} className="text-slate-400 animate-spin" />
-      </div>
-    );
+    return <SplashScreen />;
   }
   return user ? <LandingPage /> : <WaitlistPage />;
 }
@@ -94,6 +106,7 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <ScrollToTopOnNavigation />
+        <StartupSplash />
         <Suspense fallback={<PageLoader />}>
           <Routes>
             {/* Public Routes that ALWAYS stay live — marketing + legal
@@ -131,9 +144,24 @@ function App() {
 
               <Route element={<ProtectedRoute />}>
                 <Route element={<AccountStatusGate />}>
-                  <Route path="/app" element={<DashboardPage />} />
+                  {/* Persistent app shell: one floating navy pill tab bar on
+                      every viewport. The old dashboard tabs are real routes
+                      now. Roadmap lives in the shell too (it keeps its own
+                      sticky page header). */}
+                  <Route element={<AppShell />}>
+                    {/* The four Sleek tabs */}
+                    <Route path="/app" element={<HomeScreen />} />
+                    <Route path="/app/discover" element={<DiscoverScreen />} />
+                    <Route path="/app/matches" element={<MatchesScreen />} />
+                    <Route path="/app/visa" element={<VisaHubScreen />} />
+                    {/* Stack-style pages reachable from the tabs */}
+                    <Route path="/app/saved" element={<SavedSchoolsPage />} />
+                    <Route path="/app/billing" element={<BillingPage />} />
+                    <Route path="/app/profile" element={<ProfilePage />} />
+                    <Route path="/app/interviews" element={<InterviewHistoryPage />} />
+                    <Route path="/app/roadmap" element={<RoadmapPage />} />
+                  </Route>
                   <Route path="/app/reports/:reportId" element={<FullReportPage />} />
-                  <Route path="/app/roadmap" element={<RoadmapPage />} />
                   {/* The diagnostic is a modal on /app/roadmap now. This route
                       is kept so old links, bookmarks and the signup `next=`
                       deep link still open it. */}
@@ -149,6 +177,9 @@ function App() {
                 </Route>
               </Route>
             </Route>
+
+            {/* Catch-all 404 — unknown URLs previously rendered blank. */}
+            <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
         <SupportChatWidget />

@@ -18,7 +18,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useRef, useState } from "react";
-import { FileUp, Loader2, AlertTriangle, X, Type, FileText } from "lucide-react";
+import { FileUp, AlertTriangle, X, Type, FileText } from "lucide-react";
+import { Button } from "../ui/Button";
+import { IconChip } from "../ui/IconChip";
+import { cn } from "../../lib/cn";
 
 const MAX_FILE_MB = 10;
 const ACCEPT_TYPES =
@@ -139,18 +142,24 @@ export default function CvDocumentIntake({
   return (
     <div className="space-y-5">
       {/* Mode switch */}
-      <div className="inline-flex p-1 bg-slate-100 rounded-2xl">
+      <div className="inline-flex p-1 bg-slate-100 rounded-full">
         <button
           type="button"
           onClick={() => setMode("upload")}
-          className={`px-4 py-2 rounded-xl text-[13px] font-bold transition-colors inline-flex items-center gap-1.5 ${mode === "upload" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+          className={cn(
+            "px-4 py-2 rounded-full text-[13px] font-bold transition-colors inline-flex items-center gap-1.5",
+            mode === "upload" ? "bg-ink text-white" : "text-slate-600 hover:text-slate-900",
+          )}
         >
           <FileUp size={14} /> Upload file
         </button>
         <button
           type="button"
           onClick={() => setMode("paste")}
-          className={`px-4 py-2 rounded-xl text-[13px] font-bold transition-colors inline-flex items-center gap-1.5 ${mode === "paste" ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
+          className={cn(
+            "px-4 py-2 rounded-full text-[13px] font-bold transition-colors inline-flex items-center gap-1.5",
+            mode === "paste" ? "bg-ink text-white" : "text-slate-600 hover:text-slate-900",
+          )}
         >
           <Type size={14} /> Paste text
         </button>
@@ -178,17 +187,19 @@ export default function CvDocumentIntake({
               onDragOver={onDragOver}
               onDragLeave={onDragLeave}
               onDrop={onDrop}
-              className={`w-full border-2 border-dashed rounded-3xl px-6 py-10 text-center transition-all ${
+              className={cn(
+                "w-full border-2 border-dashed rounded-card px-6 py-10 text-center transition-all",
                 dragOver
-                  ? "border-blue-500 bg-blue-50/60 ring-2 ring-blue-100 scale-[1.005]"
-                  : "border-slate-300 hover:border-slate-400 hover:bg-slate-50"
-              }`}
+                  ? "border-primary-500 bg-primary-50/60 ring-2 ring-primary-100 scale-[1.005]"
+                  : "border-slate-300 hover:border-slate-400 hover:bg-slate-50",
+              )}
             >
-              <div className={`w-14 h-14 mx-auto rounded-2xl flex items-center justify-center mb-3 transition-colors ${
-                dragOver ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600"
-              }`}>
-                <FileUp size={22} />
-              </div>
+              <IconChip
+                icon={<FileUp size={22} />}
+                tint={dragOver ? "primary" : "slate"}
+                size="lg"
+                className="mx-auto mb-3 transition-colors"
+              />
               <p className="text-sm font-bold text-slate-900 mb-1">
                 {dragOver ? "Drop your file here" : "Drag and drop your CV here"}
               </p>
@@ -196,10 +207,8 @@ export default function CvDocumentIntake({
               <p className="text-[11px] text-slate-400">{ACCEPT_HUMAN} · Max {MAX_FILE_MB}MB</p>
             </button>
           ) : (
-            <div className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3">
-              <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-700 flex-shrink-0">
-                <FileText size={16} />
-              </div>
+            <div className="flex items-center gap-3 bg-slate-50 border border-slate-200/70 rounded-2xl px-4 py-3">
+              <IconChip icon={<FileText size={16} />} tint="primary" size="md" />
               <div className="flex-1 min-w-0">
                 <p className="text-[13px] font-bold text-slate-900 truncate">{file.name}</p>
                 <p className="text-[11px] text-slate-500">{(file.size / 1024).toFixed(0)} KB · {file.type || "unknown"}</p>
@@ -207,7 +216,7 @@ export default function CvDocumentIntake({
               <button
                 type="button"
                 onClick={() => handleFile(null)}
-                className="w-8 h-8 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-200 flex items-center justify-center transition-colors"
+                className="w-8 h-8 rounded-full text-slate-500 hover:text-slate-900 hover:bg-slate-200 flex items-center justify-center transition-colors"
                 aria-label="Remove file"
               >
                 <X size={14} />
@@ -223,7 +232,7 @@ export default function CvDocumentIntake({
           value={pasteText}
           onChange={(e) => setPasteText(e.target.value)}
           placeholder="Paste your CV text here…"
-          className="w-full min-h-[280px] resize-y bg-white border border-slate-200 rounded-3xl px-5 py-4 text-[14px] text-slate-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          className="w-full min-h-[280px] resize-y bg-white border border-slate-200 rounded-2xl px-5 py-4 text-[14px] text-slate-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
         />
       )}
 
@@ -234,15 +243,15 @@ export default function CvDocumentIntake({
         </div>
       )}
 
-      <button
-        type="button"
+      <Button
         onClick={handleSubmit}
-        disabled={busy}
-        className="w-full inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-2xl text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+        loading={busy}
+        variant="primary"
+        size="lg"
+        className="w-full"
       >
-        {busy && <Loader2 size={14} className="animate-spin" />}
         {busy ? "Working…" : submitLabel}
-      </button>
+      </Button>
     </div>
   );
 }

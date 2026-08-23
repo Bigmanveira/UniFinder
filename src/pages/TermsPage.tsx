@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
-import { FileText } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import BrandLogo from "../components/BrandLogo";
+import { Eyebrow } from "../components/ui/Eyebrow";
 
 const LAST_UPDATED = "May 11, 2026";
 
@@ -12,29 +13,38 @@ const LAST_UPDATED = "May 11, 2026";
 // ─────────────────────────────────────────────────────────────────────────────
 export default function TermsPage() {
   return (
-    <div className="min-h-screen bg-slate-50 font-sans selection:bg-primary-500 selection:text-white">
-      <header className="absolute top-0 left-0 right-0 z-50 px-6 py-6 flex items-center justify-between max-w-7xl mx-auto">
-        <BrandLogo size="md" />
-        <Link to="/login" className="text-sm font-bold text-primary-600 hover:text-primary-700 bg-primary-50 px-5 py-2.5 rounded-full transition-colors">
+    <div className="min-h-screen bg-surface font-sans selection:bg-primary-500 selection:text-white">
+      <header className="max-w-5xl mx-auto px-5 sm:px-6 py-5 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Link
+            to="/"
+            aria-label="Back home"
+            className="w-9 h-9 shrink-0 rounded-full bg-white border border-slate-200/70 shadow-sm hover:border-slate-300 flex items-center justify-center text-slate-700 transition-colors"
+          >
+            <ArrowLeft size={15} />
+          </Link>
+          <BrandLogo size="md" />
+        </div>
+        <Link
+          to="/login"
+          className="rounded-full bg-ink text-white text-sm font-bold px-5 py-2.5 hover:bg-slate-800 shadow-lg shadow-slate-900/20 transition-all active:scale-95"
+        >
           Log in
         </Link>
       </header>
 
-      <section className="pt-32 pb-12 px-6 relative overflow-hidden">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-primary-500/10 blur-[100px] rounded-full pointer-events-none" />
-        <div className="max-w-3xl mx-auto text-center relative z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary-50 border border-primary-100 text-primary-600 text-xs font-black tracking-widest uppercase mb-6">
-            <FileText size={14} /> The rules of the road
-          </div>
-          <h1 className="text-4xl md:text-6xl font-black text-slate-900 leading-tight mb-4 tracking-tight">
-            Terms of <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-accent-500">Service</span>
+      <section className="pt-10 sm:pt-16 pb-10 px-5 sm:px-6">
+        <div className="max-w-3xl mx-auto text-center">
+          <Eyebrow className="mb-3">The rules of the road</Eyebrow>
+          <h1 className="text-4xl md:text-5xl font-black tracking-tight text-slate-900 leading-tight mb-4">
+            Terms of <span className="text-primary-600">Service</span>
           </h1>
           <p className="text-sm text-slate-500 font-medium">Last updated: {LAST_UPDATED}</p>
         </div>
       </section>
 
-      <section className="px-6 pb-32">
-        <article className="max-w-3xl mx-auto bg-white rounded-[24px] border border-slate-200 shadow-sm px-7 py-8 md:px-10 md:py-12 space-y-8 text-slate-700 leading-relaxed">
+      <section className="px-5 sm:px-6 pb-28">
+        <article className="max-w-3xl mx-auto bg-white border border-slate-200/70 rounded-card shadow-card px-7 py-8 md:px-10 md:py-12 space-y-8 text-slate-700 leading-relaxed">
 
           <Block title="Welcome">
             <p>
@@ -139,7 +149,7 @@ export default function TermsPage() {
         </article>
       </section>
 
-      <footer className="bg-white py-10 border-t border-slate-100">
+      <footer className="bg-white py-10 border-t border-slate-200/70">
         <div className="max-w-6xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-4 text-sm">
           <BrandLogo size="sm" />
           <div className="flex gap-6 text-sm font-bold text-slate-400">

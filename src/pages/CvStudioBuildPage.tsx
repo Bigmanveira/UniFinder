@@ -15,12 +15,14 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useState } from "react";
-import { Link } from "react-router-dom";
-import { ArrowLeft, Wrench, AlertTriangle, RotateCw, Plus, X, Loader2 } from "lucide-react";
+import { Wrench, AlertTriangle, RotateCw, Plus, X } from "lucide-react";
 import { useAcademicCv } from "../components/cv/useAcademicCv";
 import CvPreviewPaywall from "../components/cv/CvPreviewPaywall";
 import CvStudioFooter from "../components/cv/CvStudioFooter";
 import GenerationLoader from "../components/cv/GenerationLoader";
+import { AppHeader } from "../components/AppHeader";
+import { Button } from "../components/ui/Button";
+import { IconChip } from "../components/ui/IconChip";
 
 interface EduEntry        { institution: string; location: string; degree: string; dates: string; gpa: string; electives: string; }
 interface AchievementEntry{ title: string; date: string; }
@@ -75,36 +77,26 @@ export default function CvStudioBuildPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 antialiased flex flex-col">
-      <div className="relative overflow-hidden">
-        <div className="pointer-events-none absolute top-[-160px] right-[-120px] w-[480px] h-[480px] bg-gradient-to-br from-violet-300/40 via-fuchsia-200/25 to-transparent rounded-full blur-[140px]" aria-hidden />
+    <div className="min-h-screen bg-surface text-slate-900 antialiased flex flex-col">
+      <AppHeader
+        title="Build from scratch"
+        subtitle="Guided intake · 800 tokens to unlock the full CV"
+        backTo="/app/cv-studio"
+        backLabel="Back to CV Studio"
+        maxWidth="max-w-6xl"
+      />
 
-        <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/85 backdrop-blur supports-[backdrop-filter]:bg-white/70">
-          <div className="max-w-6xl mx-auto px-5 h-14 flex items-center gap-3">
-            <Link to="/app/cv-studio" className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 transition-colors" aria-label="Back to CV Studio">
-              <ArrowLeft size={15} />
-            </Link>
-            <div className="flex-1 min-w-0">
-              <h1 className="text-[15px] font-bold leading-tight truncate">Build from scratch</h1>
-              <p className="text-xs text-slate-500 truncate">Guided intake · 800 tokens to unlock the full CV</p>
-            </div>
-          </div>
-        </header>
-
-        {!cv.document && (
-          <section className="relative max-w-3xl mx-auto px-5 pt-10 sm:pt-14 pb-2 text-center">
-            <div className="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-violet-700 text-white items-center justify-center mb-5 shadow-md shadow-violet-500/20">
-              <Wrench size={22} />
-            </div>
-            <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 mb-3 leading-[1.1]">
-              Tell us the facts. We'll do the formatting.
-            </h2>
-            <p className="text-base sm:text-[17px] text-slate-600 leading-relaxed max-w-2xl mx-auto">
-              Fill in only what applies — empty sections are skipped. The AI takes your raw facts and produces a polished CV that follows the standard template. Preview is free; unlock costs 800 tokens.
-            </p>
-          </section>
-        )}
-      </div>
+      {!cv.document && (
+        <section className="relative max-w-3xl mx-auto px-5 pt-10 sm:pt-14 pb-2 text-center">
+          <IconChip icon={<Wrench size={22} />} tint="primary" size="lg" className="mx-auto mb-5" />
+          <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 mb-3 leading-[1.1]">
+            Tell us the facts. We'll do the formatting.
+          </h2>
+          <p className="text-base sm:text-[17px] text-slate-600 leading-relaxed max-w-2xl mx-auto">
+            Fill in only what applies — empty sections are skipped. The AI takes your raw facts and produces a polished CV that follows the standard template. Preview is free; unlock costs 800 tokens.
+          </p>
+        </section>
+      )}
 
       <main className="relative max-w-3xl mx-auto px-5 py-8 w-full flex-1 space-y-8">
         {cv.generating && (
@@ -134,7 +126,7 @@ export default function CvStudioBuildPage() {
                   value={objective}
                   onChange={(e) => setObjective(e.target.value)}
                   placeholder="To advance in knowledge and develop new skills for critical analysis of economic issues, in order to become a practically astute and academically informed economist."
-                  className="w-full min-h-[90px] resize-y bg-white border border-slate-200 rounded-2xl px-4 py-3 text-[14px] text-slate-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                  className="w-full min-h-[90px] resize-y bg-white border border-slate-200 rounded-2xl px-4 py-3 text-[14px] text-slate-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 />
               </Block>
 
@@ -204,7 +196,7 @@ export default function CvStudioBuildPage() {
                   value={keySkills}
                   onChange={(e) => setKeySkills(e.target.value)}
                   placeholder={"Computer skills: proficient in Microsoft Office, SPSS, and STATA\nWriter of articles and motivational messages"}
-                  className="w-full min-h-[100px] resize-y bg-white border border-slate-200 rounded-2xl px-4 py-3 text-[14px] text-slate-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+                  className="w-full min-h-[100px] resize-y bg-white border border-slate-200 rounded-2xl px-4 py-3 text-[14px] text-slate-900 leading-relaxed focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
                 />
               </Block>
 
@@ -239,14 +231,15 @@ export default function CvStudioBuildPage() {
               </div>
             )}
 
-            <button
+            <Button
               onClick={handleSubmit}
-              disabled={cv.generating}
-              className="w-full inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 rounded-2xl text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              loading={cv.generating}
+              variant="primary"
+              size="lg"
+              className="w-full"
             >
-              {cv.generating && <Loader2 size={14} className="animate-spin" />}
               {cv.generating ? "Building your CV…" : "Generate my CV (free preview)"}
-            </button>
+            </Button>
           </>
         )}
 
@@ -262,7 +255,7 @@ export default function CvStudioBuildPage() {
                 </p>
                 <button
                   onClick={cv.reset}
-                  className="inline-flex items-center gap-1.5 text-[12px] font-bold text-slate-600 hover:text-slate-900 transition-colors"
+                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
                 >
                   <RotateCw size={12} /> Start over
                 </button>
@@ -299,13 +292,13 @@ function Field({ label, value, onChange, placeholder, wide }: {
 }) {
   return (
     <div className={wide ? "sm:col-span-2" : ""}>
-      <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block mb-1.5">{label}</label>
+      <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-eyebrow block mb-1.5">{label}</label>
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-2.5 text-[14px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+        className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-2.5 text-[14px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
       />
     </div>
   );
@@ -313,7 +306,7 @@ function Field({ label, value, onChange, placeholder, wide }: {
 
 function Block({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-7">
+    <div className="bg-white rounded-card border border-slate-200/70 shadow-card p-6 sm:p-7">
       <h3 className="text-base font-black text-slate-900 mb-1">{title}</h3>
       {sub && <p className="text-xs text-slate-500 mb-4 leading-relaxed">{sub}</p>}
       {!sub && <div className="mb-4" />}
@@ -329,7 +322,7 @@ function BulletList({ bullets, onChange, placeholder }: {
 }) {
   return (
     <div>
-      <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider block mb-1.5">Bullets</label>
+      <label className="text-[11px] font-semibold text-slate-400 uppercase tracking-eyebrow block mb-1.5">Bullets</label>
       <div className="space-y-2">
         {bullets.map((b, idx) => (
           <div key={idx} className="flex gap-2">
@@ -342,13 +335,13 @@ function BulletList({ bullets, onChange, placeholder }: {
                 onChange(next);
               }}
               placeholder={placeholder}
-              className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-[14px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-violet-500"
+              className="flex-1 bg-white border border-slate-200 rounded-xl px-3 py-2 text-[14px] text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500"
             />
             {bullets.length > 1 && (
               <button
                 type="button"
                 onClick={() => onChange(bullets.filter((_, i) => i !== idx))}
-                className="w-9 h-9 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center transition-colors flex-shrink-0"
+                className="w-9 h-9 rounded-full text-slate-500 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center transition-colors flex-shrink-0"
                 aria-label="Remove bullet"
               >
                 <X size={14} />
@@ -359,7 +352,7 @@ function BulletList({ bullets, onChange, placeholder }: {
         <button
           type="button"
           onClick={() => onChange([...bullets, ""])}
-          className="inline-flex items-center gap-1.5 text-[12px] font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl px-3 py-1.5 transition-colors"
+          className="inline-flex items-center gap-1.5 text-[12px] font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-full px-3.5 py-1.5 transition-colors"
         >
           <Plus size={12} /> Add bullet
         </button>
@@ -378,7 +371,7 @@ function RepeatableBlock<T>({
   renderRow: (item: T, update: (next: T) => void) => React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-7">
+    <div className="bg-white rounded-card border border-slate-200/70 shadow-card p-6 sm:p-7">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-base font-black text-slate-900">
           {title}
@@ -387,7 +380,7 @@ function RepeatableBlock<T>({
         <button
           type="button"
           onClick={() => setItems([...items, empty()])}
-          className="inline-flex items-center gap-1.5 text-[12px] font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl px-3 py-1.5 transition-colors"
+          className="inline-flex items-center gap-1.5 text-[12px] font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-full px-3.5 py-1.5 transition-colors"
         >
           <Plus size={12} /> Add
         </button>
@@ -413,7 +406,7 @@ function RepeatableBlock<T>({
               <button
                 type="button"
                 onClick={() => setItems(items.filter((_, i) => i !== idx))}
-                className="absolute top-3 right-3 w-8 h-8 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-200 flex items-center justify-center transition-colors"
+                className="absolute top-3 right-3 w-8 h-8 rounded-full text-slate-500 hover:text-slate-900 hover:bg-slate-200 flex items-center justify-center transition-colors"
                 aria-label="Remove entry"
               >
                 <X size={14} />

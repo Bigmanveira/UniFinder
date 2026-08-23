@@ -86,39 +86,43 @@ export default function FeedbackSurveyModal({ open, trigger, triggerId, onClose 
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/60 animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-ink/60 animate-fade-in"
       onClick={() => !busy && submit("skipped")}
     >
       <div
-        className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-sm w-full overflow-hidden"
+        className="relative overflow-hidden bg-white rounded-card-lg shadow-card border border-slate-100 max-w-sm w-full"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Signature ring decor — sits behind the header copy. */}
+        <div aria-hidden className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full border-[16px] border-primary-100/70" />
+
         {thanks ? (
           // ── Thank-you panel ───────────────────────────────────────
-          <div className="p-7 text-center">
-            <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+          <div className="relative p-8 text-center">
+            <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-[#E8F5E9] text-[#2E7D32] flex items-center justify-center">
               <CheckCircle2 size={26} />
             </div>
-            <h2 className="text-lg font-black text-slate-900 mb-1">Thanks for the feedback!</h2>
+            <h2 className="text-lg font-black tracking-tight text-slate-900 mb-1">Thanks for the feedback!</h2>
             <p className="text-sm text-slate-500">It helps us make College Ready better.</p>
           </div>
         ) : (
           <>
-            <header className="flex items-start justify-between px-5 pt-5">
-              <div>
-                <h2 className="text-base font-black text-slate-900 leading-tight">{copy.title}</h2>
-                <p className="text-xs text-slate-500 mt-0.5">{copy.subtitle}</p>
+            <header className="relative flex items-start justify-between px-6 pt-6">
+              <div className="pr-4">
+                <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-slate-500">Quick feedback</p>
+                <h2 className="mt-1 text-lg font-black tracking-tight text-slate-900 leading-tight">{copy.title}</h2>
+                <p className="text-xs text-slate-500 mt-1">{copy.subtitle}</p>
               </div>
               <button
                 onClick={() => !busy && submit("skipped")}
                 aria-label="Close"
-                className="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors"
+                className="w-8 h-8 shrink-0 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors"
               >
                 <X size={14} />
               </button>
             </header>
 
-            <div className="px-5 py-4">
+            <div className="relative px-6 py-4">
               {/* Star rating row. Click a star to pick. Hover state
                   is purely visual; the chosen rating sticks until
                   the user picks another. */}
@@ -132,11 +136,11 @@ export default function FeedbackSurveyModal({ open, trigger, triggerId, onClose 
                       onClick={() => setRating(n)}
                       aria-checked={filled}
                       role="radio"
-                      className="p-1.5 rounded-lg hover:bg-amber-50 transition-colors"
+                      className="p-1.5 rounded-full hover:bg-primary-50 transition-colors"
                     >
                       <Star
                         size={28}
-                        className={filled ? "text-amber-400 fill-amber-400" : "text-slate-300"}
+                        className={filled ? "text-primary-500 fill-primary-500" : "text-slate-300"}
                       />
                     </button>
                   );
@@ -147,7 +151,7 @@ export default function FeedbackSurveyModal({ open, trigger, triggerId, onClose 
                   Optional — keeps the prompt feeling lightweight. */}
               {rating > 0 && (
                 <label className="block mt-2 animate-fade-in">
-                  <span className="block text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">
+                  <span className="block text-[11px] font-semibold uppercase tracking-eyebrow text-slate-500 mb-1.5">
                     One thing we could improve? (optional)
                   </span>
                   <textarea
@@ -158,7 +162,7 @@ export default function FeedbackSurveyModal({ open, trigger, triggerId, onClose 
                     placeholder={trigger === "visa_interview"
                       ? "e.g. Anna asked too many similar questions"
                       : "e.g. Funding info felt thin for HBCUs"}
-                    className="w-full bg-white border border-slate-200 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 rounded-xl px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 transition-colors resize-none"
+                    className="w-full bg-white border border-slate-200 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-100 rounded-2xl px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 transition-colors resize-none"
                   />
                 </label>
               )}
@@ -168,18 +172,18 @@ export default function FeedbackSurveyModal({ open, trigger, triggerId, onClose 
               )}
             </div>
 
-            <footer className="px-5 pb-5 pt-1 flex items-center gap-2">
+            <footer className="relative px-6 pb-6 pt-1 flex items-center gap-2.5">
               <button
                 onClick={() => submit("skipped")}
                 disabled={busy}
-                className="flex-1 inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-50 border border-slate-200 disabled:opacity-50 text-slate-600 font-bold py-2.5 rounded-xl text-sm transition-colors"
+                className="flex-1 inline-flex items-center justify-center gap-2 bg-white hover:bg-slate-50 border border-slate-200 disabled:opacity-50 text-slate-600 font-bold py-3 rounded-full text-sm transition-colors"
               >
                 Skip
               </button>
               <button
                 onClick={() => submit("submitted")}
                 disabled={!canSubmit}
-                className="flex-1 inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-2.5 rounded-xl text-sm transition-colors shadow-md bg-primary-600 hover:bg-primary-700 shadow-primary-600/20"
+                className="flex-1 inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold py-3 rounded-full text-sm transition-colors bg-primary-500 hover:bg-primary-600 shadow-glow"
               >
                 {busy ? <Loader2 size={14} className="animate-spin" /> : null}
                 {busy ? "Sending…" : "Submit"}

@@ -266,8 +266,8 @@ export default function RoadmapOnboardingModal({
               <span
                 key={idx}
                 className={`h-1.5 rounded-full transition-all duration-300 ${
-                  active ? "w-8 bg-gradient-to-r from-blue-500 to-violet-500"
-                  : done  ? "w-1.5 bg-slate-700"
+                  active ? "w-8 bg-primary-500"
+                  : done  ? "w-1.5 bg-ink"
                   :         "w-1.5 bg-slate-300"
                 }`}
               />
@@ -281,7 +281,7 @@ export default function RoadmapOnboardingModal({
             question="What academic level have you completed?"
             sub="The highest qualification you've already finished — not what you're applying for."
             icon={<Compass size={20} />}
-            iconBg="from-blue-500 to-blue-700"
+            iconBg="from-primary-500 to-primary-700"
             options={Q1_OPTIONS}
             value={answers.completedAcademicLevel}
             onPick={(v) => { setAnswer("completedAcademicLevel", v); }}
@@ -293,7 +293,7 @@ export default function RoadmapOnboardingModal({
             question="What level are you seeking admission for?"
             sub="The programme you want to enrol in next."
             icon={<Compass size={20} />}
-            iconBg="from-violet-500 to-purple-600"
+            iconBg="from-primary-500 to-primary-700"
             options={Q2_OPTIONS}
             value={answers.targetAcademicLevel}
             onPick={(v) => { setAnswer("targetAcademicLevel", v); }}
@@ -305,7 +305,7 @@ export default function RoadmapOnboardingModal({
             question="Where are you currently in the process?"
             sub="Tick every one that applies. We'll route you to the furthest-along stage and surface the right next steps."
             icon={<MapPin size={20} />}
-            iconBg="from-fuchsia-500 to-pink-600"
+            iconBg="from-primary-500 to-primary-700"
             options={Q3_OPTIONS}
             values={answers.currentProcessStatus ?? []}
             onToggle={(v) => {
@@ -324,7 +324,7 @@ export default function RoadmapOnboardingModal({
             question="What do you need help with right now?"
             sub="Tick every one that applies. We'll use these to prioritize the most relevant support."
             icon={<Compass size={20} />}
-            iconBg="from-amber-500 to-orange-600"
+            iconBg="from-primary-500 to-primary-700"
             options={Q4_OPTIONS}
             values={answers.primaryNeed ?? []}
             onToggle={(v) => {
@@ -345,7 +345,7 @@ export default function RoadmapOnboardingModal({
             question="What country are you applying from?"
             sub="We're built for African students first — Ghana is the home market — but the tools work for anyone."
             icon={<MapPin size={20} />}
-            iconBg="from-rose-500 to-red-600"
+            iconBg="from-primary-500 to-primary-700"
             options={Q5_OPTIONS}
             value={answers.originCountry}
             onPick={(v) => { setAnswer("originCountry", v); }}
@@ -357,7 +357,7 @@ export default function RoadmapOnboardingModal({
             question="When do you hope to start?"
             sub="Most US programmes have a main Fall intake. Spring is smaller."
             icon={<Compass size={20} />}
-            iconBg="from-emerald-500 to-teal-600"
+            iconBg="from-primary-500 to-primary-700"
             options={Q6_OPTIONS}
             value={answers.preferredStartTerm}
             onPick={(v) => { setAnswer("preferredStartTerm", v); }}
@@ -376,7 +376,7 @@ export default function RoadmapOnboardingModal({
             type="button"
             onClick={handleBack}
             disabled={step === 1}
-            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-[13px] font-bold text-slate-700 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-full text-[13px] font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <ArrowLeft size={14} /> Back
           </button>
@@ -385,7 +385,7 @@ export default function RoadmapOnboardingModal({
               type="button"
               onClick={handleNext}
               disabled={!canAdvance}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold bg-slate-900 hover:bg-slate-800 text-white shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full text-sm font-bold bg-ink hover:bg-slate-800 text-white shadow-lg shadow-slate-900/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
             >
               Next <ArrowRight size={14} />
             </button>
@@ -394,7 +394,7 @@ export default function RoadmapOnboardingModal({
               type="button"
               onClick={handleSubmit}
               disabled={!canAdvance || submitting}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-sm font-bold bg-gradient-to-br from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 text-white shadow-lg shadow-blue-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full text-sm font-bold bg-primary-500 hover:bg-primary-600 text-white shadow-glow disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95"
             >
               {submitting && <Loader2 size={14} className="animate-spin" />}
               {submitting
@@ -412,14 +412,14 @@ export default function RoadmapOnboardingModal({
           believe progress is being wiped. */}
       {confirmingUpdate && (
         <div
-          className="fixed inset-0 z-[70] flex items-center justify-center px-4 bg-slate-900/60 backdrop-blur-sm"
+          className="fixed inset-0 z-[70] flex items-center justify-center px-4 bg-ink/60 backdrop-blur-sm"
           onClick={() => setConfirmingUpdate(false)}
         >
           <div
-            className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-md w-full p-7"
+            className="bg-white rounded-card-lg shadow-card border border-slate-200/70 max-w-md w-full p-7"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-5">
+            <div className="w-12 h-12 rounded-2xl bg-primary-50 text-primary-600 flex items-center justify-center mb-5">
               <ShieldCheck size={20} />
             </div>
             <h2 className="text-xl font-black text-slate-900 mb-2 tracking-tight">
@@ -432,25 +432,25 @@ export default function RoadmapOnboardingModal({
             </p>
             <ul className="text-[13px] text-slate-700 space-y-2 mb-6">
               <li className="flex items-start gap-2">
-                <Check size={14} className="text-emerald-600 mt-0.5 flex-shrink-0" />
+                <Check size={14} className="text-primary-600 mt-0.5 flex-shrink-0" />
                 <span><span className="font-bold">Will change:</span> diagnostic answers, current stage, recommended tool, progress %</span>
               </li>
               <li className="flex items-start gap-2">
-                <Check size={14} className="text-emerald-600 mt-0.5 flex-shrink-0" />
+                <Check size={14} className="text-primary-600 mt-0.5 flex-shrink-0" />
                 <span><span className="font-bold">Stays:</span> every checklist item you've ticked, your notes, and the date you started</span>
               </li>
             </ul>
             <div className="flex gap-2.5">
               <button
                 onClick={() => setConfirmingUpdate(false)}
-                className="flex-1 px-4 py-3 rounded-2xl text-sm font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
+                className="flex-1 px-4 py-3 rounded-full text-sm font-bold text-slate-700 bg-white border border-slate-200 hover:border-slate-300 hover:bg-slate-50 transition-all active:scale-95"
               >
                 Cancel
               </button>
               <button
                 onClick={() => void performSubmit()}
                 disabled={submitting}
-                className="flex-1 px-4 py-3 rounded-2xl text-sm font-bold text-white bg-slate-900 hover:bg-slate-800 transition-colors disabled:opacity-60"
+                className="flex-1 px-4 py-3 rounded-full text-sm font-bold text-white bg-ink hover:bg-slate-800 transition-all active:scale-95 disabled:opacity-60"
               >
                 {submitting ? <Loader2 size={14} className="animate-spin inline" /> : "Update my answers"}
               </button>
@@ -505,13 +505,13 @@ function QuestionPanel<T extends string>({
   twoColumns?: boolean;
 }) {
   return (
-    <section className="bg-white rounded-3xl border border-slate-200 shadow-sm p-7 sm:p-9">
+    <section className="bg-white rounded-card border border-slate-200/70 shadow-card p-7 sm:p-9">
       <div className="flex items-start gap-4 mb-7">
         <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${iconBg} text-white flex items-center justify-center shadow-md flex-shrink-0`}>
           {icon}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-black tracking-[0.18em] uppercase text-slate-500 mb-1">{kicker}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-slate-400 mb-1">{kicker}</p>
           <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 leading-tight mb-1.5">{question}</h2>
           <p className="text-[13px] text-slate-600 leading-relaxed">{sub}</p>
         </div>
@@ -528,12 +528,12 @@ function QuestionPanel<T extends string>({
               aria-pressed={selected}
               className={`text-left flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 transition-all ${
                 selected
-                  ? "bg-slate-900 text-white border-slate-900"
+                  ? "bg-ink text-white border-ink"
                   : "bg-white text-slate-900 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
               }`}
             >
               <span className={`w-5 h-5 rounded-md flex-shrink-0 flex items-center justify-center transition-colors border-2 ${
-                selected ? "bg-white border-white text-slate-900" : "bg-white border-slate-300"
+                selected ? "bg-white border-white text-ink" : "bg-white border-slate-300"
               }`} aria-hidden>
                 {selected && <Check size={12} className="stroke-[3]" />}
               </span>
@@ -563,16 +563,16 @@ function MultiSelectPanel<T extends string>({
   twoColumns?: boolean;
 }) {
   return (
-    <section className="bg-white rounded-3xl border border-slate-200 shadow-sm p-7 sm:p-9">
+    <section className="bg-white rounded-card border border-slate-200/70 shadow-card p-7 sm:p-9">
       <div className="flex items-start gap-4 mb-7">
         <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${iconBg} text-white flex items-center justify-center shadow-md flex-shrink-0`}>
           {icon}
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-black tracking-[0.18em] uppercase text-slate-500 mb-1">{kicker}</p>
+          <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-slate-400 mb-1">{kicker}</p>
           <div className="flex items-center gap-2 flex-wrap mb-1.5">
             <h2 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 leading-tight">{question}</h2>
-            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-black uppercase tracking-widest">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary-50 text-primary-700 border border-primary-200 text-[10px] font-semibold uppercase tracking-eyebrow">
               Multi-select
             </span>
           </div>
@@ -591,12 +591,12 @@ function MultiSelectPanel<T extends string>({
               aria-pressed={selected}
               className={`text-left flex items-center gap-3 px-4 py-3.5 rounded-2xl border-2 transition-all ${
                 selected
-                  ? "bg-slate-900 text-white border-slate-900"
+                  ? "bg-ink text-white border-ink"
                   : "bg-white text-slate-900 border-slate-200 hover:border-slate-300 hover:bg-slate-50"
               }`}
             >
               <span className={`w-5 h-5 rounded-md flex-shrink-0 flex items-center justify-center transition-colors border-2 ${
-                selected ? "bg-white border-white text-slate-900" : "bg-white border-slate-300"
+                selected ? "bg-white border-white text-ink" : "bg-white border-slate-300"
               }`} aria-hidden>
                 {selected && <Check size={12} className="stroke-[3]" />}
               </span>

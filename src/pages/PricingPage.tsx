@@ -7,6 +7,8 @@ import {
   Loader2, Check, AlertTriangle, ShieldCheck, Lock,
 } from "lucide-react";
 import BrandLogo from "../components/BrandLogo";
+import { Button } from "../components/ui/Button";
+import { IconChip } from "../components/ui/IconChip";
 import { formatTokens } from "../lib/tokens";
 
 type CreditPack = {
@@ -113,7 +115,7 @@ export default function PricingPage() {
 
     // Require auth to buy; preserve intent and drop user on Billing after auth.
     if (!user) {
-      navigate(`/signup?next=${encodeURIComponent("/app?tab=billing")}`);
+      navigate(`/signup?next=${encodeURIComponent("/app/billing")}`);
       return;
     }
 
@@ -138,9 +140,9 @@ export default function PricingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white font-sans selection:bg-primary-500 selection:text-white">
-      {/* Header — clean pill nav, sticky so the Buy CTA stays in reach. */}
-      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-100">
+    <div className="min-h-screen bg-surface font-sans selection:bg-primary-500 selection:text-white">
+      {/* Header — clean surface bar, sticky so the Buy CTA stays in reach. */}
+      <header className="sticky top-0 z-40 bg-surface/90 backdrop-blur border-b border-slate-200/60">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <BrandLogo size="md" />
           <nav className="hidden md:flex items-center gap-8">
@@ -149,15 +151,11 @@ export default function PricingPage() {
           </nav>
           <div className="flex items-center gap-3 md:gap-4">
             {user ? (
-              <Link to="/app" className="bg-slate-900 text-white px-5 py-2.5 rounded-full text-sm font-bold hover:bg-slate-800 transition-colors">
-                Dashboard
-              </Link>
+              <Button to="/app" variant="dark">Dashboard</Button>
             ) : (
               <>
                 <Link to="/login" className="hidden sm:inline text-sm font-bold text-slate-700 hover:text-slate-900 transition-colors">Log in</Link>
-                <Link to="/intake" className="bg-slate-900 text-white px-5 py-2.5 rounded-full text-sm font-bold hover:bg-slate-800 transition-colors">
-                  Start Free
-                </Link>
+                <Button to="/intake" variant="dark">Start Free</Button>
               </>
             )}
           </div>
@@ -166,7 +164,10 @@ export default function PricingPage() {
 
       {/* Hero */}
       <section className="max-w-4xl mx-auto px-6 pt-16 md:pt-24 pb-10 md:pb-12 text-center">
-        <p className="text-xs font-black tracking-[0.2em] uppercase text-primary-600 mb-4">Pricing</p>
+        <p className="inline-flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-eyebrow text-slate-400 mb-4">
+          <span className="w-2 h-2 rounded-full bg-primary-500" />
+          Pricing
+        </p>
         <h1 className="text-4xl md:text-5xl font-black text-slate-900 leading-[1.05] tracking-tight mb-5">
           Pay per match. No subscriptions.
         </h1>
@@ -179,13 +180,13 @@ export default function PricingPage() {
       {/* Banners */}
       <div className="max-w-6xl mx-auto px-6">
         {returnStatus === "paid" && (
-          <div className="mb-6 bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-start gap-3">
-            <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 flex-shrink-0">
+          <div className="mb-6 bg-primary-50 border border-primary-200 rounded-card p-4 flex items-start gap-3">
+            <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 flex-shrink-0">
               <Check size={16} />
             </div>
             <div className="flex-1">
-              <p className="font-bold text-emerald-900 text-sm mb-0.5">Payment received</p>
-              <p className="text-xs text-emerald-800 leading-relaxed">
+              <p className="font-bold text-primary-900 text-sm mb-0.5">Payment received</p>
+              <p className="text-xs text-primary-800 leading-relaxed">
                 Tokens usually post within a few seconds. If your balance hasn't updated in two minutes, contact{" "}
                 <a className="underline" href="mailto:support@collegeready.io">support@collegeready.io</a> with your confirmation.
               </p>
@@ -193,24 +194,25 @@ export default function PricingPage() {
           </div>
         )}
         {returnStatus === "cancelled" && (
-          <div className="mb-6 bg-amber-50 border border-amber-200 rounded-2xl p-4 text-sm text-amber-900">
+          <div className="mb-6 bg-amber-50 border border-amber-200 rounded-card p-4 text-sm text-amber-900">
             Payment was cancelled — no tokens charged.
           </div>
         )}
         {error && (
-          <div className="mb-4 bg-rose-50 border border-rose-200 rounded-2xl p-3 text-sm text-rose-700 flex items-start gap-2">
+          <div className="mb-4 bg-rose-50 border border-rose-200 rounded-card p-3 text-sm text-rose-700 flex items-start gap-2">
             <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
             <span>{error}</span>
           </div>
         )}
       </div>
 
-      {/* Pricing grid */}
+      {/* Pricing grid — same pack-card recipe as the in-app Billing page so
+          public pricing and in-app billing read as one system. */}
       <section className="max-w-6xl mx-auto px-6 pb-16">
         {loading ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
             {[0,1,2,3,4].map(i => (
-              <div key={i} className="bg-slate-50 rounded-2xl p-6 border border-slate-100 h-80 animate-pulse" />
+              <div key={i} className="bg-white rounded-card p-6 border border-slate-200/70 shadow-card h-80 animate-pulse" />
             ))}
           </div>
         ) : (
@@ -224,20 +226,20 @@ export default function PricingPage() {
               return (
                 <div
                   key={pack.id}
-                  className={`relative rounded-2xl p-6 flex flex-col transition-shadow ${
+                  className={`relative rounded-card p-6 flex flex-col transition-all ${
                     pack.recommended
-                      ? "bg-slate-900 text-white border border-slate-900 shadow-xl sm:-translate-y-1"
-                      : "bg-white border border-slate-200 hover:border-slate-300 hover:shadow-md"
+                      ? "bg-primary-50 border-2 border-primary-500 shadow-card-hover sm:-translate-y-1"
+                      : "bg-white border border-slate-200/70 shadow-card hover:border-primary-300 hover:shadow-card-hover"
                   }`}
                 >
                   {pack.recommended && (
-                    <div className="absolute -top-3 left-6 bg-primary-500 text-white text-[10px] font-black tracking-widest uppercase px-2.5 py-1 rounded-md">
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary-600 text-white text-[10px] font-black tracking-eyebrow uppercase px-3 py-1 rounded-full whitespace-nowrap">
                       Most Popular
                     </div>
                   )}
 
-                  <h3 className={`text-sm font-black uppercase tracking-wider mb-3 ${
-                    pack.recommended ? "text-primary-300" : "text-slate-500"
+                  <h3 className={`text-sm font-black uppercase tracking-eyebrow mb-3 ${
+                    pack.recommended ? "text-primary-700" : "text-slate-500"
                   }`}>
                     {pack.label}
                   </h3>
@@ -247,19 +249,19 @@ export default function PricingPage() {
                   <div className="mb-6">
                     <div className="flex items-baseline gap-1.5">
                       <span className={`text-5xl font-black tabular-nums tracking-tight ${
-                        pack.recommended ? "text-white" : "text-slate-900"
+                        pack.recommended ? "text-primary-900" : "text-slate-900"
                       }`}>${pack.priceUsd}</span>
                       <span className={`text-xs font-bold ${
-                        pack.recommended ? "text-slate-400" : "text-slate-400"
+                        pack.recommended ? "text-primary-700/70" : "text-slate-400"
                       }`}>USD</span>
                     </div>
                     <p className={`text-xs font-bold mt-2 ${
-                      pack.recommended ? "text-slate-300" : "text-slate-700"
+                      pack.recommended ? "text-primary-800" : "text-slate-700"
                     }`}>
                       {formatTokens(pack.credits)} tokens · ${perCreditUsd} per 100 tokens
                     </p>
                     <p className={`text-[11px] font-medium mt-1 ${
-                      pack.recommended ? "text-slate-400" : "text-slate-400"
+                      pack.recommended ? "text-primary-700/80" : "text-slate-400"
                     }`}>
                       Charged in {localGlyph}{pack.priceLocal} {pack.currency}
                     </p>
@@ -270,11 +272,9 @@ export default function PricingPage() {
                   <ul className="space-y-2 mb-6 flex-1">
                     {features.map((feat) => (
                       <li key={feat} className={`flex items-start gap-2 text-xs leading-snug ${
-                        pack.recommended ? "text-slate-200" : "text-slate-600"
+                        pack.recommended ? "text-primary-900/80" : "text-slate-600"
                       }`}>
-                        <Check size={14} className={`flex-shrink-0 mt-0.5 ${
-                          pack.recommended ? "text-primary-400" : "text-primary-500"
-                        }`} />
+                        <Check size={14} className="flex-shrink-0 mt-0.5 text-primary-500" />
                         <span>{feat}</span>
                       </li>
                     ))}
@@ -283,10 +283,10 @@ export default function PricingPage() {
                   <button
                     onClick={() => handleBuy(pack.id)}
                     disabled={!!buying}
-                    className={`w-full inline-flex items-center justify-center gap-2 font-bold py-3 rounded-xl text-sm transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+                    className={`w-full inline-flex items-center justify-center gap-2 font-bold py-3.5 rounded-full text-sm transition-colors active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed ${
                       pack.recommended
-                        ? "bg-primary-500 text-white hover:bg-primary-400"
-                        : "bg-slate-900 text-white hover:bg-slate-800"
+                        ? "bg-primary-500 text-white hover:bg-primary-600 shadow-glow"
+                        : "bg-slate-100 text-slate-900 hover:bg-slate-200"
                     }`}
                   >
                     {isBuying && <Loader2 size={14} className="animate-spin" />}
@@ -304,8 +304,11 @@ export default function PricingPage() {
           the per-category 5-credit reveal isn't a surprise once they're
           inside the report. */}
       <section className="max-w-6xl mx-auto px-6 pb-12">
-        <div className="rounded-3xl border border-slate-200 bg-slate-50/60 p-6 sm:p-8">
-          <p className="text-[11px] font-black tracking-[0.2em] uppercase text-slate-500 mb-4">How tokens are spent</p>
+        <div className="rounded-card border border-slate-200/70 bg-white shadow-card p-6 sm:p-8">
+          <p className="inline-flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-eyebrow text-slate-400 mb-4">
+            <span className="w-2 h-2 rounded-full bg-primary-500" />
+            How tokens are spent
+          </p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <CreditSpend
               cost="100 tokens"
@@ -329,7 +332,7 @@ export default function PricingPage() {
       {/* Trust strip — restrained, status-page-style row that explains the
           payment posture and currency conversion in plain language. */}
       <section className="max-w-6xl mx-auto px-6 pb-20">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-slate-200 rounded-2xl overflow-hidden border border-slate-200">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-slate-200/70 rounded-card overflow-hidden border border-slate-200/70 shadow-card">
           <TrustCell
             icon={<ShieldCheck size={18} />}
             heading="Secure checkout"
@@ -355,7 +358,7 @@ export default function PricingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-white py-12 border-t border-slate-100">
+      <footer className="bg-white py-12 border-t border-slate-200/70">
         <div className="max-w-6xl mx-auto px-6 flex flex-col gap-8">
           <div className="flex flex-col items-center md:flex-row md:justify-between gap-6">
             <BrandLogo size="sm" />
@@ -367,7 +370,7 @@ export default function PricingPage() {
               <Link to="/contact" className="hover:text-primary-600 transition-colors">Contact</Link>
             </nav>
           </div>
-          <p className="text-xs font-medium text-slate-400 text-center md:text-left border-t border-slate-100 pt-6">
+          <p className="text-xs font-medium text-slate-400 text-center md:text-left border-t border-slate-200/70 pt-6">
             © 2026 College Ready. Practice tools only. Not affiliated with any government, embassy, or consular service.
           </p>
         </div>
@@ -378,8 +381,8 @@ export default function PricingPage() {
 
 function CreditSpend({ cost, title, body }: { cost: string; title: string; body: string }) {
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-5">
-      <span className="inline-block text-[10px] font-black tracking-widest uppercase text-primary-600 bg-primary-50 border border-primary-100 rounded-full px-2 py-0.5 mb-3">
+    <div className="bg-white rounded-2xl border border-slate-200/70 p-5">
+      <span className="inline-block text-[10px] font-black tracking-eyebrow uppercase text-primary-600 bg-primary-50 border border-primary-100 rounded-full px-2.5 py-1 mb-3">
         {cost}
       </span>
       <p className="text-sm font-black text-slate-900 mb-1.5">{title}</p>
@@ -391,9 +394,7 @@ function CreditSpend({ cost, title, body }: { cost: string; title: string; body:
 function TrustCell({ icon, heading, body }: { icon: React.ReactNode; heading: string; body: string }) {
   return (
     <div className="bg-white p-6 flex items-start gap-4">
-      <div className="w-10 h-10 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center flex-shrink-0">
-        {icon}
-      </div>
+      <IconChip icon={icon} tint="primary" size="md" />
       <div className="min-w-0">
         <p className="text-sm font-black text-slate-900 mb-1">{heading}</p>
         <p className="text-xs text-slate-500 leading-relaxed">{body}</p>

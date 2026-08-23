@@ -1,5 +1,6 @@
 import { motion, useReducedMotion } from "framer-motion";
 import { AlertTriangle, ArrowLeft, Check, Lightbulb, RotateCcw, Target } from "lucide-react";
+import { Button } from "../ui/Button";
 import type { VisaInterviewReport } from "../../types";
 
 interface Props {
@@ -26,11 +27,9 @@ const SCORE_LABELS: { key: keyof VisaInterviewReport; label: string }[] = [
 
 /* Readiness bands, running warm (at risk) to cool (ready).
  *
- * NOTE: tailwind.config.js aliases emerald/green/lime/teal to brandBlue, so
- * this palette contains no green at all — `text-emerald-700` resolves to the
- * same blue as `text-blue-700`. The previous thresholds therefore painted
- * 60-79 and 80+ in an identical colour, making the top two bands impossible
- * to tell apart. Every colour below resolves to a genuinely distinct value. */
+ * Fills stay on the design system's primary/sky/amber/rose tones, and every
+ * band resolves to a genuinely distinct colour: primary-600 (strong) vs the
+ * sky accent (steady) vs amber (shaky) vs rose (weak). */
 interface Band {
   fill:  string;  // bar fill on the profile chart
   text:  string;  // numeral colour on light surfaces
@@ -39,8 +38,8 @@ interface Band {
 }
 
 function bandFor(score: number): Band {
-  if (score >= 80)         return { fill: "bg-blue-600",   text: "text-blue-700",  onInk: "text-blue-200",  label: "Strong" };
-  if (score >= READY_LINE) return { fill: "bg-accent-500", text: "text-sky-600",   onInk: "text-sky-200",   label: "Steady" };
+  if (score >= 80)         return { fill: "bg-primary-600", text: "text-primary-700", onInk: "text-primary-200", label: "Strong" };
+  if (score >= READY_LINE) return { fill: "bg-accent-500",  text: "text-sky-600",     onInk: "text-sky-200",     label: "Steady" };
   if (score >= 40)         return { fill: "bg-amber-400",  text: "text-amber-600", onInk: "text-amber-200", label: "Shaky"  };
   return                          { fill: "bg-rose-500",   text: "text-rose-600",  onInk: "text-rose-200",  label: "Weak"   };
 }
@@ -86,31 +85,37 @@ export default function InterviewReportView({ report, onRetry, onBack }: Props) 
     <motion.div
       initial={reduceMotion ? false : { opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      className="space-y-4"
+      className="relative space-y-4"
     >
+      {/* Soft ambient orbs — fill the empty page margins behind the report
+          without ever sitting under body text. */}
+      <div aria-hidden className="pointer-events-none absolute -left-32 top-1/4 -z-10 h-80 w-80 rounded-full bg-primary-200/40 blur-[120px]" />
+      <div aria-hidden className="pointer-events-none absolute -right-28 bottom-12 -z-10 h-72 w-72 rounded-full bg-sky-200/40 blur-[120px]" />
       {/* ---- Verdict header -------------------------------------------- */}
-      <section className="overflow-hidden rounded-[26px] border border-[#22376d] bg-[#07142f] text-white">
-        <div className="flex items-center justify-between gap-3 border-b border-white/10 px-6 py-3 sm:px-8">
-          <p className="font-utility text-[10px] uppercase tracking-[0.22em] text-[#8fa6e8]">
+      <section className="relative overflow-hidden rounded-card-lg bg-ink text-white">
+        <div aria-hidden className="pointer-events-none absolute -right-8 -top-10 w-36 h-36 rounded-full border-[18px] border-primary-500/20" />
+        <div aria-hidden className="pointer-events-none absolute -right-6 top-8 w-48 h-48 rounded-full bg-primary-500/15 blur-3xl" />
+        <div className="relative flex items-center justify-between gap-3 border-b border-white/10 px-6 py-3 sm:px-8">
+          <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-primary-300">
             F-1 practice assessment
           </p>
           {report.scoringVersion && (
-            <p className="font-utility text-[10px] uppercase tracking-[0.14em] text-white/35">
+            <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-white/35">
               {report.scoringVersion}
             </p>
           )}
         </div>
 
-        <div className="flex flex-wrap items-end gap-x-8 gap-y-4 px-6 py-7 sm:px-8">
+        <div className="relative flex flex-wrap items-end gap-x-8 gap-y-4 px-6 py-7 sm:px-8">
           <div className="flex items-start gap-1">
-            <span className="font-display text-[68px] font-bold leading-[0.85] tracking-tight tabular-nums sm:text-[84px]">
+            <span className="text-[68px] font-black leading-[0.85] tracking-tight tabular-nums sm:text-[84px]">
               {overall}
             </span>
             <span className="font-utility mt-2 text-xs text-white/40">/100</span>
           </div>
 
           <div className="min-w-[220px] flex-1">
-            <h2 className="font-display text-xl font-bold tracking-tight sm:text-2xl">
+            <h2 className="text-xl font-black tracking-tight sm:text-2xl">
               {verdict.headline}
             </h2>
             <p className="mt-1.5 text-sm leading-relaxed text-white/65">{verdict.detail}</p>
@@ -119,18 +124,18 @@ export default function InterviewReportView({ report, onRetry, onBack }: Props) 
 
         {/* The disclaimer sits directly against the number it qualifies —
             shown once here rather than repeated in the footer. */}
-        <p className="border-t border-white/10 px-6 py-3.5 text-[12.5px] leading-relaxed text-white/55 sm:px-8">
+        <p className="relative border-t border-white/10 px-6 py-3.5 text-[12.5px] leading-relaxed text-white/55 sm:px-8">
           {report.disclaimer}
         </p>
       </section>
 
       {/* ---- Readiness profile ----------------------------------------- */}
-      <section className="rounded-[26px] border border-slate-200 bg-white p-5 sm:p-6">
+      <section className="rounded-card border border-slate-100 bg-white shadow-card p-5 sm:p-6">
         <div className="mb-5 flex flex-wrap items-baseline justify-between gap-2">
-          <h3 className="font-display text-base font-bold tracking-tight text-slate-900">
+          <h3 className="text-base font-black tracking-tight text-slate-900">
             Readiness profile
           </h3>
-          <p className="font-utility text-[10px] uppercase tracking-[0.16em] text-slate-400">
+          <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-slate-400">
             Benchmark {READY_LINE}
           </p>
         </div>
@@ -191,22 +196,22 @@ export default function InterviewReportView({ report, onRetry, onBack }: Props) 
 
       {/* ---- Where to start next --------------------------------------- */}
       {below.length > 0 && (
-        <section className="rounded-[26px] border border-[#c8d2f8] bg-[#f4f6ff] p-5 sm:p-6">
-          <h3 className="flex items-center gap-2 font-display text-base font-bold tracking-tight text-[#1b2f68]">
-            <Target size={15} className="text-[#5169c7]" /> Start here next time
+        <section className="rounded-card border border-primary-100 bg-primary-50 p-5 sm:p-6">
+          <h3 className="flex items-center gap-2 text-base font-black tracking-tight text-primary-900">
+            <Target size={15} className="text-primary-600" /> Start here next time
           </h3>
-          <p className="mt-1.5 text-[13px] leading-relaxed text-[#31437e]">
+          <p className="mt-1.5 text-[13px] leading-relaxed text-primary-800">
             Your two lowest areas from this run. Rehearse these before booking anything.
           </p>
           <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
             {focus.map((row) => (
               <div
                 key={row.key as string}
-                className="flex items-baseline justify-between gap-3 rounded-2xl border border-[#ccd6fb] bg-white px-4 py-3"
+                className="flex items-baseline justify-between gap-3 rounded-2xl border border-primary-100 bg-white px-4 py-3"
               >
                 <span className="text-sm font-bold text-slate-900">{row.label}</span>
                 <span className="flex items-baseline gap-1.5">
-                  <span className="font-utility text-[10px] uppercase tracking-[0.14em] text-slate-400">
+                  <span className="text-[10px] font-semibold uppercase tracking-eyebrow text-slate-400">
                     {row.band.label}
                   </span>
                   <span className={`font-utility text-base font-bold tabular-nums ${row.band.text}`}>
@@ -227,8 +232,8 @@ export default function InterviewReportView({ report, onRetry, onBack }: Props) 
 
       {/* ---- Red flags -------------------------------------------------- */}
       {report.redFlagsToImprove.length > 0 && (
-        <section className="rounded-[26px] border border-amber-200 bg-amber-50 p-5 sm:p-6">
-          <h3 className="flex items-center gap-2 font-display text-base font-bold tracking-tight text-amber-900">
+        <section className="rounded-card border border-amber-200 bg-amber-50 p-5 sm:p-6">
+          <h3 className="flex items-center gap-2 text-base font-black tracking-tight text-amber-900">
             <AlertTriangle size={15} className="text-amber-600" /> Fix before the real interview
           </h3>
           <ul className="mt-3 space-y-2">
@@ -244,8 +249,8 @@ export default function InterviewReportView({ report, onRetry, onBack }: Props) 
 
       {/* ---- Recommended practice --------------------------------------- */}
       {report.recommendedPractice.length > 0 && (
-        <section className="rounded-[26px] border border-slate-200 bg-white p-5 sm:p-6">
-          <h3 className="flex items-center gap-2 font-display text-base font-bold tracking-tight text-slate-900">
+        <section className="rounded-card border border-slate-100 bg-white shadow-card p-5 sm:p-6">
+          <h3 className="flex items-center gap-2 text-base font-black tracking-tight text-slate-900">
             <Lightbulb size={15} className="text-amber-500" /> Recommended practice
           </h3>
           <ul className="mt-3 space-y-2.5">
@@ -263,20 +268,20 @@ export default function InterviewReportView({ report, onRetry, onBack }: Props) 
 
       {/* ---- Sample improved answers ------------------------------------ */}
       {report.sampleImprovedAnswers.length > 0 && (
-        <section className="rounded-[26px] border border-slate-200 bg-white p-5 sm:p-6">
-          <h3 className="flex items-center gap-2 font-display text-base font-bold tracking-tight text-slate-900">
-            <Check size={15} className="text-blue-600" /> Stronger versions of your answers
+        <section className="rounded-card border border-slate-100 bg-white shadow-card p-5 sm:p-6">
+          <h3 className="flex items-center gap-2 text-base font-black tracking-tight text-slate-900">
+            <Check size={15} className="text-primary-600" /> Stronger versions of your answers
           </h3>
           <div className="mt-4 space-y-4">
             {report.sampleImprovedAnswers.map((s, i) => (
               <div key={i} className="border-t border-slate-100 pt-4 first:border-0 first:pt-0">
-                <p className="font-utility text-[10px] uppercase tracking-[0.16em] text-slate-400">
+                <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-slate-400">
                   Asked
                 </p>
                 <p className="mt-1 text-[13px] font-semibold leading-relaxed text-slate-500">
                   {s.question}
                 </p>
-                <p className="mt-2.5 border-l-2 border-blue-500 pl-3.5 text-sm leading-relaxed text-slate-900">
+                <p className="mt-2.5 border-l-2 border-primary-500 pl-3.5 text-sm leading-relaxed text-slate-900">
                   {s.improvedAnswer}
                 </p>
                 <p className="mt-2 text-xs leading-relaxed text-slate-500">{s.whyBetter}</p>
@@ -288,18 +293,24 @@ export default function InterviewReportView({ report, onRetry, onBack }: Props) 
 
       {/* ---- Actions ----------------------------------------------------- */}
       <div className="flex flex-col gap-2.5 pt-1 sm:flex-row">
-        <button
+        <Button
+          variant="outline"
+          size="lg"
+          className="flex-1"
           onClick={onBack}
-          className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-3.5 text-sm font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6179d8] focus-visible:ring-offset-2"
+          icon={<ArrowLeft size={15} />}
         >
-          <ArrowLeft size={15} /> Back to dashboard
-        </button>
-        <button
+          Back to dashboard
+        </Button>
+        <Button
+          variant="dark"
+          size="lg"
+          className="flex-1"
           onClick={onRetry}
-          className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#07142f] py-3.5 text-sm font-semibold text-white shadow-lg shadow-[#07142f]/20 transition-colors hover:bg-[#102454] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6179d8] focus-visible:ring-offset-2"
+          icon={<RotateCcw size={15} />}
         >
-          <RotateCcw size={15} /> Practice again
-        </button>
+          Practice again
+        </Button>
       </div>
     </motion.div>
   );
@@ -315,15 +326,15 @@ function FeedbackList({
   if (items.length === 0) return null;
 
   const surface = tone === "blue"
-    ? "border-[#c8d2f8] bg-[#f4f6ff]"
+    ? "border-primary-100 bg-primary-50"
     : "border-rose-200 bg-rose-50/70";
-  const heading = tone === "blue" ? "text-[#1b2f68]" : "text-rose-900";
-  const body    = tone === "blue" ? "text-[#31437e]" : "text-rose-900";
-  const marker  = tone === "blue" ? "bg-[#6078d5]"   : "bg-rose-400";
+  const heading = tone === "blue" ? "text-primary-900" : "text-rose-900";
+  const body    = tone === "blue" ? "text-primary-800" : "text-rose-900";
+  const marker  = tone === "blue" ? "bg-primary-500"   : "bg-rose-400";
 
   return (
-    <section className={`rounded-[26px] border p-5 ${surface}`}>
-      <h3 className={`font-display text-base font-bold tracking-tight ${heading}`}>{title}</h3>
+    <section className={`rounded-card border p-5 ${surface}`}>
+      <h3 className={`text-base font-black tracking-tight ${heading}`}>{title}</h3>
       <ul className="mt-3 space-y-2">
         {items.map((s, i) => (
           <li key={i} className={`flex items-start gap-2.5 text-[13px] leading-relaxed ${body}`}>

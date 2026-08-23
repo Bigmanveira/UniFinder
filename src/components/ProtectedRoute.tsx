@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
+import SplashScreen from "./SplashScreen";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Wraps protected /app routes. If the user is signed-out, we bounce them to
@@ -13,11 +14,9 @@ export const ProtectedRoute = () => {
   const location = useLocation();
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="w-12 h-12 border-4 border-primary-100 border-t-primary-500 rounded-full animate-spin"></div>
-      </div>
-    );
+    // The branded splash — matches the StartupSplash overlay so nothing
+    // unbranded flashes underneath it during the initial auth resolution.
+    return <SplashScreen />;
   }
 
   if (!user) {

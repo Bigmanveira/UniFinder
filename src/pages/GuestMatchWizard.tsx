@@ -1,7 +1,8 @@
 import { useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { GraduationCap, MapPin, BookOpen, Calculator, DollarSign, FileCheck, ArrowRight, ArrowLeft } from "lucide-react";
+import { GraduationCap, MapPin, BookOpen, Calculator, DollarSign, FileCheck, ArrowRight, ArrowLeft, ChevronDown } from "lucide-react";
 import BrandLogo from "../components/BrandLogo";
+import AppFooter from "../components/layout/AppFooter";
 import { motion } from "framer-motion";
 import { useAuth } from "../hooks/useAuth";
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
@@ -177,46 +178,60 @@ export default function GuestMatchWizard() {
   const renderHeader = (title: string) => (
     <div className="mb-8">
       <div className="flex items-center gap-4 mb-4">
-        <div className="w-12 h-12 rounded-2xl bg-primary-500 flex items-center justify-center text-white shadow-lg shadow-primary-500/20">
+        <div className="w-12 h-12 rounded-2xl bg-primary-600 flex items-center justify-center text-white shadow-glow">
           {renderIcon(step)}
         </div>
         <div>
-          <div className="text-[10px] font-black tracking-widest text-slate-400 uppercase">Step {step} of {totalSteps - 1}</div>
-          <h2 className="text-2xl font-black text-slate-900">{title}</h2>
+          <div className="text-[11px] font-semibold uppercase tracking-eyebrow text-slate-400">Step {step} of {totalSteps - 1}</div>
+          <h2 className="text-2xl font-black tracking-tight text-slate-900">{title}</h2>
         </div>
       </div>
       <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-        <motion.div 
+        <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${progress}%` }}
-          className="h-full bg-primary-500 rounded-full"
+          className="h-full bg-primary-600 rounded-full"
         />
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 dot-grid-bg font-sans selection:bg-primary-500 selection:text-white flex flex-col">
-      <header className="p-6 flex justify-center">
+    <div className="relative min-h-screen bg-surface dot-grid-bg font-sans selection:bg-primary-500 selection:text-white flex flex-col">
+      {/* Decorative atmosphere — soft orbs + navy ring motifs in the desktop
+          gutters. Purely visual: aria-hidden, no pointer events, clipped so
+          nothing can cause horizontal overflow. */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -left-40 top-[-140px] h-[440px] w-[440px] rounded-full bg-primary-200/40 blur-[120px]" />
+        <div className="absolute -right-32 bottom-[-160px] h-[480px] w-[480px] rounded-full bg-sky-200/50 blur-[130px]" />
+        <div className="absolute right-[-60px] top-1/2 h-72 w-72 -translate-y-1/2 rounded-full bg-primary-200/40 blur-[120px]" />
+        <div className="hidden lg:block absolute left-[calc(50%-560px)] top-24 h-36 w-36 rounded-full border-[18px] border-primary-500/20" />
+        <div className="hidden lg:block absolute right-[calc(50%-580px)] bottom-28 h-44 w-44 rounded-full border-[18px] border-primary-500/10" />
+      </div>
+
+      <header className="relative z-10 p-6 flex justify-center">
         <BrandLogo size="md" />
       </header>
 
-      <main className="flex-1 w-full max-w-xl mx-auto px-6 pb-12 pt-4">
+      <main className="relative z-10 flex-1 w-full max-w-xl mx-auto px-6 pb-12 pt-4 flex flex-col justify-center">
         <motion.div 
           key={step}
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -20 }}
-          className="bg-white rounded-[32px] p-8 shadow-xl shadow-slate-200/40 border border-slate-100 relative overflow-hidden"
+          className="bg-white rounded-card-lg p-8 shadow-card border border-slate-200/70 relative overflow-hidden"
         >
           {/* STEP 1: DESTINATION */}
           {step === 1 && (
             <div>
               {renderHeader("Destination")}
-              <label className="block text-xs font-bold tracking-widest text-slate-500 mb-2 uppercase">Select country</label>
-              <select className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-primary-500">
-                <option>🇺🇸 United States (USA)</option>
-              </select>
+              <label className="block text-[11px] font-semibold uppercase tracking-eyebrow text-slate-500 mb-2">Select country</label>
+              <div className="relative">
+                <select className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold text-slate-900 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 appearance-none cursor-pointer">
+                  <option>🇺🇸 United States (USA)</option>
+                </select>
+                <ChevronDown size={16} className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              </div>
             </div>
           )}
 
@@ -229,7 +244,7 @@ export default function GuestMatchWizard() {
                   <button key={lvl} onClick={() => {
                     updateForm("level", lvl);
                     updateForm("testType", lvl === "Undergraduate" ? "SAT" : "None");
-                  }} className={`w-full text-left p-5 rounded-2xl border-2 transition-all font-bold ${formData.level === lvl ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-slate-100 bg-white text-slate-600 hover:border-slate-200'}`}>
+                  }} className={`w-full text-left px-6 py-4 rounded-full border-2 transition-all font-bold ${formData.level === lvl ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-slate-200/70 bg-white text-slate-600 hover:border-slate-300'}`}>
                     {lvl}
                   </button>
                 ))}
@@ -241,7 +256,7 @@ export default function GuestMatchWizard() {
           {step === 3 && (
             <div>
               {renderHeader("Field of Study")}
-              <label htmlFor="intended-major" className="block text-xs font-bold tracking-widest text-slate-500 mb-2 uppercase">Intended Major</label>
+              <label htmlFor="intended-major" className="block text-[11px] font-semibold uppercase tracking-eyebrow text-slate-500 mb-2">Intended Major</label>
               <input
                 id="intended-major"
                 type="text"
@@ -250,7 +265,7 @@ export default function GuestMatchWizard() {
                 onChange={(e) => updateForm("field", e.target.value)}
                 list="major-options"
                 autoComplete="off"
-                className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-primary-500"
+                className="w-full bg-white border border-slate-200 rounded-2xl px-5 py-4 text-slate-900 font-bold focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
               />
               {/* Native datalist — browser-rendered autocomplete, zero JS,
                   zero network requests. Users can still type free-form (we
@@ -267,31 +282,34 @@ export default function GuestMatchWizard() {
             <div className="space-y-6">
               {renderHeader("Academic Profile")}
               <div>
-                <label className="block text-xs font-bold tracking-widest text-slate-500 mb-2 uppercase">
+                <label className="block text-[11px] font-semibold uppercase tracking-eyebrow text-slate-500 mb-2">
                   Standardized Test
                 </label>
                 <div className="flex gap-4">
-                  <select 
-                    value={formData.testType} 
-                    onChange={(e) => {
-                      updateForm("testType", e.target.value);
-                      if (e.target.value === "None") updateForm("testScores", "");
-                    }}
-                    className="w-1/3 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-4 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-primary-500"
-                  >
-                    {formData.level === "Undergraduate" ? (
-                      <>
-                        <option value="SAT">SAT</option>
-                        <option value="ACT">ACT</option>
-                      </>
-                    ) : (
-                      <>
-                        <option value="None">None</option>
-                        <option value="GRE">GRE</option>
-                        <option value="GMAT">GMAT</option>
-                      </>
-                    )}
-                  </select>
+                  <div className="relative w-1/3">
+                    <select
+                      value={formData.testType}
+                      onChange={(e) => {
+                        updateForm("testType", e.target.value);
+                        if (e.target.value === "None") updateForm("testScores", "");
+                      }}
+                      className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold text-slate-900 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 appearance-none cursor-pointer"
+                    >
+                      {formData.level === "Undergraduate" ? (
+                        <>
+                          <option value="SAT">SAT</option>
+                          <option value="ACT">ACT</option>
+                        </>
+                      ) : (
+                        <>
+                          <option value="None">None</option>
+                          <option value="GRE">GRE</option>
+                          <option value="GMAT">GMAT</option>
+                        </>
+                      )}
+                    </select>
+                    <ChevronDown size={16} className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  </div>
                   
                   {formData.testType !== "None" && (
                     <input 
@@ -299,32 +317,35 @@ export default function GuestMatchWizard() {
                       placeholder={formData.testType === "SAT" ? "e.g. 1450" : formData.testType === "ACT" ? "e.g. 32" : formData.testType === "GRE" ? "e.g. 320" : "e.g. 700"} 
                       value={formData.testScores} 
                       onChange={(e) => updateForm("testScores", e.target.value)} 
-                      className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-primary-500" 
+                      className="flex-1 bg-white border border-slate-200 rounded-2xl px-5 py-4 text-slate-900 font-bold focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100" 
                     />
                   )}
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-bold tracking-widest text-slate-500 mb-2 uppercase">
+                <label className="block text-[11px] font-semibold uppercase tracking-eyebrow text-slate-500 mb-2">
                   Grading system
                 </label>
-                <select
-                  value={formData.gradingSystem}
-                  onChange={(e) => {
-                    updateForm("gradingSystem", e.target.value);
-                    // Clear GPA when switching scales so users don't accidentally
-                    // submit a 5.0-scale value as a 4.0-scale value.
-                    updateForm("gpa", "");
-                  }}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-primary-500 mb-4"
-                >
-                  <option value="GPA (4.0 scale)">GPA (4.0 scale)</option>
-                  <option value="GPA (5.0 scale)">GPA (5.0 scale) — Nigerian / WAEC</option>
-                  <option value="CWA (out of 100)">CWA (out of 100)</option>
-                </select>
+                <div className="relative mb-4">
+                  <select
+                    value={formData.gradingSystem}
+                    onChange={(e) => {
+                      updateForm("gradingSystem", e.target.value);
+                      // Clear GPA when switching scales so users don't accidentally
+                      // submit a 5.0-scale value as a 4.0-scale value.
+                      updateForm("gpa", "");
+                    }}
+                    className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold text-slate-900 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 appearance-none cursor-pointer"
+                  >
+                    <option value="GPA (4.0 scale)">GPA (4.0 scale)</option>
+                    <option value="GPA (5.0 scale)">GPA (5.0 scale) — Nigerian / WAEC</option>
+                    <option value="CWA (out of 100)">CWA (out of 100)</option>
+                  </select>
+                  <ChevronDown size={16} className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                </div>
 
-                <label className="block text-xs font-bold tracking-widest text-slate-500 mb-2 uppercase">
+                <label className="block text-[11px] font-semibold uppercase tracking-eyebrow text-slate-500 mb-2">
                   {formData.gradingSystem === "CWA (out of 100)" ? "Your CWA" : "Your GPA"}
                   {formData.level === "Undergraduate" && <span className="font-medium normal-case text-slate-400 ml-1">— Optional</span>}
                 </label>
@@ -340,7 +361,7 @@ export default function GuestMatchWizard() {
                   }
                   value={formData.gpa}
                   onChange={(e) => updateForm("gpa", e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-2xl px-5 py-4 text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="w-full bg-white border border-slate-200 rounded-2xl px-5 py-4 text-slate-900 font-bold focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
                 />
                 <p className="text-[11px] text-slate-400 mt-2">
                   {formData.gradingSystem === "CWA (out of 100)"
@@ -359,7 +380,7 @@ export default function GuestMatchWizard() {
               {renderHeader("Funding")}
               <div className="space-y-3">
                 {["Full Funding", "Partial Scholarship", "Self-Funded"].map(f => (
-                  <button key={f} onClick={() => updateForm("funding", f)} className={`w-full text-left p-5 rounded-2xl border-2 transition-all font-bold ${formData.funding === f ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-slate-100 bg-white text-slate-600 hover:border-slate-200'}`}>
+                  <button key={f} onClick={() => updateForm("funding", f)} className={`w-full text-left px-6 py-4 rounded-full border-2 transition-all font-bold ${formData.funding === f ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-slate-200/70 bg-white text-slate-600 hover:border-slate-300'}`}>
                     {f}
                   </button>
                 ))}
@@ -372,7 +393,7 @@ export default function GuestMatchWizard() {
             <div>
               {renderHeader("Document Upload")}
               <div 
-                className={`border-2 border-dashed rounded-3xl p-8 text-center cursor-pointer transition-colors ${fileName ? 'border-primary-500 bg-primary-50' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'}`}
+                className={`border-2 border-dashed rounded-card p-8 text-center cursor-pointer transition-colors ${fileName ? 'border-primary-500 bg-primary-50' : 'border-slate-200 bg-slate-50 hover:bg-slate-100'}`}
                 onClick={() => fileInputRef.current?.click()}
               >
                 <FileCheck className={`w-8 h-8 mx-auto mb-3 ${fileName ? 'text-primary-600' : 'text-primary-500'}`} />
@@ -390,8 +411,8 @@ export default function GuestMatchWizard() {
           {/* STEP 7: PROCESSING */}
           {step === 7 && (
             <div className="text-center py-12">
-              <div className="w-20 h-20 border-4 border-primary-100 border-t-primary-500 rounded-full animate-spin mx-auto mb-6"></div>
-              <h2 className="text-2xl font-black text-slate-900 mb-2">Analyzing our growing database of U.S. schools...</h2>
+              <div className="w-20 h-20 border-4 border-primary-100 border-t-primary-600 rounded-full animate-spin mx-auto mb-6"></div>
+              <h2 className="text-2xl font-black tracking-tight text-slate-900 mb-2">Analyzing our growing database of U.S. schools...</h2>
               <p className="text-slate-500 text-sm">Feeding your profile into the deterministic matching engine.</p>
             </div>
           )}
@@ -418,13 +439,17 @@ export default function GuestMatchWizard() {
               >
                 <ArrowLeft size={16} /> Back
               </button>
-              <button onClick={handleNext} className="flex-1 px-6 py-4 rounded-full font-bold text-sm bg-slate-900 text-white hover:bg-slate-800 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-slate-900/10">
+              <button onClick={handleNext} className="flex-1 px-6 py-4 rounded-full font-bold text-sm bg-primary-500 text-white hover:bg-primary-600 transition-all active:scale-95 flex items-center justify-center gap-2 shadow-glow">
                 {step === 6 ? "Generate Matches" : "Continue"} <ArrowRight size={16} />
               </button>
             </div>
           )}
         </motion.div>
       </main>
+
+      <div className="relative z-10 w-full max-w-xl mx-auto px-6">
+        <AppFooter />
+      </div>
     </div>
   );
 }

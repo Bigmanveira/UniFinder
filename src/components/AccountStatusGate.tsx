@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { doc, onSnapshot } from "firebase/firestore";
-import { AlertTriangle, Loader2, LogOut, ShieldAlert } from "lucide-react";
+import { AlertTriangle, LogOut, ShieldAlert } from "lucide-react";
 import { Outlet } from "react-router-dom";
 import { useAuth } from "../hooks/useAuth";
 import { db } from "../lib/firebase";
 import { signOutWithAudit } from "../lib/userAudit";
+import SplashScreen from "./SplashScreen";
+import BrandLogo from "./BrandLogo";
+import { Eyebrow } from "./ui/Eyebrow";
 
 type AccountStatus = "active" | "restricted" | "deactivated" | "deleted";
 
@@ -57,11 +60,7 @@ export function AccountStatusGate() {
   }
 
   if (!user || !account || account.uid !== user.uid) {
-    return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-        <Loader2 size={24} className="animate-spin text-primary-500" />
-      </div>
-    );
+    return <SplashScreen />;
   }
 
   if (account.status === "active") return <Outlet />;
@@ -90,27 +89,36 @@ function AccountUnavailable({
   message: string;
   warning: boolean;
 }) {
+  // Dark ink hero card centered on bg-surface — sibling of NotFoundPage.
   return (
-    <div className="min-h-screen bg-slate-50 px-6 py-12 flex items-center justify-center">
-      <section className="w-full max-w-lg rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm">
-        <div className={`mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl ${
-          warning ? "bg-amber-50 text-amber-600" : "bg-rose-50 text-rose-600"
-        }`}>
-          {warning ? <AlertTriangle size={26} /> : <ShieldAlert size={26} />}
+    <div className="min-h-screen bg-surface flex items-center justify-center p-5">
+      <section className="relative w-full max-w-lg bg-ink text-white rounded-card-lg overflow-hidden shadow-2xl p-8 sm:p-12 text-center">
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <div className="absolute -right-12 -top-16 w-56 h-56 rounded-full border-[22px] border-primary-500/15" />
+          <div className="absolute -left-16 -bottom-20 w-56 h-56 rounded-full bg-primary-500/15 blur-3xl" />
         </div>
-        <h1 className="text-2xl font-black text-slate-900">{title}</h1>
-        <p className="mt-3 text-sm leading-6 text-slate-600">{message}</p>
-        <p className="mt-4 text-xs text-slate-500">
-          Support: <a className="font-bold text-primary-600" href="mailto:support@unifinder.app">support@unifinder.app</a>
-        </p>
-        <button
-          type="button"
-          onClick={() => void signOutWithAudit()}
-          className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-3 text-sm font-bold text-white hover:bg-slate-800"
-        >
-          <LogOut size={15} />
-          Sign out
-        </button>
+        <div className="relative flex flex-col items-center">
+          <BrandLogo size="md" tone="light" iconOnly asLink={false} className="mb-6" />
+          <div className={`mb-4 flex h-12 w-12 items-center justify-center rounded-2xl ${
+            warning ? "bg-amber-500/15 text-amber-300" : "bg-rose-500/15 text-rose-300"
+          }`}>
+            {warning ? <AlertTriangle size={22} /> : <ShieldAlert size={22} />}
+          </div>
+          <Eyebrow tone="light" className="mb-2">Account status</Eyebrow>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight mb-3">{title}</h1>
+          <p className="text-sm text-white/60 font-medium leading-relaxed max-w-sm">{message}</p>
+          <p className="mt-4 text-xs font-medium text-white/50">
+            Support: <a className="font-bold text-primary-300 hover:text-primary-200" href="mailto:support@collegeready.io">support@collegeready.io</a>
+          </p>
+          <button
+            type="button"
+            onClick={() => void signOutWithAudit()}
+            className="mt-8 inline-flex items-center justify-center gap-2 rounded-full bg-primary-500 hover:bg-primary-600 px-7 py-3.5 text-sm font-bold text-white shadow-glow transition-all active:scale-95"
+          >
+            <LogOut size={15} />
+            Sign out
+          </button>
+        </div>
       </section>
     </div>
   );

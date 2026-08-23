@@ -109,13 +109,17 @@ export default function InterviewIntroCard({
       transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
       className="space-y-5"
     >
-      <section className="relative overflow-hidden rounded-[30px] border border-[#263f7a] bg-[#07142f] text-white shadow-[0_24px_70px_rgba(7,20,47,0.28)]">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_85%_15%,rgba(95,120,220,0.28),transparent_38%),linear-gradient(135deg,#07142f_0%,#102454_58%,#172d68_100%)]" aria-hidden />
+      {/* Briefing hero — dark ink surface with the signature ring/orb decor */}
+      <section className="relative overflow-hidden rounded-card-lg bg-ink text-white shadow-[0_24px_70px_rgba(15,23,42,0.28)]">
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <div className="absolute -right-8 -top-10 w-40 h-40 rounded-full border-[18px] border-primary-500/20" />
+          <div className="absolute -right-6 top-10 w-48 h-48 rounded-full bg-primary-500/15 blur-3xl" />
+        </div>
         <div className="relative grid gap-0 sm:grid-cols-[1.15fr_0.85fr]">
           <div className="p-6 sm:p-8">
             <div className="mb-8 flex items-center justify-between sm:mb-12">
-              <span className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.22em] text-[#aebeff]">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#91a8ff]" /> Interview briefing
+              <span className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-eyebrow text-white/50">
+                <span className="h-1.5 w-1.5 rounded-full bg-primary-400" /> Interview briefing
               </span>
               <span className="rounded-full border border-white/15 bg-white/[0.06] px-2.5 py-1 text-[10px] font-semibold text-white/70 sm:hidden">
                 F-1 practice
@@ -124,7 +128,7 @@ export default function InterviewIntroCard({
 
             <div className="flex items-start gap-4">
               <div className="relative shrink-0">
-                <div className="absolute -inset-1 rounded-2xl bg-[#6f86e8]/35 blur-md" aria-hidden />
+                <div className="absolute -inset-1 rounded-2xl bg-primary-500/35 blur-md" aria-hidden />
                 <img
                   src="/anna.webp"
                   alt="Anna, your practice visa officer"
@@ -134,11 +138,11 @@ export default function InterviewIntroCard({
                 />
               </div>
               <div className="min-w-0 pt-1">
-                <p className="text-xs font-semibold text-[#aebeff]">Live with Anna</p>
-                <h2 className="mt-1 text-2xl font-bold tracking-[-0.025em] text-white sm:text-[2rem]">
+                <p className="text-xs font-semibold text-primary-300">Live with Anna</p>
+                <h2 className="mt-1 text-2xl font-black tracking-tight text-white sm:text-[2rem]">
                   Prepare the interview around your application.
                 </h2>
-                <p className="mt-3 max-w-md text-sm leading-6 text-slate-300">
+                <p className="mt-3 max-w-md text-sm leading-6 text-white/65">
                   Add the circumstances that matter. Anna will adapt using approved questions only.
                 </p>
               </div>
@@ -146,7 +150,7 @@ export default function InterviewIntroCard({
           </div>
 
           <div className="border-t border-white/10 bg-white/[0.045] p-6 backdrop-blur-sm sm:border-l sm:border-t-0 sm:p-7">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/50">Session format</p>
+            <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-white/50">Session format</p>
             <div className="mt-5 space-y-4">
               <SessionDetail icon={<Video size={16} />} label="Live interviewer" value="Face-to-face simulation" />
               <SessionDetail icon={<Mic size={16} />} label="Voice answers" value="No typing during the mock" />
@@ -156,11 +160,12 @@ export default function InterviewIntroCard({
         </div>
       </section>
 
-      <section className="rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_12px_40px_rgba(15,23,42,0.07)] sm:p-6">
+      {/* Applicant context picker */}
+      <section className="rounded-card border border-slate-200/70 bg-white p-5 shadow-card sm:p-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#5169c7]">Applicant context</p>
-            <h3 className="mt-1 text-lg font-bold tracking-tight text-slate-950">What applies to this application?</h3>
+            <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-primary-600">Applicant context</p>
+            <h3 className="mt-1 text-lg font-black tracking-tight text-slate-950">What applies to this application?</h3>
           </div>
           <p className="text-xs text-slate-500">Select any that apply</p>
         </div>
@@ -175,15 +180,15 @@ export default function InterviewIntroCard({
                 onClick={() => toggleContext(option.id)}
                 aria-pressed={selected}
                 className={[
-                  "group flex min-h-[88px] items-start gap-3 rounded-2xl border p-3.5 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6179d8] focus-visible:ring-offset-2",
+                  "group flex min-h-[88px] items-start gap-3 rounded-2xl border p-3.5 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2",
                   selected
-                    ? "border-[#6078d5] bg-[#f1f4ff] shadow-[0_8px_22px_rgba(79,103,196,0.12)]"
-                    : "border-slate-200 bg-slate-50/60 hover:border-[#a9b7ed] hover:bg-white",
+                    ? "border-primary-500 bg-primary-50 shadow-[0_8px_22px_rgba(59,130,246,0.12)]"
+                    : "border-slate-200 bg-slate-50/60 hover:border-primary-300 hover:bg-white",
                 ].join(" ")}
               >
                 <span className={[
                   "flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors",
-                  selected ? "bg-[#1b2f68] text-white" : "bg-white text-slate-500 shadow-sm ring-1 ring-slate-200",
+                  selected ? "bg-ink text-white" : "bg-white text-slate-500 shadow-sm ring-1 ring-slate-200",
                 ].join(" ")}>
                   {option.icon}
                 </span>
@@ -192,7 +197,7 @@ export default function InterviewIntroCard({
                     {option.label}
                     <span className={[
                       "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition-colors",
-                      selected ? "border-[#6078d5] bg-[#6078d5] text-white" : "border-slate-300 bg-white text-transparent",
+                      selected ? "border-primary-600 bg-primary-600 text-white" : "border-slate-300 bg-white text-transparent",
                     ].join(" ")}>
                       <Check size={12} className="stroke-[3]" />
                     </span>
@@ -208,7 +213,7 @@ export default function InterviewIntroCard({
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: "auto" }}
-            className="mt-3 rounded-2xl border border-[#c8d2f8] bg-[#f6f8ff] px-4 py-3 text-xs leading-5 text-[#273a77]"
+            className="mt-3 rounded-2xl border border-primary-200 bg-primary-50 px-4 py-3 text-xs leading-5 text-primary-900"
           >
             Anna will ask what reason you were given for the refusal and what changed in your new application.
           </motion.div>
@@ -216,9 +221,9 @@ export default function InterviewIntroCard({
       </section>
 
       {willBePreview && (
-        <div className="rounded-2xl border border-[#c8d2f8] bg-[#f4f6ff] px-4 py-3.5 text-[13px] leading-relaxed text-[#273a77]">
+        <div className="rounded-2xl border border-primary-200 bg-primary-50 px-4 py-3.5 text-[13px] leading-relaxed text-primary-900">
           <p className="font-bold">Free 2-minute preview</p>
-          <p className="mt-0.5 text-[#4b5d96]">The full scored report unlocks with a 1,500-token interview.</p>
+          <p className="mt-0.5 text-primary-700">The full scored report unlocks with a 1,500-token interview.</p>
         </div>
       )}
 
@@ -234,13 +239,13 @@ export default function InterviewIntroCard({
         onClick={() => setAccepted((current) => !current)}
         aria-pressed={accepted}
         className={[
-          "flex w-full items-start gap-3 rounded-2xl border px-4 py-3.5 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6179d8] focus-visible:ring-offset-2",
-          accepted ? "border-[#6078d5] bg-[#f3f5ff]" : "border-slate-200 bg-white hover:border-slate-300",
+          "flex w-full items-start gap-3 rounded-2xl border px-4 py-3.5 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2",
+          accepted ? "border-primary-500 bg-primary-50" : "border-slate-200 bg-white hover:border-slate-300",
         ].join(" ")}
       >
         <span className={[
           "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2",
-          accepted ? "border-[#6078d5] bg-[#6078d5] text-white" : "border-slate-300 bg-white text-transparent",
+          accepted ? "border-primary-600 bg-primary-600 text-white" : "border-slate-300 bg-white text-transparent",
         ].join(" ")}>
           <Check size={12} className="stroke-[3]" />
         </span>
@@ -252,7 +257,7 @@ export default function InterviewIntroCard({
       <button
         onClick={() => canStart && onStart(accepted, applicantContexts)}
         disabled={!canStart}
-        className="flex w-full items-center justify-center gap-2 rounded-2xl bg-[#102454] py-4 text-base font-semibold text-white shadow-[0_12px_30px_rgba(16,36,84,0.24)] transition-all hover:-translate-y-0.5 hover:bg-[#172f6d] hover:shadow-[0_16px_34px_rgba(16,36,84,0.3)] active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0"
+        className="flex w-full items-center justify-center gap-2 rounded-full bg-primary-500 py-4 text-base font-bold text-white shadow-glow transition-all hover:bg-primary-600 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-45"
       >
         {starting ? (
           <Loader2 size={17} className="animate-spin" />
@@ -269,12 +274,12 @@ export default function InterviewIntroCard({
 function SessionDetail({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
   return (
     <div className="flex items-center gap-3">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.07] text-[#b7c5ff]">
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.07] text-primary-300">
         {icon}
       </span>
       <div>
         <p className="text-xs font-bold text-white">{label}</p>
-        <p className="mt-0.5 text-[11px] text-slate-400">{value}</p>
+        <p className="mt-0.5 text-[11px] text-white/50">{value}</p>
       </div>
     </div>
   );

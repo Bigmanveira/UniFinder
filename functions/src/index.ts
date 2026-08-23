@@ -1681,7 +1681,7 @@ export const startVisaInterviewSession = onCall(
     const uid = request.auth?.uid;
     if (!uid) throw new HttpsError("unauthenticated", "Sign in to start a practice interview");
 
-    const { mode, disclaimerAccepted, clientRequestId, isReturningApplicant } = request.data ?? {};
+    const { mode, disclaimerAccepted, clientRequestId, isReturningApplicant, retryOfSessionId } = request.data ?? {};
     if (disclaimerAccepted !== true) {
       throw new HttpsError("failed-precondition", "Disclaimer must be accepted");
     }
@@ -1699,6 +1699,34 @@ export const startVisaInterviewSession = onCall(
     const db = admin.firestore();
     const founder = isFounderEmail(request.auth?.token?.email as string | undefined);
 
+    // ── Free retry after a broken interview ──────────────────────────────
+    // When a paid session dies mid-flight (HeyGen media loss, connection
+    // drop), the user already paid for an interview they never got. The
+    // client passes the dead session's id; if it (a) belongs to this user,
+    // (b) was a paid-kind session, (c) never produced a scored report
+    // (status !== "completed"), and (d) hasn't already been used for a
+    // retry, the replacement session is free. Each session grants at most
+    // ONE retry, but a free-retry session that dies again can itself be
+    // retried — the chain is rooted in a single paid charge and ends the
+    // moment a report is delivered.
+    let freeRetryOf: string | null = null;
+    if (typeof retryOfSessionId === "string" && retryOfSessionId.length > 0 && retryOfSessionId.length <= 100) {
+      const deadSnap = await db.collection("visaInterviewSessions").doc(retryOfSessionId).get();
+      const dead = deadSnap.data();
+      if (
+        deadSnap.exists &&
+        dead?.userId === uid &&
+        dead?.kind === "paid" &&
+        dead?.status !== "completed" &&
+        !dead?.retryConsumedBy
+      ) {
+        freeRetryOf = retryOfSessionId;
+      }
+      // Invalid retry claims fall through to the normal (charged) path
+      // rather than erroring — the client UI only offers the button on
+      // real failures, so this is just belt-and-braces against tampering.
+    }
+
     // Auto-detect preview vs paid mode based on wallet balance. Users
     // with ≥15 credits get the full paid 5-min interview + scored
     // report. Users with < 15 credits get a free 3-min preview gated
@@ -1708,7 +1736,10 @@ export const startVisaInterviewSession = onCall(
     // zero-amount ledger row).
     const walletPeek = await db.collection("creditWallets").doc(uid).get();
     const currentCredits = walletPeek.exists ? (walletPeek.data()?.credits ?? 0) : FREE_CREDITS_ON_SIGNUP;
-    const wantsPreview = !founder && currentCredits < VISA_INTERVIEW_CREDIT_COST;
+    // A free retry is always a paid-kind session (full duration + scored
+    // report) even if the wallet has since dropped below the price — the
+    // user already paid for the broken original.
+    const wantsPreview = !founder && !freeRetryOf && currentCredits < VISA_INTERVIEW_CREDIT_COST;
 
     // 7-day preview cooldown — protects HeyGen minutes from a single
     // account burning previews on loop. Founders bypass the cooldown
@@ -1799,6 +1830,20 @@ export const startVisaInterviewSession = onCall(
     // Atomic: deduct credit (paid mode only) + create session + create first officer message + log usage
     await db.runTransaction(async (tx) => {
       const wallet = await tx.get(walletRef);
+      // Re-validate the free-retry claim inside the transaction (all reads
+      // before writes) so two concurrent restarts can't both ride one
+      // broken interview: the second one sees retryConsumedBy and pays.
+      if (freeRetryOf) {
+        const deadInTx = await tx.get(db.collection("visaInterviewSessions").doc(freeRetryOf));
+        const d = deadInTx.data();
+        if (!deadInTx.exists || d?.retryConsumedBy || d?.status === "completed") {
+          throw new HttpsError(
+            "already-exists",
+            "This interview was already restarted. Start a new interview instead.",
+            { reason: "retry_already_consumed" },
+          );
+        }
+      }
       let credits: number;
       if (!wallet.exists) {
         credits = FREE_CREDITS_ON_SIGNUP;
@@ -1814,13 +1859,21 @@ export const startVisaInterviewSession = onCall(
       // Preview already passed the cooldown check above, so we know
       // it's not abuse. The "Insufficient credits" hard error can no
       // longer fire — that case routes into preview mode instead.
-      if (!founder && sessionKind === "paid") {
+      if (!founder && sessionKind === "paid" && !freeRetryOf) {
         if (credits < VISA_INTERVIEW_CREDIT_COST) {
           // Should never hit — auto-detect routes to preview when credits
           // are low. Belt-and-braces only.
           throw new HttpsError("resource-exhausted", "Insufficient credits");
         }
         tx.update(walletRef, { credits: credits - VISA_INTERVIEW_CREDIT_COST, updatedAt: now });
+      }
+
+      // Free retry: consume the dead session's retry entitlement inside the
+      // same transaction so two concurrent restarts can't both ride one
+      // broken interview. Also close the dead session out.
+      if (freeRetryOf) {
+        const deadRef = db.collection("visaInterviewSessions").doc(freeRetryOf);
+        tx.update(deadRef, { retryConsumedBy: sessionRef.id, status: "cancelled", updatedAt: now });
       }
 
       tx.set(sessionRef, {
@@ -1842,7 +1895,8 @@ export const startVisaInterviewSession = onCall(
         disclaimerAccepted:   true,
         documentsRequested:   { i20: false, ds160: true },
         documentsUploaded:    { i20: false, ds160: false },
-        creditsUsed:          sessionKind === "paid" ? VISA_INTERVIEW_CREDIT_COST : 0,
+        creditsUsed:          sessionKind === "paid" && !freeRetryOf ? VISA_INTERVIEW_CREDIT_COST : 0,
+        ...(freeRetryOf ? { freeRetryOf } : {}),
         startedAt:            now,
         createdAt:            now,
         updatedAt:            now,
@@ -1865,10 +1919,11 @@ export const startVisaInterviewSession = onCall(
       // row regardless of which path they took.
       const ledgerType =
         founder              ? "founder_visa_interview" :
+        freeRetryOf          ? "visa_interview_free_retry" :
         sessionKind === "preview" ? "visa_interview_preview" :
         "visa_interview_start";
       const ledgerAmount =
-        sessionKind === "paid" && !founder ? -VISA_INTERVIEW_CREDIT_COST : 0;
+        sessionKind === "paid" && !founder && !freeRetryOf ? -VISA_INTERVIEW_CREDIT_COST : 0;
       tx.set(txRef, {
         userId:    uid,
         amount:    ledgerAmount,

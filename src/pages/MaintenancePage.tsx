@@ -1,12 +1,10 @@
 // MaintenancePage — what users see when the kill switch is flipped.
 //
-// Design rules (matched to the SeedProd-style "Under Construction"
-// reference):
-//   - Full-bleed dark hero so the page reads as deliberate, not
-//     broken. We use a soft navy gradient with a brand-tinted glow
-//     instead of a photograph so the look stays on-brand.
-//   - Centered stack: logo → eyebrow → headline → optional countdown
-//     → CTA. Vertical rhythm is calm, not crowded.
+// Design rules (Sleek design language — sibling of NotFoundPage):
+//   - Dark ink hero card centered on bg-surface with the signature
+//     ring + orb decor, so the page reads as deliberate, not broken.
+//   - Centered stack inside the card: logo → eyebrow → headline →
+//     optional countdown → CTA. Vertical rhythm is calm, not crowded.
 //   - Live countdown (DAYS / HOURS / MINUTES / SECONDS) when the
 //     admin sets an ETA in the ops portal. When no ETA is set, the
 //     countdown block hides cleanly and the CTA gets a little more
@@ -19,6 +17,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Mail } from "lucide-react";
 import BrandLogo from "../components/BrandLogo";
+import { Eyebrow } from "../components/ui/Eyebrow";
 
 // Inline SVGs for the social icons. lucide-react in this project is
 // pinned to an old version that doesn't export Twitter / Instagram /
@@ -88,61 +87,51 @@ export default function MaintenancePage({ message, etaMs }: Props) {
   const parts     = remaining !== null ? diffParts(remaining) : null;
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-950 text-white font-sans relative overflow-hidden">
-      {/* Background atmosphere — soft brand-tinted glows behind the
-          centered content, deliberately subtle so they don't compete
-          with the headline. Same pattern as the marketing landing. */}
-      <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute top-[-15%] left-[-10%] w-[600px] h-[600px] bg-primary-600/20 rounded-full blur-[120px]" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[700px] h-[700px] bg-accent-500/10 rounded-full blur-[140px]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,#1e3a8a33,transparent_60%)]" />
-      </div>
+    <div className="min-h-screen bg-surface flex flex-col items-center justify-center p-5 font-sans">
+      {/* Hero — dark ink card, sibling of NotFoundPage. */}
+      <main className="relative w-full max-w-xl bg-ink text-white rounded-card-lg overflow-hidden shadow-2xl p-8 sm:p-12 text-center">
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <div className="absolute -right-12 -top-16 w-56 h-56 rounded-full border-[22px] border-primary-500/15" />
+          <div className="absolute -left-16 -bottom-20 w-56 h-56 rounded-full bg-primary-500/15 blur-3xl" />
+        </div>
 
-      {/* Top: logo on its own. Centered so the rest of the layout
-          reads as one centered column without competing with a
-          left-aligned brand mark. */}
-      <header className="relative z-10 pt-10 md:pt-14 flex justify-center">
-        <BrandLogo size="lg" tone="light" asLink={false} />
-      </header>
+        <div className="relative flex flex-col items-center">
+          <BrandLogo size="md" tone="light" iconOnly asLink={false} className="mb-6" />
+          <Eyebrow tone="light" className="mb-2">Under maintenance</Eyebrow>
 
-      {/* Hero — eyebrow, headline, countdown, CTA. */}
-      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-6 py-12 text-center max-w-3xl mx-auto">
-        <p className="text-[11px] md:text-xs font-black tracking-[0.3em] text-primary-300 uppercase mb-5">
-          Under maintenance
-        </p>
+          <h1 className="text-2xl sm:text-3xl font-black tracking-tight leading-tight mb-4">
+            {message?.trim() ? message : DEFAULT_MESSAGE}
+          </h1>
 
-        <h1 className="text-3xl md:text-5xl font-black leading-[1.1] tracking-tight mb-5">
-          {message?.trim() ? message : DEFAULT_MESSAGE}
-        </h1>
+          <p className="text-sm text-white/60 font-medium leading-relaxed mb-8 max-w-sm">
+            We'll be back shortly. Existing work is safe — nothing was lost. Thanks for your patience while we ship something better.
+          </p>
 
-        <p className="text-sm md:text-base text-slate-300/90 max-w-xl leading-relaxed mb-10">
-          We'll be back shortly. Existing work is safe — nothing was lost. Thanks for your patience while we ship something better.
-        </p>
-
-        {parts && (
-          <div className="mb-10">
-            <p className="text-[10px] md:text-xs font-bold tracking-[0.25em] text-slate-400 uppercase mb-4">
-              We'll be back in
-            </p>
-            <div className="flex items-start gap-3 md:gap-5">
-              <CountdownCell value={parts.days}    label="Days" />
-              <CountdownCell value={parts.hours}   label="Hours" />
-              <CountdownCell value={parts.minutes} label="Minutes" />
-              <CountdownCell value={parts.seconds} label="Seconds" />
+          {parts && (
+            <div className="mb-8">
+              <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-white/50 mb-4">
+                We'll be back in
+              </p>
+              <div className="flex items-start gap-3 sm:gap-5 justify-center">
+                <CountdownCell value={parts.days}    label="Days" />
+                <CountdownCell value={parts.hours}   label="Hours" />
+                <CountdownCell value={parts.minutes} label="Minutes" />
+                <CountdownCell value={parts.seconds} label="Seconds" />
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <a
-          href={`mailto:${SUPPORT_EMAIL}`}
-          className="inline-flex items-center gap-2 bg-white text-slate-900 hover:bg-slate-100 transition-colors font-bold px-7 py-3 rounded-full text-sm shadow-lg shadow-slate-900/50"
-        >
-          <Mail size={14} /> Contact us
-        </a>
+          <a
+            href={`mailto:${SUPPORT_EMAIL}`}
+            className="inline-flex items-center gap-2 rounded-full bg-primary-500 hover:bg-primary-600 text-white font-bold px-7 py-3.5 text-sm shadow-glow transition-all active:scale-95"
+          >
+            <Mail size={14} /> Contact us
+          </a>
+        </div>
       </main>
 
-      {/* Footer — socials, links, copyright. */}
-      <footer className="relative z-10 pb-8 md:pb-10 px-6">
+      {/* Footer — socials, links, copyright on the light surface. */}
+      <footer className="mt-8 px-6">
         <div className="max-w-3xl mx-auto flex flex-col items-center gap-4">
           <ul className="flex items-center gap-2">
             {SOCIALS.map((s) => (
@@ -152,7 +141,7 @@ export default function MaintenancePage({ message, etaMs }: Props) {
                   target="_blank"
                   rel="noreferrer"
                   aria-label={s.label}
-                  className="w-9 h-9 rounded-full bg-white/5 hover:bg-white/15 border border-white/10 flex items-center justify-center text-slate-300 hover:text-white transition-colors"
+                  className="w-9 h-9 rounded-full bg-white border border-slate-200/70 shadow-sm hover:border-slate-300 flex items-center justify-center text-slate-500 hover:text-slate-900 transition-colors"
                 >
                   {s.icon}
                 </a>
@@ -161,14 +150,14 @@ export default function MaintenancePage({ message, etaMs }: Props) {
           </ul>
 
           <nav className="flex items-center gap-5 text-[11px] font-bold text-slate-400">
-            <Link to="/terms"   className="hover:text-white transition-colors">Terms</Link>
-            <span className="text-slate-700">·</span>
-            <Link to="/privacy" className="hover:text-white transition-colors">Privacy</Link>
-            <span className="text-slate-700">·</span>
-            <Link to="/contact" className="hover:text-white transition-colors">Contact</Link>
+            <Link to="/terms"   className="hover:text-slate-900 transition-colors">Terms</Link>
+            <span className="text-slate-300">·</span>
+            <Link to="/privacy" className="hover:text-slate-900 transition-colors">Privacy</Link>
+            <span className="text-slate-300">·</span>
+            <Link to="/contact" className="hover:text-slate-900 transition-colors">Contact</Link>
           </nav>
 
-          <p className="text-[11px] text-slate-500">
+          <p className="text-[11px] font-medium text-slate-400">
             © {new Date().getFullYear()} College Ready. All rights reserved.
           </p>
         </div>
@@ -179,16 +168,15 @@ export default function MaintenancePage({ message, etaMs }: Props) {
 
 function CountdownCell({ value, label }: { value: number; label: string }) {
   // Each "cell" is a stacked column: a big tabular two-digit number
-  // on top, a small uppercase label below. Matches the reference
-  // (DAYS / HOURS / MINUTES / SECONDS) but lives on a transparent
-  // background so it sits cleanly on top of the navy hero.
+  // on top, a small uppercase label below. Lives on the ink card so
+  // the numbers stay white and the labels muted.
   const v = String(value).padStart(2, "0");
   return (
-    <div className="flex flex-col items-center min-w-[64px] md:min-w-[80px]">
-      <span className="text-4xl md:text-6xl font-black tabular-nums text-white leading-none">
+    <div className="flex flex-col items-center min-w-[56px] sm:min-w-[72px]">
+      <span className="text-3xl sm:text-5xl font-black tabular-nums text-white leading-none">
         {v}
       </span>
-      <span className="mt-2 text-[10px] md:text-[11px] font-bold tracking-[0.2em] uppercase text-slate-400">
+      <span className="mt-2 text-[10px] sm:text-[11px] font-semibold tracking-eyebrow uppercase text-white/50">
         {label}
       </span>
     </div>

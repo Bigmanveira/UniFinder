@@ -22,8 +22,10 @@ import { signInWithPopup, getAdditionalUserInfo, GoogleAuthProvider } from "fire
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import { auth, googleProvider, db, functions } from "../lib/firebase";
-import { ArrowRight, Mail, Check, Loader2, Tag, ChevronDown, ChevronUp } from "lucide-react";
+import { ArrowRight, Check, Loader2, Tag, ChevronDown, ChevronUp } from "lucide-react";
 import BrandLogo from "../components/BrandLogo";
+import { Eyebrow } from "../components/ui/Eyebrow";
+import { Input } from "../components/ui/Input";
 import { motion } from "framer-motion";
 import {
   captureReferralCodeFromUrl,
@@ -238,33 +240,50 @@ export default function SignupPage() {
   })();
 
   return (
-    <div className="min-h-screen relative flex items-center justify-center p-4 sm:p-6 font-sans selection:bg-primary-500 selection:text-white">
-      {/* Background image + overlay (unchanged from the password version) */}
-      <div className="absolute inset-0 z-0">
-        <img
-          src="https://images.unsplash.com/photo-1606761568499-6d2451b23c66?q=80&w=2000&auto=format&fit=crop"
-          className="w-full h-full object-cover"
-          alt="Graduation"
-        />
-        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"></div>
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent"></div>
-      </div>
+    <div className="min-h-screen bg-surface flex font-sans selection:bg-primary-500 selection:text-white">
+      {/* Ink backdrop panel — desktop only. Same treatment as LoginPage so
+          the two auth surfaces read as siblings. */}
+      <aside className="hidden lg:flex relative w-[44%] xl:w-2/5 bg-ink text-white flex-col justify-between p-10 xl:p-14 overflow-hidden">
+        <div aria-hidden className="pointer-events-none absolute inset-0">
+          <div className="absolute -right-12 -top-16 w-64 h-64 rounded-full border-[22px] border-primary-500/15" />
+          <div className="absolute -right-6 top-28 w-56 h-56 rounded-full bg-primary-500/15 blur-3xl" />
+          <div className="absolute -left-20 -bottom-24 w-64 h-64 rounded-full bg-primary-500/10 blur-3xl" />
+        </div>
+        <div className="relative">
+          <BrandLogo size="md" tone="light" />
+        </div>
+        <div className="relative max-w-sm">
+          <Eyebrow tone="light" className="mb-3">Get started</Eyebrow>
+          <h2 className="text-3xl xl:text-4xl font-black tracking-tight leading-tight mb-4">
+            Find your fit. Practice the interview. Land ready.
+          </h2>
+          <p className="text-sm text-white/60 font-medium leading-relaxed">
+            Join today and get 200 free tokens to explore verified matches and interview practice.
+          </p>
+        </div>
+        <p className="relative text-[11px] font-medium text-white/40">
+          © {new Date().getFullYear()} College Ready
+        </p>
+      </aside>
 
-      <div className="absolute top-6 left-6 z-20">
-        <BrandLogo size="md" tone="light" />
-      </div>
+      {/* Auth card column */}
+      <main className="flex-1 flex flex-col items-center justify-center p-5 sm:p-8">
+        <div className="lg:hidden mb-8">
+          <BrandLogo size="md" />
+        </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.4 }}
-        className="relative z-10 w-full max-w-[420px]"
-      >
-        <div className="bg-white/95 backdrop-blur-2xl rounded-[32px] p-8 sm:p-10 shadow-2xl shadow-slate-900/50 border border-white/50">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-black text-slate-900 mb-2">Create Account</h1>
-            <p className="text-slate-500 font-medium text-sm">Join today and get 200 free tokens.</p>
-          </div>
+        <motion.div
+          initial={{ opacity: 0, y: 20, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.4 }}
+          className="relative z-10 w-full max-w-[440px]"
+        >
+          <div className="bg-white border border-slate-200/70 rounded-card-lg shadow-card p-8 sm:p-10">
+            <div className="text-center mb-8">
+              <Eyebrow className="mb-2">Sign up</Eyebrow>
+              <h1 className="text-3xl font-black tracking-tight text-slate-900 mb-2">Create account</h1>
+              <p className="text-slate-500 font-medium text-sm">Join today and get 200 free tokens.</p>
+            </div>
 
           {sent ? (
             // After we ship the magic link, swap to a "check your inbox"
@@ -273,20 +292,20 @@ export default function SignupPage() {
             // pre-submit form again unless they click "Use a
             // different email" to reset.
             <div className="space-y-4">
-              <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 flex-shrink-0">
+              <div className="bg-primary-50 border border-primary-100 rounded-2xl p-4 flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 flex-shrink-0">
                   <Check size={16} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-bold text-emerald-900 text-sm mb-0.5">Check your inbox</p>
-                  <p className="text-xs text-emerald-800 leading-relaxed break-words">
+                  <p className="font-bold text-primary-900 text-sm mb-0.5">Check your inbox</p>
+                  <p className="text-xs text-primary-800 leading-relaxed break-words">
                     A sign-in link is on its way to <span className="font-mono">{email}</span> from <span className="font-mono">noreply@collegeready.io</span>. Open it on this device to finish.
                   </p>
-                  <p className="text-[11px] text-emerald-700 mt-1.5 leading-relaxed">
+                  <p className="text-[11px] text-primary-700 mt-1.5 leading-relaxed">
                     If this email is already registered, you'll be signed into that account.
                   </p>
                   {referralCode.trim() && (
-                    <p className="text-[11px] text-emerald-700 mt-1 leading-relaxed">
+                    <p className="text-[11px] text-primary-700 mt-1 leading-relaxed">
                       Referral code <span className="font-mono font-bold">{referralCode.trim().toUpperCase()}</span> will be applied automatically when you land. Your referrer gets 500 tokens once you make your first purchase.
                     </p>
                   )}
@@ -304,7 +323,7 @@ export default function SignupPage() {
               <button
                 onClick={handleGoogle}
                 disabled={loading}
-                className="w-full bg-slate-50 border border-slate-200 text-slate-700 font-bold py-3.5 rounded-2xl mb-6 hover:bg-slate-100 disabled:opacity-50 transition-colors flex items-center justify-center gap-3"
+                className="w-full inline-flex items-center justify-center gap-3 rounded-full bg-white border border-slate-200 text-slate-900 text-sm font-bold py-3.5 px-5 mb-6 shadow-sm hover:border-slate-300 hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50"
               >
                 <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5" alt="Google" />
                 Sign Up with Google
@@ -312,33 +331,25 @@ export default function SignupPage() {
 
               <div className="flex items-center gap-4 mb-6">
                 <div className="flex-1 h-px bg-slate-200"></div>
-                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Or email</span>
+                <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-eyebrow">Or email</span>
                 <div className="flex-1 h-px bg-slate-200"></div>
               </div>
 
               <form onSubmit={handleSendLink} className="space-y-4">
-                <div>
-                  <label className="block text-[10px] font-black tracking-widest text-slate-500 mb-2 uppercase ml-1">Email Address</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
-                      <Mail size={18} />
-                    </div>
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      className="w-full bg-slate-50 border border-slate-200 rounded-2xl pl-11 pr-5 py-3.5 text-slate-900 font-bold focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
-                      placeholder="you@example.com"
-                    />
-                  </div>
-                </div>
+                <Input
+                  label="Email address"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  placeholder="you@example.com"
+                />
 
                 {/* "I have a referral code" — collapsed by default so the
                     primary signup flow is the lowest-friction path. Click
                     to expand and reveal the input. Pre-fills if a ?ref=
                     landed via URL so the user can confirm or correct. */}
-                <div className="bg-slate-50/60 border border-slate-200 rounded-2xl overflow-hidden">
+                <div className="bg-slate-50/60 border border-slate-200/70 rounded-2xl overflow-hidden">
                   <button
                     type="button"
                     onClick={() => setReferralOpen((v) => !v)}
@@ -359,10 +370,10 @@ export default function SignupPage() {
                         maxLength={32}
                         autoCapitalize="characters"
                         spellCheck={false}
-                        className="w-full bg-white border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-mono uppercase text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 transition-all"
+                        className="w-full bg-white border border-slate-200 rounded-2xl px-4 py-2.5 text-sm font-mono uppercase text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100 transition-all"
                         placeholder="JANE2025"
                       />
-                      <p className="text-[10px] text-slate-500 mt-1.5 leading-relaxed">
+                      <p className="text-[10px] font-medium text-slate-500 mt-1.5 leading-relaxed">
                         Got a code from a marketer or friend? Bonus tokens land in your wallet right after you sign in.
                       </p>
                     </div>
@@ -370,30 +381,31 @@ export default function SignupPage() {
                 </div>
 
                 {error && (
-                  <p className="text-xs text-rose-600 leading-relaxed text-center">{error}</p>
+                  <p className="text-xs font-semibold text-rose-600 leading-relaxed text-center">{error}</p>
                 )}
 
                 <button
                   disabled={loading || !email.trim()}
                   type="submit"
-                  className="w-full bg-primary-600 text-white font-bold py-4 rounded-2xl mt-4 hover:bg-primary-700 transition-transform active:scale-[0.98] flex items-center justify-center gap-2 shadow-lg shadow-primary-600/25 disabled:opacity-50"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-full bg-primary-500 hover:bg-primary-600 text-white text-sm font-bold py-4 mt-4 shadow-glow transition-all active:scale-95 disabled:opacity-50"
                 >
                   {loading ? <Loader2 size={16} className="animate-spin" /> : null}
-                  {loading ? "Sending link…" : "Send sign-in link"} {!loading && <ArrowRight size={18} />}
+                  {loading ? "Sending link…" : "Send sign-in link"} {!loading && <ArrowRight size={16} />}
                 </button>
 
-                <p className="text-[11px] text-slate-500 text-center leading-relaxed">
+                <p className="text-[11px] font-medium text-slate-400 text-center leading-relaxed">
                   No password needed. We'll email you a one-time sign-in link.
                 </p>
               </form>
             </>
           )}
 
-          <p className="text-sm font-medium text-slate-500 text-center mt-8">
-            Already have an account? <Link to={loginHref} className="text-primary-600 font-black hover:underline">Log in</Link>
-          </p>
-        </div>
-      </motion.div>
+            <p className="text-sm font-medium text-slate-500 text-center mt-8">
+              Already have an account? <Link to={loginHref} className="text-primary-600 font-black hover:underline">Log in</Link>
+            </p>
+          </div>
+        </motion.div>
+      </main>
     </div>
   );
 }

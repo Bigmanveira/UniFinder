@@ -4,13 +4,15 @@
 // reads as "frozen" — so we cycle through mode-specific status lines on
 // a 1.6s rhythm to keep the user oriented.
 //
-// Visual treatment: animated multi-layer gradient halo around a rotating
-// sparkle, with a fade-cross transition between status lines so it feels
-// alive without screaming for attention.
+// Visual treatment: matches the app's splash language — a white card with
+// a primary icon chip, a primary sweep bar that advances with the status
+// stage, and a muted label. Single-accent (primary blue) by design.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useState } from "react";
 import { Wand2 } from "lucide-react";
+import { Eyebrow } from "../ui/Eyebrow";
+import { IconChip } from "../ui/IconChip";
 
 type CvMode = "review" | "build" | "convert";
 
@@ -45,17 +47,8 @@ const STATUS_LINES: Record<CvMode, string[]> = {
   ],
 };
 
-// Per-mode accent so the loader matches the brand color of the tool
-// the user just clicked from.
-const MODE_THEME: Record<CvMode, { from: string; to: string; ring: string; chip: string }> = {
-  review:  { from: "from-blue-500",    to: "to-cyan-500",     ring: "ring-blue-500/30",    chip: "bg-blue-50 text-blue-700 border-blue-200" },
-  build:   { from: "from-violet-500",  to: "to-fuchsia-500",  ring: "ring-violet-500/30",  chip: "bg-violet-50 text-violet-700 border-violet-200" },
-  convert: { from: "from-emerald-500", to: "to-teal-500",     ring: "ring-emerald-500/30", chip: "bg-emerald-50 text-emerald-700 border-emerald-200" },
-};
-
 export default function GenerationLoader({ mode }: { mode: CvMode }) {
   const lines = STATUS_LINES[mode];
-  const theme = MODE_THEME[mode];
   const [stageIndex, setStageIndex] = useState(0);
   const [visible, setVisible] = useState(true);
 
@@ -76,27 +69,21 @@ export default function GenerationLoader({ mode }: { mode: CvMode }) {
   const stageLabel = mode === "build" ? "Building" : mode === "convert" ? "Converting" : "Reviewing";
 
   return (
-    <div className="relative bg-white rounded-[32px] border border-slate-200 shadow-xl shadow-slate-900/[0.04] overflow-hidden">
-      {/* Animated decorative background — three soft gradient blobs that
-          slowly orbit the centre. Pure CSS keyframes (drift-* below)
-          mean no JS animation cost. */}
-      <div className="absolute inset-0 pointer-events-none" aria-hidden>
-        <div className={`absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-gradient-to-br ${theme.from} ${theme.to} opacity-20 rounded-full blur-3xl animate-pulse`} style={{ animationDuration: "4s" }} />
-        <div className={`absolute bottom-[-30%] right-[-10%] w-[70%] h-[70%] bg-gradient-to-br ${theme.from} ${theme.to} opacity-15 rounded-full blur-3xl animate-pulse`} style={{ animationDuration: "5s", animationDelay: "1.5s" }} />
-      </div>
-
+    <div className="relative bg-white rounded-card-lg border border-slate-200/70 shadow-card overflow-hidden">
       <div className="relative px-8 py-14 sm:py-16 flex flex-col items-center text-center">
-        {/* Animated sparkle — outer ring spins slowly, inner sparkle
-            pulses on a different cadence so the eye keeps catching motion. */}
+        {/* Primary icon chip with a soft halo */}
         <div className="relative mb-7">
-          <div className={`absolute inset-[-12px] rounded-full bg-gradient-to-br ${theme.from} ${theme.to} opacity-25 blur-2xl animate-pulse`} aria-hidden />
-          <div className={`relative w-20 h-20 rounded-full bg-gradient-to-br ${theme.from} ${theme.to} flex items-center justify-center shadow-2xl ${theme.ring} ring-8`}>
-            <Wand2 size={32} className="text-white animate-pulse" style={{ animationDuration: "1.8s" }} />
-          </div>
+          <div className="absolute inset-[-12px] rounded-full bg-primary-500/15 blur-2xl animate-pulse" aria-hidden />
+          <IconChip
+            icon={<Wand2 size={28} className="animate-pulse" style={{ animationDuration: "1.8s" }} />}
+            tint="primary"
+            size="lg"
+            className="relative w-16 h-16 rounded-full shadow-xl shadow-primary-600/10 ring-8 ring-primary-500/10"
+          />
         </div>
 
-        <span className={`inline-flex items-center gap-1.5 text-[10px] font-black tracking-[0.18em] uppercase border rounded-full px-2.5 py-1 mb-3 ${theme.chip}`}>
-          {stageLabel}
+        <span className="inline-flex items-center rounded-full border border-primary-200 bg-primary-50 px-2.5 py-1 mb-3">
+          <Eyebrow tone="primary">{stageLabel}</Eyebrow>
         </span>
 
         {/* Status line — cross-fade between messages. Min height locks
@@ -116,18 +103,26 @@ export default function GenerationLoader({ mode }: { mode: CvMode }) {
           This usually takes 10–25 seconds. Hang tight — we're writing in your voice, not in chatbot.
         </p>
 
+        {/* Primary sweep bar — advances with stageIndex so the user has
+            a sense of "this loader knows where it is in the process." */}
+        <div className="w-full max-w-xs h-1.5 rounded-full bg-slate-100 overflow-hidden mt-7" aria-hidden>
+          <div
+            className="h-full rounded-full bg-primary-600 transition-all duration-500"
+            style={{ width: `${((stageIndex + 1) / lines.length) * 100}%` }}
+          />
+        </div>
+
         {/* Progress dots — purely decorative pacing cue, advances with
-            stageIndex so the user has a sense of "this loader knows
-            where it is in the process." */}
-        <div className="flex items-center gap-2 mt-7" aria-hidden>
+            stageIndex. */}
+        <div className="flex items-center gap-2 mt-4" aria-hidden>
           {lines.map((_, idx) => (
             <span
               key={idx}
               className={`h-1.5 rounded-full transition-all duration-500 ${
                 idx === stageIndex
-                  ? `w-7 bg-gradient-to-r ${theme.from} ${theme.to}`
+                  ? "w-7 bg-primary-600"
                   : idx < stageIndex
-                    ? "w-1.5 bg-slate-400"
+                    ? "w-1.5 bg-primary-300"
                     : "w-1.5 bg-slate-200"
               }`}
             />

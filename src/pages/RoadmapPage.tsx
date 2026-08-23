@@ -20,11 +20,14 @@ import RoadmapOnboardingModal from "./RoadmapOnboardingModal";
 import Modal from "../components/Modal";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  ArrowLeft, ArrowRight, Check, ChevronDown, Loader2,
+  ArrowRight, Check, ChevronDown, Loader2,
   AlertTriangle, RotateCw, Pencil, Plus,
   CheckCircle2, Hourglass, Ban, Circle, Construction, MapPin,
 } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
+import { AppHeader } from "../components/AppHeader";
+import { Button } from "../components/ui/Button";
+import { Eyebrow } from "../components/ui/Eyebrow";
 import {
   reconcileFromExternalActivity,
   subscribeStudyRoadmap,
@@ -47,7 +50,7 @@ import {
 const STATUS_META: Record<ChecklistItemStatus, { label: string; icon: React.ReactNode; chip: string }> = {
   not_started:      { label: "To do",       icon: <Circle size={11} />,        chip: "bg-slate-100 text-slate-600 border-slate-200" },
   in_progress:      { label: "In progress", icon: <Hourglass size={11} />,     chip: "bg-blue-50 text-blue-700 border-blue-200" },
-  completed:        { label: "Done",        icon: <CheckCircle2 size={11} />,  chip: "bg-emerald-50 text-emerald-700 border-emerald-200" },
+  completed:        { label: "Done",        icon: <CheckCircle2 size={11} />,  chip: "bg-primary-50 text-primary-700 border-primary-200" },
   blocked:          { label: "Blocked",     icon: <Ban size={11} />,           chip: "bg-rose-50 text-rose-700 border-rose-200" },
   needs_review:     { label: "Review",      icon: <AlertTriangle size={11} />, chip: "bg-amber-50 text-amber-800 border-amber-200" },
   // Seeded by the diagnostic on advanced-stage entry. Visually
@@ -157,7 +160,7 @@ export default function RoadmapPage() {
 
   if (authLoading || roadmap === "loading") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="min-h-screen flex items-center justify-center bg-surface">
         <Loader2 size={20} className="text-slate-400 animate-spin" />
       </div>
     );
@@ -167,21 +170,18 @@ export default function RoadmapPage() {
   if (roadmap === null) {
     return (
       <>
-        <div className="flex min-h-screen items-center justify-center bg-slate-50 px-6">
+        <div className="flex min-h-screen items-center justify-center bg-surface px-6">
           <div className="max-w-sm text-center">
-            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-900 text-white">
+            <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-ink text-white">
               <MapPin size={20} />
             </div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-900">Build your roadmap</h1>
+            <h1 className="text-xl font-black tracking-tight text-slate-900">Build your roadmap</h1>
             <p className="mt-2 text-sm leading-relaxed text-slate-600">
               Six quick questions and we'll map out where you are and what to do next.
             </p>
-            <button
-              onClick={() => setDismissed(false)}
-              className="mt-5 inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6179d8] focus-visible:ring-offset-2"
-            >
+            <Button variant="dark" size="lg" className="mt-5" onClick={() => setDismissed(false)}>
               Start <ArrowRight size={15} />
-            </button>
+            </Button>
             <div className="mt-3">
               <Link to="/app" className="text-xs font-semibold text-slate-500 hover:text-slate-800">
                 Back to dashboard
@@ -254,7 +254,7 @@ function Dashboard({
   const nextStage      = getNextStage(roadmap.currentStage);
 
   return (
-    <div className="relative min-h-screen text-slate-900 antialiased overflow-hidden bg-gradient-to-b from-slate-100 via-slate-50 to-white">
+    <div className="relative min-h-screen text-slate-900 antialiased overflow-hidden bg-surface">
       {/* Decorative neutral gradients — slate/stone tones only. No AI
           rainbow. Sit behind everything; pointer-events disabled. The
           gradient delivers depth without making the page feel like a
@@ -265,38 +265,41 @@ function Dashboard({
         <div className="absolute -bottom-40 right-1/4 w-[560px] h-[560px] rounded-full blur-[160px] bg-gradient-to-tr from-slate-200/30 via-white/0 to-transparent" />
       </div>
 
-      <header className="sticky top-0 z-40 border-b border-slate-200/50 bg-white/70 backdrop-blur-xl supports-[backdrop-filter]:bg-white/60">
-        <div className="max-w-3xl mx-auto px-5 h-14 flex items-center gap-3">
-          <Link to="/app" className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 transition-colors" aria-label="Back to dashboard">
-            <ArrowLeft size={15} />
-          </Link>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-[14px] font-bold leading-tight">My Roadmap</h1>
-          </div>
-          {/* Persistent stage marker. Sticky, so the user can always see which
-              stage they are on and how far through it they are — including
-              while the diagnostic modal is open over this page. */}
-          <span
-            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${currentMeta.accentChipBg} ${currentMeta.accentText} border-current/20`}
-            title={`Stage ${currentStageIndex + 1} of ${ROADMAP_STAGE_ORDER.length}: ${currentMeta.title}`}
-          >
-            <span className="font-utility tabular-nums opacity-70">
-              {currentStageIndex + 1}/{ROADMAP_STAGE_ORDER.length}
+      {/* Persistent stage marker rides in the sticky header's action slot, so
+          the user can always see which stage they are on and how far through
+          it they are — including while the diagnostic modal is open. */}
+      <AppHeader
+        title="My Roadmap"
+        backTo="/app"
+        backLabel="Back to home"
+        maxWidth="max-w-3xl"
+        className="top-16 z-30"
+        action={
+          <>
+            <span
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold ${currentMeta.accentChipBg} ${currentMeta.accentText} border-current/20`}
+              title={`Stage ${currentStageIndex + 1} of ${ROADMAP_STAGE_ORDER.length}: ${currentMeta.title}`}
+            >
+              <span className="font-utility tabular-nums opacity-70">
+                {currentStageIndex + 1}/{ROADMAP_STAGE_ORDER.length}
+              </span>
+              <span className="max-w-[9rem] truncate">{currentMeta.short}</span>
+              <span className="tabular-nums opacity-70">{roadmap.progressPercentage}%</span>
             </span>
-            <span className="max-w-[9rem] truncate">{currentMeta.short}</span>
-            <span className="tabular-nums opacity-70">{roadmap.progressPercentage}%</span>
-          </span>
-          <Link
-            to="/app/roadmap?onboarding=1&update=1"
-            className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
-            title="Refresh your diagnostic answers. Your checklist progress is preserved."
-          >
-            <RotateCw size={12} /> Update my answers
-          </Link>
-        </div>
-      </header>
+            <Link
+              to="/app/roadmap?onboarding=1&update=1"
+              className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
+              title="Refresh your diagnostic answers. Your checklist progress is preserved."
+            >
+              <RotateCw size={12} /> Update my answers
+            </Link>
+          </>
+        }
+      />
 
-      <main className="max-w-3xl mx-auto px-5 py-10 sm:py-12 space-y-8">
+      {/* Bottom padding keeps content clear of the chat launcher,
+          which now floats on EVERY viewport — no md: opt-out. */}
+      <main className="max-w-3xl mx-auto px-5 pt-10 sm:pt-12 pb-24 space-y-8">
         {/* ── Hero ── */}
         <Hero
           stageIndex={currentStageIndex}
@@ -395,15 +398,15 @@ function Hero({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      className="relative space-y-5 px-6 sm:px-8 py-7 sm:py-9 rounded-3xl border border-slate-200/70 bg-gradient-to-br from-white via-slate-50/40 to-stone-50/60 shadow-[0_1px_3px_rgba(15,23,42,0.04)] overflow-hidden"
+      className="relative space-y-5 px-6 sm:px-8 py-7 sm:py-9 rounded-card border border-slate-200/70 bg-white shadow-card overflow-hidden"
     >
-      {/* Soft emerald wash anchored to the upper-right of the hero so
-          the eye reads "progress" without the whole card being green. */}
-      <div className="pointer-events-none absolute -top-20 -right-20 w-72 h-72 rounded-full blur-3xl bg-gradient-to-br from-emerald-100/60 to-transparent" aria-hidden />
+      {/* Soft brand-blue wash anchored to the upper-right of the hero so
+          the eye reads "progress" without the whole card being tinted. */}
+      <div className="pointer-events-none absolute -top-20 -right-20 w-72 h-72 rounded-full blur-3xl bg-gradient-to-br from-primary-100/60 to-transparent" aria-hidden />
       <div className="flex items-center gap-2">
-        <p className="text-[11px] font-black tracking-[0.18em] uppercase text-emerald-700">
+        <Eyebrow tone="primary">
           Stage {stageIndex + 1} of 6
-        </p>
+        </Eyebrow>
         <span className="w-1 h-1 rounded-full bg-slate-300" aria-hidden />
         <p className="text-[11px] font-bold tracking-wide text-slate-500 truncate">
           {requiredDone}/{requiredTotal} required done
@@ -424,7 +427,7 @@ function Hero({
             initial={{ width: 0 }}
             animate={{ width: `${Math.min(progressPercentage, 100)}%` }}
             transition={{ duration: 0.6, ease: "easeOut" }}
-            className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full"
+            className="h-full bg-primary-500 rounded-full"
           />
         </div>
         <p className="text-[10px] font-bold text-slate-500 mt-1.5 tabular-nums">
@@ -433,20 +436,23 @@ function Hero({
       </div>
 
       <div className="flex flex-wrap items-center gap-2.5 pt-1">
-        <button
+        <Button
+          variant="primary"
+          size="lg"
           onClick={onPrimaryClick}
-          className="inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-bold px-5 py-3 rounded-full transition-colors"
+          icon={comingSoon ? <Construction size={13} /> : undefined}
         >
-          {comingSoon && <Construction size={13} />}
           {stage.primaryCta}
           <ArrowRight size={14} />
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="ghost"
+          size="lg"
           onClick={onUpdateStageClick}
-          className="inline-flex items-center gap-1.5 text-slate-600 hover:text-slate-900 text-sm font-bold px-4 py-3 rounded-full hover:bg-slate-100 transition-colors"
+          icon={<Pencil size={12} />}
         >
-          <Pencil size={12} /> Update stage
-        </button>
+          Update stage
+        </Button>
       </div>
     </motion.section>
   );
@@ -465,7 +471,7 @@ function Stepper({ currentStage }: { currentStage: RoadmapStageId }) {
     : (currentIndex / (totalSteps - 1)) * 100;
 
   return (
-    <section className="bg-gradient-to-br from-white via-white to-slate-50/70 rounded-3xl border border-slate-200/80 shadow-[0_1px_3px_rgba(15,23,42,0.04)] px-5 py-7 sm:px-7">
+    <section className="bg-white rounded-card border border-slate-200/70 shadow-card px-5 py-7 sm:px-7">
       <div className="relative">
         {/* Track + animated fill */}
         <div className="absolute left-[14px] right-[14px] sm:left-[18px] sm:right-[18px] top-[14px] sm:top-[18px] h-[3px] rounded-full bg-slate-200 overflow-hidden pointer-events-none" aria-hidden>
@@ -473,7 +479,7 @@ function Stepper({ currentStage }: { currentStage: RoadmapStageId }) {
             initial={{ width: 0 }}
             animate={{ width: `${fillPercent}%` }}
             transition={{ duration: 0.7, ease: "easeOut" }}
-            className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full"
+            className="h-full bg-primary-500 rounded-full"
           />
         </div>
 
@@ -492,9 +498,9 @@ function Stepper({ currentStage }: { currentStage: RoadmapStageId }) {
                   transition={{ duration: 0.3, ease: "easeOut" }}
                   className={`relative w-7 h-7 sm:w-9 sm:h-9 rounded-full flex items-center justify-center text-[11px] font-black ${
                     state === "completed"
-                      ? "bg-emerald-500 text-white"
+                      ? "bg-primary-500 text-white"
                       : state === "current"
-                        ? "bg-white text-emerald-700 border-[3px] border-emerald-500 shadow-[0_0_0_4px_rgba(59,130,246,0.12)]"
+                        ? "bg-white text-primary-700 border-[3px] border-primary-500 shadow-[0_0_0_4px_rgba(59,130,246,0.12)]"
                         : "bg-white text-slate-400 border border-slate-300"
                   }`}
                 >
@@ -535,7 +541,7 @@ function Checklist({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3, ease: "easeOut", delay: 0.05 }}
-      className="bg-gradient-to-br from-white via-white to-slate-50/70 rounded-3xl border border-slate-200/80 shadow-[0_1px_3px_rgba(15,23,42,0.04)] overflow-hidden"
+      className="bg-white rounded-card border border-slate-200/70 shadow-card overflow-hidden"
     >
       <div className="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-baseline justify-between">
         <h3 className="text-[15px] font-black text-slate-900">Your checklist</h3>
@@ -590,10 +596,10 @@ function ChecklistRow({
           whileTap={{ scale: 0.88 }}
           className={`w-5 h-5 rounded-md flex-shrink-0 mt-0.5 border-2 flex items-center justify-center transition-colors ${
             isCompleted
-              ? "bg-emerald-500 border-emerald-500 text-white"
+              ? "bg-primary-500 border-primary-500 text-white"
               : isAssumed
-                ? "bg-white border-slate-400 border-dashed text-slate-600 hover:border-emerald-400"
-                : "bg-white border-slate-300 hover:border-emerald-400"
+                ? "bg-white border-slate-400 border-dashed text-slate-600 hover:border-primary-400"
+                : "bg-white border-slate-300 hover:border-primary-400"
           } disabled:opacity-60`}
           aria-label={
             isCompleted ? `Mark ${item.title} incomplete`
@@ -629,7 +635,7 @@ function ChecklistRow({
                 : "text-slate-900"
             }`}>
               {item.title}
-              {item.required && !isCompleted && <span className="text-emerald-600 ml-1">*</span>}
+              {item.required && !isCompleted && <span className="text-primary-600 ml-1">*</span>}
             </p>
           </button>
           <AnimatePresence initial={false}>
@@ -646,12 +652,12 @@ function ChecklistRow({
 
                   {/* Primary action — "Open tool" sits ABOVE the status
                       pills as the dominant CTA so the user's eye lands
-                      there first. Solid emerald, full width on mobile,
+                      there first. Solid brand blue, full width on mobile,
                       auto width on desktop, soft shadow. */}
                   {item.toolRoute && (
                     <Link
                       to={item.toolRoute}
-                      className="group inline-flex items-center justify-between w-full sm:w-auto sm:min-w-[220px] gap-3 px-4 py-3 rounded-2xl text-[13px] font-bold bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-md shadow-emerald-500/25 hover:shadow-lg hover:shadow-emerald-500/35 hover:-translate-y-0.5 transition-all"
+                      className="group inline-flex items-center justify-between w-full sm:w-auto sm:min-w-[220px] gap-3 px-4 py-3 rounded-full text-[13px] font-bold bg-primary-500 hover:bg-primary-600 text-white shadow-glow hover:-translate-y-0.5 transition-all"
                     >
                       <span className="inline-flex items-center gap-2">
                         <span className="w-5 h-5 rounded-md bg-white/20 flex items-center justify-center">
@@ -678,7 +684,7 @@ function ChecklistRow({
                           onClick={() => onChange(s)}
                           disabled={updating}
                           className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border transition-colors ${
-                            active ? "bg-slate-900 text-white border-slate-900"
+                            active ? "bg-ink text-white border-ink"
                                    : "bg-white text-slate-700 border-slate-200 hover:border-slate-300"
                           } disabled:opacity-50`}
                         >
@@ -726,14 +732,15 @@ function NextStageBanner({
   const currentMeta = ROADMAP_STAGES[current];
   const nextMeta    = ROADMAP_STAGES[next];
   return (
-    <section className="bg-emerald-500 text-white rounded-3xl p-6 sm:p-7 relative overflow-hidden">
-      <div className="absolute -top-12 -right-12 w-40 h-40 bg-emerald-300/40 rounded-full blur-2xl pointer-events-none" aria-hidden />
+    <section className="bg-ink text-white rounded-card-lg overflow-hidden p-6 sm:p-7 relative">
+      <div aria-hidden className="pointer-events-none absolute -right-8 -top-10 w-36 h-36 rounded-full border-[18px] border-primary-500/20" />
+      <div aria-hidden className="pointer-events-none absolute -right-6 top-8 w-48 h-48 rounded-full bg-primary-500/15 blur-3xl" />
       <div className="relative flex flex-col sm:flex-row sm:items-center gap-4">
         <div className="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center flex-shrink-0">
           <CheckCircle2 size={22} className="text-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <p className="text-[11px] font-black tracking-[0.18em] uppercase text-emerald-100 mb-1">{currentMeta.title} complete</p>
+          <Eyebrow tone="light" className="mb-1">{currentMeta.title} complete</Eyebrow>
           <h3 className="text-xl sm:text-2xl font-black tracking-tight leading-tight">
             Ready for {nextMeta.title}?
           </h3>
@@ -741,7 +748,7 @@ function NextStageBanner({
         <button
           onClick={onAdvance}
           disabled={disabled}
-          className="inline-flex items-center justify-center gap-2 bg-white text-emerald-700 hover:bg-emerald-50 text-sm font-bold px-5 py-3 rounded-full transition-colors disabled:opacity-60 whitespace-nowrap"
+          className="inline-flex items-center justify-center gap-2 bg-white text-ink hover:bg-slate-100 text-sm font-bold px-5 py-3 rounded-full transition-all active:scale-95 disabled:opacity-60 whitespace-nowrap"
         >
           {disabled ? <Loader2 size={14} className="animate-spin" /> : null}
           Continue <ArrowRight size={14} />
@@ -767,7 +774,7 @@ function StagePicker({
   onClose: () => void;
 }) {
   return (
-    <section className="bg-gradient-to-br from-white via-white to-slate-50/70 rounded-3xl border border-slate-200/80 shadow-[0_1px_3px_rgba(15,23,42,0.04)] p-5 sm:p-6">
+    <section className="bg-white rounded-card border border-slate-200/70 shadow-card p-5 sm:p-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-[14px] font-black text-slate-900">Where are you now?</h3>
         <button type="button" onClick={onClose} className="text-slate-500 hover:text-slate-900 text-[12px] font-bold transition-colors">
@@ -787,13 +794,13 @@ function StagePicker({
               disabled={disabled || isCurrent}
               className={`text-left p-3 rounded-2xl border-2 transition-all ${
                 isCurrent
-                  ? "bg-emerald-50 border-emerald-300 text-emerald-900"
+                  ? "bg-primary-50 border-primary-300 text-primary-900"
                   : "bg-white border-slate-200 text-slate-900 hover:border-slate-300 hover:bg-slate-50"
               } disabled:cursor-not-allowed`}
             >
               <div className="flex items-center gap-2 mb-1">
                 <span className={`inline-flex w-5 h-5 rounded-full items-center justify-center text-[10px] font-black ${
-                  isCurrent ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-600"
+                  isCurrent ? "bg-primary-500 text-white" : "bg-slate-100 text-slate-600"
                 }`}>
                   {isCurrent ? <Check size={11} className="stroke-[3]" /> : stageIndex + 1}
                 </span>
@@ -830,7 +837,7 @@ function ComingSoonModal({
     <AnimatePresence>
       {stage && (
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/60 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-ink/60 backdrop-blur-sm"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -842,11 +849,11 @@ function ComingSoonModal({
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.96, opacity: 0, y: 8 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
-            className="relative bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-sm w-full overflow-hidden"
+            className="relative bg-white rounded-card-lg shadow-card border border-slate-200/70 max-w-sm w-full overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-7 sm:p-9 text-center">
-              <div className="w-14 h-14 mx-auto mb-5 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-700 flex items-center justify-center">
+              <div className="w-14 h-14 mx-auto mb-5 rounded-2xl bg-primary-50 border border-primary-200 text-primary-700 flex items-center justify-center">
                 <Construction size={22} />
               </div>
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-black uppercase tracking-widest mb-3">
@@ -860,7 +867,7 @@ function ComingSoonModal({
               </p>
               <button
                 onClick={onClose}
-                className="w-full inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-2xl text-sm transition-colors"
+                className="w-full inline-flex items-center justify-center gap-2 bg-ink hover:bg-slate-800 text-white font-bold py-3 rounded-full text-sm transition-all active:scale-95"
               >
                 Back to my roadmap
               </button>

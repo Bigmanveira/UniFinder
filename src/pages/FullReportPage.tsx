@@ -15,10 +15,18 @@ import SchoolCardArt from "../components/schools/SchoolCardArt";
 import { logoUrl, faviconUrl } from "../lib/schools/schoolLogo";
 import type { SchoolMatch } from "../types";
 import { FadeIn, FadeInItem } from "../components/FadeIn";
+import { AppHeader } from "../components/AppHeader";
+import { Pill } from "../components/ui/Pill";
+import { Eyebrow } from "../components/ui/Eyebrow";
 import FeedbackSurveyModal from "../components/FeedbackSurveyModal";
 import { useShouldShowSurvey } from "../hooks/useShouldShowSurvey";
 import { isFounderEmail } from "../lib/founders";
 import { formatTokens } from "../lib/tokens";
+
+// Vetted decorative campus photo (visually verified in production) — used only
+// as a heavily blurred, low-opacity backdrop strip behind the page content.
+const CAMPUS_BACKDROP =
+  "https://images.unsplash.com/photo-1607237138185-eedd9c632b0b?auto=format&fit=crop&w=1600&q=80";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SchoolLogo — small circular logo badge with graceful Clearbit → favicon
@@ -85,18 +93,18 @@ const BUCKETS = {
   target: {
     title: "Target",
     desc:  "Realistic matches — your academic profile lines up with the typical admitted student, so admission is genuinely within reach if you apply with a strong, polished application.",
-    dot:   "bg-blue-500",
-    accent: "text-blue-700",
-    chip:   "bg-blue-50 text-blue-700 border-blue-200",
-    rule:   "from-blue-300 to-transparent",
+    dot:   "bg-primary-500",
+    accent: "text-primary-700",
+    chip:   "bg-primary-50 text-primary-700 border-primary-200",
+    rule:   "from-primary-300 to-transparent",
   },
   safety: {
     title: "Safety",
     desc:  "High admission probability. These are solid backups where your profile comfortably exceeds the typical admit threshold — useful insurance for your shortlist.",
-    dot:   "bg-emerald-500",
-    accent: "text-emerald-700",
-    chip:   "bg-emerald-50 text-emerald-700 border-emerald-200",
-    rule:   "from-emerald-300 to-transparent",
+    dot:   "bg-sky-500",
+    accent: "text-sky-700",
+    chip:   "bg-sky-50 text-sky-700 border-sky-200",
+    rule:   "from-sky-300 to-transparent",
   },
 } as const;
 
@@ -120,33 +128,33 @@ function budgetTone(v: string): "good" | "warn" | "bad" | "neutral" {
 // ─────────────────────────────────────────────────────────────────────────────
 function AiInsight({ ai }: { ai: AiReportExplanation }) {
   return (
-    <section className="rounded-[28px] border border-slate-200 bg-white p-6 sm:p-7">
-      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-        <Wand2 size={11} className="text-blue-500" /> AI insight
+    <section className="rounded-card border border-slate-100 bg-white shadow-card p-6 sm:p-7">
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-eyebrow text-slate-400">
+        <Wand2 size={11} className="text-primary-500" /> AI insight
       </span>
-      <h2 className="mt-2 max-w-3xl text-lg font-bold leading-snug tracking-tight text-slate-900 sm:text-xl">
+      <h2 className="mt-2 max-w-3xl text-lg font-black leading-snug tracking-tight text-slate-900 sm:text-xl">
         {ai.headline}
       </h2>
 
       <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+        <div className="rounded-2xl border border-slate-100 bg-surface p-4">
           <div className="mb-2.5 flex items-center gap-1.5">
             <Star size={11} className="text-amber-500" />
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Your strengths</p>
+            <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-slate-500">Your strengths</p>
           </div>
           <ul className="space-y-1.5">
             {ai.topStrengths.map((s, i) => (
               <li key={i} className="flex items-start gap-2 text-[13px] leading-relaxed text-slate-700">
-                <Check size={11} className="mt-1 flex-shrink-0 text-blue-600" />
+                <Check size={11} className="mt-1 flex-shrink-0 text-primary-600" />
                 <span>{s}</span>
               </li>
             ))}
           </ul>
         </div>
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+        <div className="rounded-2xl border border-slate-100 bg-surface p-4">
           <div className="mb-2.5 flex items-center gap-1.5">
             <Lightbulb size={12} className="text-amber-500" />
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Quick wins</p>
+            <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-slate-500">Quick wins</p>
           </div>
           <ol className="space-y-1.5">
             {ai.quickWins.map((w, i) => (
@@ -176,7 +184,7 @@ function PlaceCard({
   return (
     <button
       onClick={onClick}
-      className="group relative aspect-[3/4] w-full rounded-[28px] overflow-hidden text-left active:scale-[0.98] transition-transform shadow-[0_4px_24px_rgba(15,23,42,0.08)] hover:shadow-[0_12px_40px_rgba(15,23,42,0.16)]"
+      className="group relative aspect-[3/4] w-full rounded-card overflow-hidden text-left active:scale-[0.98] transition-transform shadow-card hover:shadow-card-hover"
     >
       <SchoolCardArt
         unitId={match.school.unitId}
@@ -214,7 +222,7 @@ function PlaceCard({
             <Star size={10} className="fill-current" /> {match.matchScore}
           </span>
           {ai && match.admissionLikelihood != null && match.admissionLikelihood >= 70 && (
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-500/90 text-white text-[10px] font-bold">High odds</span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-primary-600/90 text-white text-[10px] font-bold">High odds</span>
           )}
         </div>
       </div>
@@ -253,14 +261,14 @@ function DetailModal({
   return (
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-6"
+      className="fixed inset-0 z-50 bg-ink/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-6"
       onClick={onClose}
     >
       <motion.div
         initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
         transition={{ type: "spring", stiffness: 280, damping: 30 }}
         onClick={(e) => e.stopPropagation()}
-        className="bg-white w-full sm:max-w-md rounded-t-[32px] sm:rounded-3xl max-h-[92vh] sm:max-h-[88vh] flex flex-col overflow-hidden shadow-2xl"
+        className="bg-white w-full sm:max-w-md rounded-t-card-lg sm:rounded-card-lg max-h-[92vh] sm:max-h-[88vh] flex flex-col overflow-hidden shadow-2xl"
       >
         {/* Image hero */}
         <div className="relative flex-shrink-0 h-64 sm:h-72">
@@ -306,21 +314,21 @@ function DetailModal({
               <div className="flex items-start gap-3 min-w-0 flex-1">
                 <SchoolLogo schoolUrl={match.school.schoolUrl} size="lg" />
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-[22px] font-bold leading-tight tracking-tight mb-1">{match.school.name}</h2>
+                  <h2 className="text-[22px] font-black leading-tight tracking-tight mb-1">{match.school.name}</h2>
                   <p className="text-sm text-slate-500 flex items-center gap-1">
                     <MapPin size={12} /> {match.school.city ? `${match.school.city}, ${match.school.state}` : match.school.state}
                   </p>
                 </div>
               </div>
               <div className="text-right flex-shrink-0">
-                <p className="text-[11px] text-slate-500">Match</p>
-                <p className="text-2xl font-bold tabular-nums leading-none">{match.matchScore}</p>
+                <p className="text-[10px] font-semibold uppercase tracking-eyebrow text-slate-500">Match</p>
+                <p className="text-2xl font-black tabular-nums leading-none tracking-tight">{match.matchScore}</p>
               </div>
             </div>
 
             {/* Overview header */}
             <div className="pt-2">
-              <h3 className="text-base font-bold">Overview</h3>
+              <h3 className="text-base font-black tracking-tight">Overview</h3>
             </div>
 
             {/* Stats row — three pills like reference */}
@@ -334,7 +342,7 @@ function DetailModal({
             {ai && (
               <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold ${
                 ai.programAvailability === "yes" || ai.programAvailability === "likely"
-                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                  ? "bg-primary-50 text-primary-700 border border-primary-200"
                   : "bg-amber-50 text-amber-800 border border-amber-200"
               }`}>
                 {ai.programAvailability === "yes" || ai.programAvailability === "likely"
@@ -371,7 +379,7 @@ function DetailModal({
                     >
                       <div className="pt-3 space-y-3">
                         <TipBlock title="Admission" icon={<Check size={11} />} tips={ai.applicationTips} />
-                        <TipBlock title="Funding" icon={<DollarSign size={11} />} tips={ai.fundingTips} accent="emerald" />
+                        <TipBlock title="Funding" icon={<DollarSign size={11} />} tips={ai.fundingTips} accent="primary" />
                       </div>
                     </motion.div>
                   )}
@@ -389,7 +397,7 @@ function DetailModal({
                 href={match.school.schoolUrl.startsWith("http") ? match.school.schoolUrl : `https://${match.school.schoolUrl}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 flex items-center justify-center gap-2 text-sm sm:text-base font-semibold py-4 rounded-2xl transition-colors active:scale-[0.99] bg-white border border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50"
+                className="flex-1 flex items-center justify-center gap-2 text-sm sm:text-base font-bold py-4 rounded-full transition-colors active:scale-95 bg-white border border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50"
               >
                 <Globe size={15} /> Visit website
               </a>
@@ -397,10 +405,10 @@ function DetailModal({
             <button
               onClick={onSave}
               disabled={saved}
-              className={`flex-1 flex items-center justify-center gap-2 text-sm sm:text-base font-semibold py-4 rounded-2xl transition-all active:scale-[0.99] ${
+              className={`flex-1 flex items-center justify-center gap-2 text-sm sm:text-base font-bold py-4 rounded-full transition-all active:scale-95 ${
                 saved
-                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200 cursor-default"
-                  : "bg-slate-900 hover:bg-slate-800 text-white shadow-lg shadow-slate-900/20"
+                  ? "bg-primary-50 text-primary-700 border border-primary-200 cursor-default"
+                  : "bg-ink hover:bg-slate-800 text-white shadow-lg shadow-slate-900/20"
               }`}
             >
               {saved ? <><Check size={16} /> Saved</> : <>Save school <Send size={15} /></>}
@@ -417,18 +425,18 @@ function StatPill({ icon, label, value, tone }: {
   tone?: "good" | "warn" | "bad" | "neutral";
 }) {
   const valueCls =
-    tone === "good" ? "text-emerald-700"
+    tone === "good" ? "text-primary-700"
     : tone === "warn" ? "text-amber-700"
     : tone === "bad"  ? "text-rose-600"
     : "text-slate-900";
   return (
-    <div className="bg-slate-50 rounded-2xl p-3 flex items-center gap-2.5">
-      <div className="w-9 h-9 rounded-full bg-white border border-slate-200 flex items-center justify-center text-slate-600 flex-shrink-0">
+    <div className="bg-surface border border-slate-100 rounded-2xl p-3 flex items-center gap-2.5">
+      <div className="w-9 h-9 rounded-full bg-white border border-slate-100 shadow-sm flex items-center justify-center text-slate-600 flex-shrink-0">
         {icon}
       </div>
       <div className="min-w-0">
-        <p className={`text-[13px] font-bold tabular-nums leading-none truncate ${valueCls}`}>{value}</p>
-        <p className="text-[11px] text-slate-500 mt-0.5 leading-none">{label}</p>
+        <p className={`text-[13px] font-black tabular-nums leading-none truncate ${valueCls}`}>{value}</p>
+        <p className="text-[10px] font-semibold uppercase tracking-eyebrow text-slate-500 mt-1 leading-none">{label}</p>
       </div>
     </div>
   );
@@ -438,11 +446,11 @@ function TipBlock({ title, icon, tips, accent = "slate" }: {
   title: string;
   icon: React.ReactNode;
   tips: string[];
-  accent?: "slate" | "emerald";
+  accent?: "slate" | "primary";
 }) {
-  const cls = accent === "emerald"
-    ? { bg: "bg-emerald-50", border: "border-emerald-200", text: "text-emerald-700", num: "text-emerald-400" }
-    : { bg: "bg-slate-50",   border: "border-slate-200",   text: "text-slate-700",   num: "text-slate-400" };
+  const cls = accent === "primary"
+    ? { bg: "bg-primary-50", border: "border-primary-200", text: "text-primary-700", num: "text-primary-400" }
+    : { bg: "bg-surface",    border: "border-slate-100",   text: "text-slate-700",   num: "text-slate-400" };
   return (
     <div className={`${cls.bg} ${cls.border} border rounded-2xl p-4`}>
       <div className="flex items-center gap-1.5 mb-2">
@@ -478,9 +486,10 @@ function BucketSection({
       {showHeader && (
         <FadeIn>
           <header className="mb-5 sm:mb-6">
+            <Eyebrow className="mb-1">Admission bucket</Eyebrow>
             <div className="flex items-center gap-3 mb-2">
               <span className={`inline-flex items-center justify-center w-3 h-3 rounded-full ${meta.dot} shadow-sm`} aria-hidden />
-              <h2 className={`text-2xl sm:text-3xl font-bold tracking-tight ${meta.accent}`}>
+              <h2 className={`text-2xl sm:text-3xl font-black tracking-tight ${meta.accent}`}>
                 {meta.title} <span className="text-slate-900">schools</span>
               </h2>
               <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold tabular-nums border ${meta.chip}`}>
@@ -512,14 +521,9 @@ function FilterPill({ label, count, active, onClick }: {
   label: string; count: number; active: boolean; onClick: () => void;
 }) {
   return (
-    <button onClick={onClick}
-      className={`flex-shrink-0 px-5 py-2.5 rounded-full text-sm font-semibold transition-colors ${
-        active
-          ? "bg-slate-900 text-white"
-          : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-      }`}>
+    <Pill active={active} onClick={onClick} className="px-5 py-2.5 text-sm">
       {label}{count > 0 && active && <span className="ml-1.5 opacity-70">{count}</span>}
-    </button>
+    </Pill>
   );
 }
 
@@ -655,7 +659,7 @@ export default function FullReportPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="text-center">
           <Loader2 size={20} className="text-slate-400 mx-auto mb-3 animate-spin" />
           <p className="text-sm text-slate-500">Loading your report…</p>
@@ -665,14 +669,14 @@ export default function FullReportPage() {
   }
   if (error || !report) {
     return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center p-6">
+      <div className="min-h-screen bg-surface flex flex-col items-center justify-center p-6">
         <div className="text-center max-w-md">
           <div className="w-12 h-12 bg-rose-50 border border-rose-200 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4">
             <AlertTriangle size={18} />
           </div>
-          <h2 className="text-xl font-bold mb-2 tracking-tight">Report not found</h2>
+          <h2 className="text-xl font-black mb-2 tracking-tight">Report not found</h2>
           <p className="text-sm text-slate-500 mb-6">{error || "Something went wrong."}</p>
-          <Link to="/app" className="bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold px-5 py-2.5 rounded-2xl inline-block transition-colors">Return to dashboard</Link>
+          <Link to="/app" className="bg-ink hover:bg-slate-800 text-white text-sm font-bold px-5 py-2.5 rounded-full inline-block transition-colors">Return to dashboard</Link>
         </div>
       </div>
     );
@@ -719,48 +723,53 @@ export default function FullReportPage() {
   const initial = (user?.email?.[0] ?? "U").toUpperCase();
 
   return (
-    <div className="min-h-screen text-slate-900 antialiased pb-24 relative overflow-hidden bg-gradient-to-b from-white via-blue-50/30 to-white">
-      {/* Decorative soft glow blobs */}
-      <div className="pointer-events-none absolute top-[-100px] right-[-100px] w-[440px] h-[440px] bg-blue-200/40 rounded-full blur-[120px]" aria-hidden />
-      <div className="pointer-events-none absolute top-[120px] left-[-120px] w-[380px] h-[380px] bg-cyan-200/30 rounded-full blur-[120px]" aria-hidden />
+    <div className="min-h-screen text-slate-900 antialiased pb-24 relative overflow-hidden bg-gradient-to-b from-surface via-primary-50/40 to-surface">
+      {/* Decorative backdrop — subtle campus photo strip under the hero,
+          soft blurred orbs, and the navy ring motif. All aria-hidden +
+          pointer-events-none; content contrast always wins. */}
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[420px] overflow-hidden">
+        <img src={CAMPUS_BACKDROP} alt="" className="h-full w-full object-cover opacity-10 blur-2xl" />
+        <div className="absolute inset-0 bg-gradient-to-b from-surface/40 via-surface/70 to-surface" />
+      </div>
+      <div className="pointer-events-none absolute top-[-100px] right-[-100px] w-[440px] h-[440px] bg-primary-200/40 rounded-full blur-[120px]" aria-hidden />
+      <div className="pointer-events-none absolute top-[120px] left-[-120px] w-[380px] h-[380px] bg-sky-200/50 rounded-full blur-[130px]" aria-hidden />
+      <div aria-hidden className="pointer-events-none absolute right-[-70px] top-[230px] hidden h-56 w-56 rounded-full border-[24px] border-primary-500/10 lg:block" />
+      <div aria-hidden className="pointer-events-none absolute left-[-60px] bottom-[140px] hidden h-44 w-44 rounded-full border-[18px] border-primary-500/10 xl:block" />
 
       {/* Sticky header — back, title, run-new-match, avatar */}
-      <header className="border-b border-slate-200 sticky top-0 z-40 bg-white/85 backdrop-blur supports-[backdrop-filter]:bg-white/70">
-        <div className="max-w-6xl mx-auto px-5 h-14 flex items-center gap-3">
-          <Link to="/app" className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 transition-colors">
-            <ArrowLeft size={15} />
-          </Link>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-[15px] font-bold leading-tight truncate">Your top {bucketed.top10.length} matches</h1>
-            <p className="text-xs text-slate-500 truncate">
-              {bucketed.reach.length} reach · {bucketed.target.length} target · {bucketed.safety.length} safety
-            </p>
-          </div>
-          <button
-            onClick={handleRunNewMatch}
-            className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 transition-colors"
-            title="Try different criteria"
-          >
-            <RefreshCw size={12} /> New match
-          </button>
-          <button
-            onClick={handleRunNewMatch}
-            className="sm:hidden w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 transition-colors"
-            aria-label="Run new match"
-          >
-            <RefreshCw size={14} />
-          </button>
-          <div className="w-9 h-9 rounded-full ring-2 ring-white shadow-sm bg-gradient-to-br from-blue-500 to-cyan-600 text-white flex items-center justify-center font-bold text-sm">
-            {initial}
-          </div>
-        </div>
-      </header>
+      <AppHeader
+        backTo="/app"
+        maxWidth="max-w-6xl"
+        title={`Your top ${bucketed.top10.length} matches`}
+        subtitle={`${bucketed.reach.length} reach · ${bucketed.target.length} target · ${bucketed.safety.length} safety`}
+        action={
+          <>
+            <button
+              onClick={handleRunNewMatch}
+              className="hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full text-xs font-bold text-slate-900 bg-white border border-slate-200 shadow-sm hover:bg-slate-50 transition-colors"
+              title="Try different criteria"
+            >
+              <RefreshCw size={12} /> New match
+            </button>
+            <button
+              onClick={handleRunNewMatch}
+              className="sm:hidden w-9 h-9 rounded-full bg-white border border-slate-200 shadow-sm hover:bg-slate-50 flex items-center justify-center text-slate-900 transition-colors"
+              aria-label="Run new match"
+            >
+              <RefreshCw size={14} />
+            </button>
+            <div className="w-9 h-9 rounded-full ring-2 ring-white shadow-sm bg-gradient-to-br from-primary-500 to-sky-500 text-white flex items-center justify-center font-bold text-sm">
+              {initial}
+            </div>
+          </>
+        }
+      />
 
       <main className="relative max-w-6xl mx-auto px-5 py-7 space-y-9">
         {/* Pill filters + bucket sections */}
         <FadeIn delay={0.1}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold tracking-tight">Your shortlist</h2>
+            <h2 className="text-lg font-black tracking-tight">Your shortlist</h2>
             <span className="text-sm font-semibold text-slate-400 tabular-nums">{counts.all} schools</span>
           </div>
           <div className="flex gap-2 mb-7 overflow-x-auto -mx-1 px-1 pb-1" style={{ scrollbarWidth: "none" }}>
@@ -806,7 +815,7 @@ export default function FullReportPage() {
                   : <LockedBucketCard bucket="safety" count={bucketed.safety.length} walletCredits={walletCredits} isFounder={founder} busy={revealingBucket === "safety"} onReveal={() => handleReveal("safety")} showHeader={activeFilter === "all"} />
               )}
               {revealError && (
-                <p className="text-xs text-rose-700 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2">
+                <p className="text-xs font-medium text-rose-700 bg-rose-50 border border-rose-200 rounded-2xl px-3.5 py-2.5">
                   {revealError}
                 </p>
               )}
@@ -826,17 +835,18 @@ export default function FullReportPage() {
         <FadeIn>
           <button
             onClick={() => navigate("/app/roadmap")}
-            className="group w-full text-left bg-gradient-to-br from-slate-900 via-slate-900 to-blue-900 text-white rounded-3xl p-6 sm:p-7 relative overflow-hidden hover:shadow-xl hover:shadow-slate-900/20 transition-shadow"
+            className="group w-full text-left bg-ink text-white rounded-card-lg p-6 sm:p-7 relative overflow-hidden hover:shadow-xl hover:shadow-slate-900/20 transition-shadow"
           >
-            <div className="absolute -top-16 -right-16 w-48 h-48 bg-blue-500/20 rounded-full blur-3xl" aria-hidden />
-            <div className="absolute -bottom-12 -left-12 w-40 h-40 bg-cyan-500/15 rounded-full blur-3xl" aria-hidden />
+            <div aria-hidden className="absolute -right-8 -top-10 w-36 h-36 rounded-full border-[18px] border-primary-500/20" />
+            <div aria-hidden className="absolute -right-6 top-8 w-48 h-48 rounded-full bg-primary-500/15 blur-3xl" />
+            <div className="absolute -bottom-12 -left-12 w-40 h-40 bg-sky-500/15 rounded-full blur-3xl" aria-hidden />
             <div className="relative flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center text-white flex-shrink-0">
                 <Map size={20} className="text-amber-300" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-semibold tracking-wide text-amber-300 mb-1">NEXT STAGE</p>
-                <h3 className="text-xl sm:text-2xl font-bold tracking-tight leading-tight">Your application roadmap</h3>
+                <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-amber-300 mb-1">Next stage</p>
+                <h3 className="text-xl sm:text-2xl font-black tracking-tight leading-tight">Your application roadmap</h3>
                 <p className="text-sm text-white/70 mt-1 leading-relaxed">
                   Now that you have your shortlist, follow the step-by-step plan to apply, fund, and secure your visa.
                 </p>
@@ -904,22 +914,22 @@ const LOCKED_THEME: Record<"target" | "safety", {
   pill:     string;
 }> = {
   target: {
-    gradient: "from-blue-50 via-white to-white",
-    ring:     "ring-blue-100",
-    iconBg:   "bg-blue-600",
+    gradient: "from-primary-50 via-white to-white",
+    ring:     "ring-primary-100",
+    iconBg:   "bg-primary-500",
     iconFg:   "text-white",
-    cta:      "bg-blue-600 hover:bg-blue-700",
-    ctaRing:  "shadow-blue-500/30",
-    pill:     "bg-blue-100 text-blue-800 border-blue-200",
+    cta:      "bg-primary-500 hover:bg-primary-600",
+    ctaRing:  "shadow-glow",
+    pill:     "bg-primary-100 text-primary-800 border-primary-200",
   },
   safety: {
-    gradient: "from-emerald-50 via-white to-white",
-    ring:     "ring-emerald-100",
-    iconBg:   "bg-emerald-600",
+    gradient: "from-slate-50 via-white to-white",
+    ring:     "ring-slate-100",
+    iconBg:   "bg-ink",
     iconFg:   "text-white",
-    cta:      "bg-emerald-600 hover:bg-emerald-700",
-    ctaRing:  "shadow-emerald-500/30",
-    pill:     "bg-emerald-100 text-emerald-800 border-emerald-200",
+    cta:      "bg-ink hover:bg-slate-800",
+    ctaRing:  "shadow-lg shadow-slate-900/20",
+    pill:     "bg-slate-100 text-slate-700 border-slate-200",
   },
 };
 
@@ -956,13 +966,16 @@ function LockedBucketCard({
   return (
     <section>
       {showHeader && (
-        <div className="flex items-center gap-3 mb-4">
-          <span className={`inline-block w-2.5 h-2.5 rounded-full ${meta.dot}`} aria-hidden />
-          <h3 className={`text-base font-bold tracking-tight ${meta.accent}`}>{meta.title}</h3>
-          <span className="text-xs text-slate-400 font-medium tabular-nums">{count} school{count === 1 ? "" : "s"}</span>
+        <div className="mb-4">
+          <Eyebrow className="mb-1">Admission bucket</Eyebrow>
+          <div className="flex items-center gap-3">
+            <span className={`inline-block w-2.5 h-2.5 rounded-full ${meta.dot}`} aria-hidden />
+            <h3 className={`text-base font-black tracking-tight ${meta.accent}`}>{meta.title}</h3>
+            <span className="text-xs text-slate-400 font-medium tabular-nums">{count} school{count === 1 ? "" : "s"}</span>
+          </div>
         </div>
       )}
-      <div className={`relative rounded-[28px] overflow-hidden bg-gradient-to-br ${theme.gradient} border border-slate-200 shadow-[0_4px_24px_rgba(15,23,42,0.04)] ring-1 ${theme.ring}`}>
+      <div className={`relative rounded-card overflow-hidden bg-gradient-to-br ${theme.gradient} border border-slate-100 shadow-card ring-1 ${theme.ring}`}>
         {/* Decorative blurred rows hint at the school list waiting
             behind the lock. Sits as a faint background so the central
             CTA still dominates. */}
@@ -979,11 +992,11 @@ function LockedBucketCard({
         </div>
 
         <div className="relative px-6 sm:px-8 py-9 sm:py-10 text-center flex flex-col items-center">
-          <span className={`inline-flex items-center gap-1.5 text-[10px] font-black tracking-[0.18em] uppercase ${theme.pill} border rounded-full px-2.5 py-1 mb-5`}>
+          <span className={`inline-flex items-center gap-1.5 text-[10px] font-semibold tracking-eyebrow uppercase ${theme.pill} border rounded-full px-2.5 py-1 mb-5`}>
             <Lock size={10} /> Locked
           </span>
 
-          <div className={`w-16 h-16 rounded-2xl ${theme.iconBg} ${theme.iconFg} flex items-center justify-center mb-5 shadow-lg ${theme.ctaRing}`}>
+          <div className={`w-16 h-16 rounded-2xl ${theme.iconBg} ${theme.iconFg} flex items-center justify-center mb-5 ${theme.ctaRing}`}>
             <Lock size={26} />
           </div>
 
@@ -1008,7 +1021,7 @@ function LockedBucketCard({
               <button
                 onClick={onReveal}
                 disabled={busy}
-                className={`inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-2xl text-sm font-bold transition-colors text-white shadow-md ${theme.cta} ${theme.ctaRing} disabled:opacity-60 disabled:cursor-not-allowed`}
+                className={`inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full text-sm font-bold transition-all active:scale-95 text-white ${theme.cta} ${theme.ctaRing} disabled:opacity-60 disabled:cursor-not-allowed`}
               >
                 {busy ? <Loader2 size={14} className="animate-spin" /> : <Wand2 size={14} />}
                 {busy ? "Revealing…" : `Reveal ${meta.title} — free for you`}
@@ -1022,7 +1035,7 @@ function LockedBucketCard({
               <button
                 onClick={onReveal}
                 disabled={busy}
-                className={`inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-2xl text-sm font-bold transition-colors text-white shadow-md ${theme.cta} ${theme.ctaRing} disabled:opacity-60 disabled:cursor-not-allowed`}
+                className={`inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full text-sm font-bold transition-all active:scale-95 text-white ${theme.cta} ${theme.ctaRing} disabled:opacity-60 disabled:cursor-not-allowed`}
               >
                 {busy ? <Loader2 size={14} className="animate-spin" /> : <Lock size={14} />}
                 {busy ? "Revealing…" : `Reveal ${meta.title} — ${formatTokens(REVEAL_BUCKET_COST)} tokens`}
@@ -1035,7 +1048,7 @@ function LockedBucketCard({
             <>
               <Link
                 to="/pricing"
-                className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-2xl text-sm font-bold transition-colors bg-slate-900 hover:bg-slate-800 text-white shadow-md"
+                className="inline-flex items-center justify-center gap-2 px-7 py-3.5 rounded-full text-sm font-bold transition-all active:scale-95 bg-ink hover:bg-slate-800 text-white shadow-lg shadow-slate-900/20"
               >
                 Get tokens to reveal <ArrowRight size={14} />
               </Link>

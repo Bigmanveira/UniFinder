@@ -10,6 +10,8 @@ import { getActiveSchools } from "../lib/schools/getSchools";
 import SchoolCardArt from "../components/schools/SchoolCardArt";
 import { getEligibleUnitIds } from "../lib/programs/getPrograms";
 import { FadeIn, FadeInItem } from "../components/FadeIn";
+import { Pill } from "../components/ui/Pill";
+import { Eyebrow } from "../components/ui/Eyebrow";
 import {
   getDeterministicMatches,
   getProfileImprovementAdvice,
@@ -23,6 +25,11 @@ import { functions } from "../lib/firebase";
 
 type GateState = "enforced" | "no-eligible" | "not-enforced";
 type BucketKey = "all" | "reach" | "target" | "safety";
+
+// Vetted decorative campus photo (visually verified in production) — used only
+// as a heavily blurred, low-opacity backdrop strip behind the page content.
+const CAMPUS_BACKDROP =
+  "https://images.unsplash.com/photo-1607237138185-eedd9c632b0b?auto=format&fit=crop&w=1600&q=80";
 
 const STUDY_TIPS = [
   "Most U.S. graduate programs review applications on a rolling basis — the earlier you apply, the better your funding odds.",
@@ -46,8 +53,8 @@ function progressFor(s: number) { return Math.min(95, 100 - 100 * Math.exp(-s / 
 
 const BUCKETS = {
   reach:  { title: "Reach",  desc: "Selective programs where you're competitive but not guaranteed.", dot: "bg-rose-500" },
-  target: { title: "Target", desc: "Realistic matches — your profile aligns with their typical admit.", dot: "bg-blue-500" },
-  safety: { title: "Safety", desc: "High admission probability. Solid backups for your shortlist.",     dot: "bg-emerald-500" },
+  target: { title: "Target", desc: "Realistic matches — your profile aligns with their typical admit.", dot: "bg-primary-500" },
+  safety: { title: "Safety", desc: "High admission probability. Solid backups for your shortlist.",     dot: "bg-sky-500" },
 } as const;
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -222,27 +229,40 @@ export default function LockedPreviewPage() {
   const initial = (user?.email?.[0] ?? "U").toUpperCase();
 
   return (
-    <div className="min-h-screen text-slate-900 antialiased pb-40 relative overflow-hidden bg-gradient-to-b from-white via-blue-50/30 to-white">
-      {/* Decorative soft glow blobs in the hero */}
-      <div className="pointer-events-none absolute top-[-80px] right-[-120px] w-[420px] h-[420px] bg-blue-200/40 rounded-full blur-[120px]" aria-hidden />
-      <div className="pointer-events-none absolute top-[180px] left-[-100px] w-[360px] h-[360px] bg-cyan-200/30 rounded-full blur-[120px]" aria-hidden />
+    <div className="min-h-screen text-slate-900 antialiased pb-40 relative overflow-hidden bg-gradient-to-b from-surface via-primary-50/40 to-surface">
+      {/* Decorative backdrop — subtle campus photo strip under the hero,
+          soft blurred orbs, and the navy ring motif. All aria-hidden +
+          pointer-events-none; content contrast always wins. */}
+      <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[420px] overflow-hidden">
+        <img src={CAMPUS_BACKDROP} alt="" className="h-full w-full object-cover opacity-10 blur-2xl" />
+        <div className="absolute inset-0 bg-gradient-to-b from-surface/40 via-surface/70 to-surface" />
+      </div>
+      <div className="pointer-events-none absolute top-[-80px] right-[-120px] w-[420px] h-[420px] bg-primary-200/40 rounded-full blur-[120px]" aria-hidden />
+      <div className="pointer-events-none absolute top-[180px] left-[-100px] w-[360px] h-[360px] bg-sky-200/50 rounded-full blur-[130px]" aria-hidden />
+      <div aria-hidden className="pointer-events-none absolute right-[-70px] top-[260px] hidden h-56 w-56 rounded-full border-[24px] border-primary-500/10 lg:block" />
+      <div aria-hidden className="pointer-events-none absolute left-[-60px] bottom-[180px] hidden h-44 w-44 rounded-full border-[18px] border-primary-500/10 xl:block" />
 
       {/* Header — logo + avatar */}
       <header className="relative px-5 py-5 max-w-6xl mx-auto flex items-center justify-between">
         <BrandLogo size="sm" />
         {user ? (
-          <Link to="/app" className="w-10 h-10 rounded-full ring-2 ring-white shadow-md bg-gradient-to-br from-blue-500 to-cyan-600 text-white flex items-center justify-center font-bold">
+          <Link to="/app" className="w-10 h-10 rounded-full ring-2 ring-white shadow-md bg-gradient-to-br from-primary-500 to-sky-500 text-white flex items-center justify-center font-bold">
             {initial}
           </Link>
         ) : (
-          <Link to="/login?from=results" className="text-sm font-semibold text-slate-700 hover:text-slate-900">Log in</Link>
+          <Link
+            to="/login?from=results"
+            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-900 shadow-sm transition-colors hover:bg-slate-50"
+          >
+            Log in
+          </Link>
         )}
       </header>
 
       <main className="relative max-w-6xl mx-auto px-5">
         {/* Hero greeting — bold, big, with emoji */}
         <FadeIn as="section" className="pt-4 pb-7">
-          <h1 className="text-[34px] sm:text-5xl font-bold tracking-tight leading-[1.05] text-slate-900">
+          <h1 className="text-[34px] sm:text-5xl font-black tracking-tight leading-[1.05] text-slate-900">
             {programGate === "no-eligible"
               ? "No verified programs found"
               : <>Your top {top10Count} matches <span className="inline-block ml-1">🎯</span></>}
@@ -273,11 +293,11 @@ export default function LockedPreviewPage() {
 
         {/* Empty state */}
         {programGate === "no-eligible" && (
-          <section className="bg-white border border-slate-200 rounded-3xl p-10 text-center">
+          <section className="bg-white border border-slate-100 rounded-card shadow-card p-10 text-center">
             <div className="w-12 h-12 mx-auto mb-4 rounded-full bg-rose-50 border border-rose-200 text-rose-500 flex items-center justify-center">
               <AlertTriangle size={20} />
             </div>
-            <h3 className="text-lg font-bold mb-2">No verified programs for {profile?.field || "this field"} ({profile?.level || "this level"})</h3>
+            <h3 className="text-lg font-black tracking-tight mb-2">No verified programs for {profile?.field || "this field"} ({profile?.level || "this level"})</h3>
             <p className="text-sm text-slate-500 max-w-md mx-auto leading-relaxed">
               College Ready only recommends schools with a verified program record at your chosen level.
             </p>
@@ -289,7 +309,7 @@ export default function LockedPreviewPage() {
           <>
             <FadeIn delay={0.05}>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold tracking-tight">Your shortlist</h2>
+                <h2 className="text-lg font-black tracking-tight">Your shortlist</h2>
                 <span className="text-sm font-semibold text-slate-400 tabular-nums">{counts.all} schools</span>
               </div>
               <div className="flex gap-2 mb-7 overflow-x-auto -mx-1 px-1 pb-1" style={{ scrollbarWidth: "none" }}>
@@ -326,7 +346,7 @@ export default function LockedPreviewPage() {
 // ─────────────────────────────────────────────────────────────────────────────
 function PageLoader({ label }: { label: string }) {
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center px-6">
+    <div className="min-h-screen bg-surface flex items-center justify-center px-6">
       <div className="text-center max-w-md">
         <div className="relative w-16 h-16 mx-auto mb-5">
           <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
@@ -342,16 +362,16 @@ function PageLoader({ label }: { label: string }) {
 
 function MatchErrorScreen({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center px-6">
-      <div className="max-w-md w-full bg-white rounded-3xl border border-slate-200 shadow-sm p-7 text-center">
+    <div className="min-h-screen bg-surface flex items-center justify-center px-6">
+      <div className="max-w-md w-full bg-white rounded-card border border-slate-100 shadow-card p-7 text-center">
         <div className="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-700 mx-auto mb-4">
           <AlertTriangle size={22} />
         </div>
-        <h2 className="text-xl font-bold tracking-tight text-slate-900 mb-2">We couldn't generate matches</h2>
+        <h2 className="text-xl font-black tracking-tight text-slate-900 mb-2">We couldn't generate matches</h2>
         <p className="text-sm text-slate-600 leading-relaxed mb-5">{message}</p>
         <button
           onClick={onRetry}
-          className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm py-3.5 rounded-2xl transition-colors active:scale-[0.99]"
+          className="w-full bg-ink hover:bg-slate-800 text-white font-bold text-sm py-3.5 rounded-full transition-all active:scale-95"
         >
           Try again
         </button>
@@ -367,14 +387,9 @@ function FilterPill({ label, count, active, onClick }: {
   label: string; count: number; active: boolean; onClick: () => void;
 }) {
   return (
-    <button onClick={onClick}
-      className={`flex-shrink-0 px-5 py-2.5 rounded-full text-sm font-semibold transition-colors ${
-        active
-          ? "bg-slate-900 text-white"
-          : "bg-slate-100 text-slate-500 hover:bg-slate-200"
-      }`}>
+    <Pill active={active} onClick={onClick} className="px-5 py-2.5 text-sm">
       {label}{count > 0 && active && <span className="ml-1.5 opacity-70">{count}</span>}
-    </button>
+    </Pill>
   );
 }
 
@@ -392,9 +407,10 @@ function BucketSection({ bucket, matches, showHeader }: {
         <FadeIn>
           <div className="flex items-end justify-between mb-4">
             <div>
+              <Eyebrow className="mb-1">Admission bucket</Eyebrow>
               <div className="flex items-center gap-2 mb-0.5">
                 <span className={`w-2 h-2 rounded-full ${meta.dot}`} />
-                <h3 className="text-base font-bold">{meta.title}</h3>
+                <h3 className="text-base font-black tracking-tight">{meta.title}</h3>
                 <span className="text-sm text-slate-400 tabular-nums">{matches.length}</span>
               </div>
               <p className="text-xs text-slate-500">{meta.desc}</p>
@@ -419,7 +435,7 @@ function BucketSection({ bucket, matches, showHeader }: {
 // ─────────────────────────────────────────────────────────────────────────────
 function PlaceCard({ match }: { match: SchoolMatch }) {
   return (
-    <div className="relative aspect-[3/4] rounded-[28px] overflow-hidden group cursor-not-allowed shadow-[0_4px_24px_rgba(15,23,42,0.08)] hover:shadow-[0_12px_40px_rgba(15,23,42,0.16)] transition-shadow">
+    <div className="relative aspect-[3/4] rounded-card overflow-hidden group cursor-not-allowed shadow-card hover:shadow-card-hover transition-shadow">
       <SchoolCardArt
         unitId={match.school.unitId}
         schoolUrl={match.school.schoolUrl}
@@ -480,15 +496,15 @@ function UnlockDock({
             initial={{ y: 24, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}
             className="max-w-xl mx-auto pointer-events-auto"
           >
-            <div className="bg-white rounded-3xl border border-slate-200 shadow-[0_12px_50px_rgba(15,23,42,0.12)] p-4">
+            <div className="bg-ink text-white rounded-card shadow-pillnav p-4">
               {unlockError && <UnlockErrorBanner kind={unlockError} />}
               <button onClick={onUnlock}
-                className="flex items-center justify-center gap-2 w-full bg-slate-900 hover:bg-slate-800 text-white text-base font-semibold py-4 rounded-2xl transition-all active:scale-[0.99]">
+                className="flex items-center justify-center gap-2 w-full bg-primary-500 hover:bg-primary-600 text-white text-base font-bold py-4 rounded-full shadow-glow transition-all active:scale-95">
                 {user ? <>Unlock report · 100 tokens <Send size={15} /></>
                       : <>Create free account <ArrowRight size={15} /></>}
               </button>
               {!user && (
-                <p className="mt-3 text-center text-[11px] text-slate-500">
+                <p className="mt-3 text-center text-[11px] text-white/60">
                   Includes 200 free tokens · Save schools · No card required
                 </p>
               )}
@@ -504,33 +520,34 @@ function UnlockDock({
       {unlocking && (
         <motion.div
           initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-          className="fixed inset-0 z-50 flex items-center justify-center px-5 py-8 bg-slate-950/60 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center px-5 py-8 bg-ink/60 backdrop-blur-sm"
         >
           <motion.div
             initial={{ scale: 0.94, opacity: 0, y: 8 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             transition={{ type: "spring", stiffness: 300, damping: 26 }}
-            className="relative w-full max-w-sm bg-gradient-to-br from-slate-950 via-slate-900 to-blue-950 rounded-[28px] shadow-2xl shadow-slate-950/40 border border-white/10 overflow-hidden"
+            className="relative w-full max-w-sm bg-ink text-white rounded-card-lg shadow-2xl shadow-slate-950/40 border border-white/10 overflow-hidden"
           >
             {/* Subtle background blooms inside the card */}
-            <div className="absolute -top-12 -right-12 w-48 h-48 bg-blue-500/25 rounded-full blur-[90px] pointer-events-none" />
-            <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-cyan-500/20 rounded-full blur-[90px] pointer-events-none" />
+            <div aria-hidden className="absolute -right-8 -top-10 w-36 h-36 rounded-full border-[18px] border-primary-500/20 pointer-events-none" />
+            <div className="absolute -top-12 -right-12 w-48 h-48 bg-primary-500/25 rounded-full blur-[90px] pointer-events-none" />
+            <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-sky-500/20 rounded-full blur-[90px] pointer-events-none" />
 
             <div className="relative px-6 py-7 text-center">
               {/* Hero spinner with pulsing ring */}
               <div className="relative w-20 h-20 mx-auto mb-5">
-                <div className="absolute inset-0 rounded-full bg-blue-500/20 animate-ping" style={{ animationDuration: "2s" }} />
+                <div className="absolute inset-0 rounded-full bg-primary-500/20 animate-ping" style={{ animationDuration: "2s" }} />
                 <div className="absolute inset-1 rounded-full border-[3px] border-white/15" />
-                <div className="absolute inset-1 rounded-full border-[3px] border-t-blue-400 border-r-transparent border-b-transparent border-l-transparent animate-spin" style={{ animationDuration: "1.4s" }} />
+                <div className="absolute inset-1 rounded-full border-[3px] border-t-primary-400 border-r-transparent border-b-transparent border-l-transparent animate-spin" style={{ animationDuration: "1.4s" }} />
                 <div className="absolute inset-0 m-auto w-10 h-10 flex items-center justify-center">
-                  <Wand2 size={26} className="text-blue-300" />
+                  <Wand2 size={26} className="text-primary-300" />
                 </div>
               </div>
 
               <h2 className="text-xl font-black tracking-tight text-white mb-1">
                 Building your match report
               </h2>
-              <p className="text-xs text-blue-200/75 font-medium mb-5">
+              <p className="text-xs text-primary-200/75 font-medium mb-5">
                 Sit tight while we write personalised tips for each school.
               </p>
 
@@ -546,13 +563,13 @@ function UnlockDock({
                     {stageLabel}
                   </motion.p>
                 </AnimatePresence>
-                <p className="text-[10px] text-blue-200/60 mt-0.5 tabular-nums">{unlockElapsed}s elapsed · usually 30–60s</p>
+                <p className="text-[10px] text-primary-200/60 mt-0.5 tabular-nums">{unlockElapsed}s elapsed · usually 30–60s</p>
               </div>
 
               {/* Progress bar */}
               <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden mb-5">
                 <motion.div
-                  className="h-full bg-gradient-to-r from-blue-400 to-cyan-300 rounded-full"
+                  className="h-full bg-gradient-to-r from-primary-400 to-sky-300 rounded-full"
                   initial={false}
                   animate={{ width: `${progress}%` }}
                   transition={{ duration: 0.6, ease: "easeOut" }}

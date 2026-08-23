@@ -1,45 +1,37 @@
-import { Link } from "react-router-dom";
-import { ArrowLeft, RefreshCw, AlertTriangle, RotateCw } from "lucide-react";
+import { RefreshCw, AlertTriangle, RotateCw } from "lucide-react";
 import { useAcademicCv } from "../components/cv/useAcademicCv";
 import CvDocumentIntake from "../components/cv/CvDocumentIntake";
 import CvPreviewPaywall from "../components/cv/CvPreviewPaywall";
 import CvStudioFooter from "../components/cv/CvStudioFooter";
 import GenerationLoader from "../components/cv/GenerationLoader";
+import { AppHeader } from "../components/AppHeader";
+import { Card } from "../components/ui/Card";
+import { IconChip } from "../components/ui/IconChip";
 
 export default function CvStudioReviewPage() {
   const cv = useAcademicCv("review");
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 antialiased flex flex-col">
-      <div className="relative overflow-hidden">
-        <div className="pointer-events-none absolute top-[-160px] right-[-120px] w-[480px] h-[480px] bg-gradient-to-br from-blue-300/40 via-cyan-200/25 to-transparent rounded-full blur-[140px]" aria-hidden />
+    <div className="min-h-screen bg-surface text-slate-900 antialiased flex flex-col">
+      <AppHeader
+        title="Review & revamp"
+        subtitle="Critique + rewrite your existing academic CV · 500 tokens to unlock"
+        backTo="/app/cv-studio"
+        backLabel="Back to CV Studio"
+        maxWidth="max-w-6xl"
+      />
 
-        <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/85 backdrop-blur supports-[backdrop-filter]:bg-white/70">
-          <div className="max-w-6xl mx-auto px-5 h-14 flex items-center gap-3">
-            <Link to="/app/cv-studio" className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 transition-colors" aria-label="Back to CV Studio">
-              <ArrowLeft size={15} />
-            </Link>
-            <div className="flex-1 min-w-0">
-              <h1 className="text-[15px] font-bold leading-tight truncate">Review & revamp</h1>
-              <p className="text-xs text-slate-500 truncate">Critique + rewrite your existing academic CV · 500 tokens to unlock</p>
-            </div>
-          </div>
-        </header>
-
-        {!cv.document && (
-          <section className="relative max-w-3xl mx-auto px-5 pt-10 sm:pt-14 pb-2 text-center">
-            <div className="inline-flex w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-500 to-blue-700 text-white items-center justify-center mb-5 shadow-md shadow-blue-500/20">
-              <RefreshCw size={22} />
-            </div>
-            <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 mb-3 leading-[1.1]">
-              Send us your CV. Get a sharper one back.
-            </h2>
-            <p className="text-base sm:text-[17px] text-slate-600 leading-relaxed max-w-2xl mx-auto">
-              Drag-drop a PDF, Word doc, or image — or paste the text. You'll get a focused critique pointing at what's weak, plus a fully rewritten version that fixes the issues.
-            </p>
-          </section>
-        )}
-      </div>
+      {!cv.document && (
+        <section className="relative max-w-3xl mx-auto px-5 pt-10 sm:pt-14 pb-2 text-center">
+          <IconChip icon={<RefreshCw size={22} />} tint="primary" size="lg" className="mx-auto mb-5" />
+          <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 mb-3 leading-[1.1]">
+            Send us your CV. Get a sharper one back.
+          </h2>
+          <p className="text-base sm:text-[17px] text-slate-600 leading-relaxed max-w-2xl mx-auto">
+            Drag-drop a PDF, Word doc, or image — or paste the text. You'll get a focused critique pointing at what's weak, plus a fully rewritten version that fixes the issues.
+          </p>
+        </section>
+      )}
 
       <main className="relative max-w-3xl mx-auto px-5 py-8 w-full flex-1 space-y-8">
         {cv.generating && (
@@ -47,14 +39,14 @@ export default function CvStudioReviewPage() {
         )}
 
         {!cv.document && !cv.generating && (
-          <section className="bg-white rounded-3xl border border-slate-200 shadow-sm p-6 sm:p-8">
+          <Card pad="lg" className="rounded-card">
             <CvDocumentIntake
               busy={cv.generating}
               submitLabel="Review my CV (free preview)"
               helpText="The first ~30% of your revamped CV is free to preview. Unlock the rest for 500 tokens."
               onSubmit={(payload) => void cv.generate(payload)}
             />
-          </section>
+          </Card>
         )}
 
         {cv.error && !cv.document && (
@@ -76,7 +68,7 @@ export default function CvStudioReviewPage() {
                 </p>
                 <button
                   onClick={cv.reset}
-                  className="inline-flex items-center gap-1.5 text-[12px] font-bold text-slate-600 hover:text-slate-900 transition-colors"
+                  className="inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors"
                 >
                   <RotateCw size={12} /> Start over
                 </button>

@@ -117,21 +117,23 @@ export default function DocumentUploadModal({
       {open && (
         <motion.div
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 bg-slate-950/55 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-6"
+          className="fixed inset-0 z-50 bg-ink/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-6"
           onClick={handleClose}
         >
           <motion.div
             initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 40, opacity: 0 }}
             transition={{ type: "spring", stiffness: 280, damping: 30 }}
             onClick={(e) => e.stopPropagation()}
-            className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl"
+            className="relative overflow-hidden bg-white w-full sm:max-w-md rounded-t-card-lg sm:rounded-card-lg border border-slate-100 shadow-card"
           >
-            <div className="px-6 pt-5 pb-4 border-b border-slate-100 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 flex items-center justify-center">
+            <div aria-hidden className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full border-[16px] border-primary-100/70" />
+            <div className="relative px-6 pt-5 pb-4 border-b border-slate-100 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-primary-50 border border-primary-100 text-primary-600 flex items-center justify-center">
                 <FileText size={18} />
               </div>
               <div className="flex-1 min-w-0">
-                <h2 className="text-base font-bold text-slate-900 leading-tight">Upload requested document</h2>
+                <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-slate-500">Document check</p>
+                <h2 className="text-base font-black tracking-tight text-slate-900 leading-tight">Upload requested document</h2>
                 <p className="text-xs text-slate-500 mt-0.5">{meta.title} · {meta.hint}</p>
               </div>
               <button
@@ -144,7 +146,7 @@ export default function DocumentUploadModal({
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="relative p-6 space-y-4">
               {/* Disclaimer */}
               <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-[12px] text-amber-900 flex items-start gap-2">
                 <AlertTriangle size={13} className="mt-0.5 text-amber-700 flex-shrink-0" />
@@ -156,10 +158,10 @@ export default function DocumentUploadModal({
                 onClick={() => inputRef.current?.click()}
                 disabled={busy}
                 className={`w-full border-2 border-dashed rounded-2xl p-6 text-center transition-colors ${
-                  file ? "border-blue-300 bg-blue-50/40" : "border-slate-300 bg-slate-50 hover:bg-slate-100"
+                  file ? "border-primary-300 bg-primary-50/40" : "border-slate-300 bg-slate-50 hover:bg-slate-100"
                 }`}
               >
-                <Upload size={22} className={`mx-auto mb-2 ${file ? "text-blue-700" : "text-slate-500"}`} />
+                <Upload size={22} className={`mx-auto mb-2 ${file ? "text-primary-600" : "text-slate-500"}`} />
                 {file ? (
                   <>
                     <p className="text-sm font-bold text-slate-900 truncate">{file.name}</p>
@@ -190,10 +192,10 @@ export default function DocumentUploadModal({
               <button
                 onClick={handleUpload}
                 disabled={!file || busy || done}
-                className={`w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-colors ${
+                className={`w-full inline-flex items-center justify-center gap-2 py-3 rounded-full text-sm font-bold transition-colors ${
                   done
-                    ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                    : "bg-slate-900 hover:bg-slate-800 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                    ? "bg-[#E8F5E9] text-[#2E7D32] border border-[#2E7D32]/20"
+                    : "bg-ink hover:bg-slate-800 text-white disabled:opacity-50 disabled:cursor-not-allowed"
                 }`}
               >
                 {busy ? <><Loader2 size={14} className="animate-spin" /> Uploading…</>

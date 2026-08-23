@@ -24,13 +24,13 @@
   body {
     @apply antialiased text-slate-900 selection:bg-primary-500 selection:text-white;
     background: #f6f9fd;
-    font-family: "Manrope", system-ui, sans-serif;
+    font-family: "Plus Jakarta Sans", system-ui, sans-serif;
   }
 }
 
 @layer components {
   .cr-landing {
-    font-family: "Manrope", system-ui, sans-serif;
+    font-family: "Plus Jakarta Sans", system-ui, sans-serif;
   }
 
   .landing-nav-link {
@@ -195,6 +195,27 @@
 }
 
 @layer utilities {
+  /* iOS home-indicator clearance for fixed bottom chrome (the floating
+     pill nav). Requires viewport-fit=cover in the viewport meta. */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .mb-safe {
+    margin-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Hide scrollbars on intentional horizontal rails (Windows paints them as
+     permanent gutters otherwise). Scrolling still works via touch/wheel. */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
   .landing-map-grid {
     background-image:
       linear-gradient(rgba(16, 24, 39, 0.045) 1px, transparent 1px),

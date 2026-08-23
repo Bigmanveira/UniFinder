@@ -8,6 +8,8 @@ import {
   ChevronLeft, ChevronRight, X,
 } from "lucide-react";
 import { FadeIn, FadeInItem } from "../components/FadeIn";
+import { Eyebrow } from "../components/ui/Eyebrow";
+import { IconChip } from "../components/ui/IconChip";
 
 const PAGE_SIZE = 24;
 
@@ -89,7 +91,7 @@ export default function BrowseSchoolsPage() {
   const clearFilters = () => { setQuery(""); setStateF(""); setOwnerF(""); };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans pb-24 selection:bg-primary-500 selection:text-white">
+    <div className="min-h-screen bg-surface font-sans pb-24 selection:bg-primary-500 selection:text-white">
       {/* Header */}
       <header className="p-6 flex justify-between items-center max-w-6xl mx-auto relative z-20">
         <BrandLogo size="md" />
@@ -99,14 +101,15 @@ export default function BrowseSchoolsPage() {
       <main className="max-w-6xl mx-auto px-6 mt-4">
         {/* Hero */}
         <FadeIn className="mb-8 text-center">
-          <h1 className="text-4xl font-bold tracking-tight text-slate-900 mb-3">Browse schools</h1>
+          <Eyebrow className="mb-2">School directory</Eyebrow>
+          <h1 className="text-4xl font-black tracking-tight text-slate-900 mb-3">Browse schools</h1>
           <p className="text-slate-500 font-medium">
             {loading ? "Loading…" : `${schools.length.toLocaleString()} active US institutions from the College Scorecard.`}
           </p>
         </FadeIn>
 
         {/* Filter bar */}
-        <div className="bg-white border border-slate-100 rounded-[24px] p-4 sm:p-5 shadow-sm mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="bg-white border border-slate-200/70 rounded-card p-4 sm:p-5 shadow-card mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="flex-1 relative">
             <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
@@ -114,13 +117,13 @@ export default function BrowseSchoolsPage() {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search by name (e.g. Berkeley)…"
-              className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-11 pr-4 py-3 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full bg-white border border-slate-200 rounded-2xl pl-11 pr-4 py-3 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
             />
           </div>
           <select
             value={stateF}
             onChange={(e) => setStateF(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
           >
             <option value="">All states</option>
             {stateOptions.map(s => <option key={s} value={s}>{s}</option>)}
@@ -128,14 +131,14 @@ export default function BrowseSchoolsPage() {
           <select
             value={ownerF}
             onChange={(e) => setOwnerF(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="bg-white border border-slate-200 rounded-2xl px-4 py-3 text-sm font-bold text-slate-700 focus:outline-none focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
           >
             <option value="">All ownership</option>
             {ownershipOptions.map(o => <option key={o} value={o}>{o}</option>)}
           </select>
           {hasFilters && (
             <button onClick={clearFilters}
-              className="flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-rose-500 transition-colors px-2">
+              className="flex items-center gap-1 rounded-full text-xs font-bold text-slate-500 hover:text-rose-500 transition-colors px-2">
               <X size={13} /> Clear
             </button>
           )}
@@ -154,9 +157,9 @@ export default function BrowseSchoolsPage() {
         )}
 
         {!loading && !error && filtered.length === 0 && (
-          <div className="text-center py-20 bg-white rounded-[24px] border border-slate-100">
+          <div className="text-center py-20 bg-white rounded-card border border-slate-200/70 shadow-card">
             <Building size={48} className="mx-auto text-slate-300 mb-4" />
-            <h2 className="text-xl font-black text-slate-900 mb-2">No schools match your filters</h2>
+            <h2 className="text-xl font-black tracking-tight text-slate-900 mb-2">No schools match your filters</h2>
             <p className="text-slate-500 font-medium">Try a different name, state, or ownership type.</p>
           </div>
         )}
@@ -178,17 +181,19 @@ export default function BrowseSchoolsPage() {
               <FadeInItem
                 key={school.unitId}
                 index={i}
-                className="bg-white rounded-[24px] p-6 shadow-sm border border-slate-100 hover:shadow-xl hover:border-primary-200 transition-all group"
+                className="bg-white rounded-card p-6 shadow-card border border-slate-200/70 hover:shadow-card-hover hover:border-primary-200 transition-all group"
               >
                 <div className="flex justify-between items-start mb-4">
-                  <div className="w-12 h-12 bg-primary-50 rounded-xl flex items-center justify-center text-primary-600 border border-primary-100 group-hover:scale-110 transition-transform">
-                    <Building size={20} />
-                  </div>
-                  <span className="text-[10px] font-black uppercase tracking-widest bg-slate-100 text-slate-500 px-3 py-1 rounded-full">
+                  <IconChip
+                    icon={<Building size={20} />}
+                    size="lg"
+                    className="group-hover:scale-110 transition-transform"
+                  />
+                  <span className="text-[10px] font-semibold uppercase tracking-eyebrow bg-slate-100 text-slate-500 px-3 py-1 rounded-full">
                     {school.ownership}
                   </span>
                 </div>
-                <h3 className="text-lg font-black text-slate-900 leading-tight mb-2 group-hover:text-primary-600 transition-colors">
+                <h3 className="text-lg font-black tracking-tight text-slate-900 leading-tight mb-2 group-hover:text-primary-600 transition-colors">
                   {school.name}
                 </h3>
                 <p className="text-sm font-medium text-slate-500 flex items-center gap-1.5 mb-6">
@@ -196,14 +201,14 @@ export default function BrowseSchoolsPage() {
                 </p>
                 <div className="grid grid-cols-2 gap-4 pt-6 border-t border-slate-100">
                   <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Admissions</p>
+                    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-eyebrow mb-1">Admissions</p>
                     <p className="font-bold text-slate-900">
                       {school.admissionRate ? `${Math.round(school.admissionRate * 100)}%` : "N/A"}
                     </p>
                   </div>
                   <div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Avg cost</p>
-                    <p className="font-bold text-emerald-600 flex items-center">
+                    <p className="text-[11px] font-semibold text-slate-400 uppercase tracking-eyebrow mb-1">Avg cost</p>
+                    <p className="font-bold text-primary-600 flex items-center">
                       <DollarSign size={14} />
                       {school.averageCost ? school.averageCost.toLocaleString() : "N/A"}
                     </p>
@@ -211,7 +216,7 @@ export default function BrowseSchoolsPage() {
                 </div>
                 {school.schoolUrl && (
                   <a href={school.schoolUrl} target="_blank" rel="noreferrer"
-                    className="block text-center mt-6 py-3 w-full bg-slate-50 text-slate-600 font-bold text-sm rounded-xl hover:bg-primary-50 hover:text-primary-600 transition-colors">
+                    className="block text-center mt-6 py-3 w-full bg-slate-100 text-slate-600 font-bold text-sm rounded-full hover:bg-primary-50 hover:text-primary-600 transition-colors">
                     Visit website
                   </a>
                 )}
@@ -226,7 +231,7 @@ export default function BrowseSchoolsPage() {
             <button
               onClick={() => goTo(safePage - 1)}
               disabled={safePage === 0}
-              className="w-10 h-10 rounded-xl flex items-center justify-center bg-white border border-slate-100 text-slate-600 hover:bg-primary-50 hover:text-primary-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="w-10 h-10 rounded-full flex items-center justify-center bg-white border border-slate-200/70 text-slate-600 hover:bg-primary-50 hover:text-primary-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronLeft size={16} />
             </button>
@@ -237,10 +242,10 @@ export default function BrowseSchoolsPage() {
                 <button
                   key={p}
                   onClick={() => goTo(p)}
-                  className={`w-10 h-10 rounded-xl text-sm font-black transition-colors ${
+                  className={`w-10 h-10 rounded-full text-sm font-bold transition-colors ${
                     p === safePage
-                      ? "bg-primary-600 text-white shadow-lg shadow-primary-600/20"
-                      : "bg-white border border-slate-100 text-slate-600 hover:bg-primary-50 hover:text-primary-600"
+                      ? "bg-primary-600 text-white shadow-glow"
+                      : "bg-white border border-slate-200/70 text-slate-600 hover:bg-primary-50 hover:text-primary-600"
                   }`}
                 >
                   {p + 1}
@@ -250,7 +255,7 @@ export default function BrowseSchoolsPage() {
             <button
               onClick={() => goTo(safePage + 1)}
               disabled={safePage === totalPages - 1}
-              className="w-10 h-10 rounded-xl flex items-center justify-center bg-white border border-slate-100 text-slate-600 hover:bg-primary-50 hover:text-primary-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+              className="w-10 h-10 rounded-full flex items-center justify-center bg-white border border-slate-200/70 text-slate-600 hover:bg-primary-50 hover:text-primary-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               <ChevronRight size={16} />
             </button>

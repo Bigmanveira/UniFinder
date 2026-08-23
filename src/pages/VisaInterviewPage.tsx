@@ -16,6 +16,7 @@ import LiveAvatarPanel from "../components/visa/LiveAvatarPanel";
 import { useSpeechRecognition } from "../lib/visa/useSpeechRecognition";
 import FeedbackSurveyModal from "../components/FeedbackSurveyModal";
 import { useShouldShowSurvey } from "../hooks/useShouldShowSurvey";
+import { AppHeader } from "../components/AppHeader";
 
 type Phase = "intro" | "active" | "report";
 
@@ -186,8 +187,17 @@ export default function VisaInterviewPage() {
     return unsub;
   }, [user, sessionId]);
 
-  const startInterview = async (accepted: boolean, applicantContexts: VisaApplicantContext[]) => {
+  // Remember the last interview setup so a free restart after a broken
+  // session can re-run with identical context without re-asking the user.
+  const lastSetupRef = useRef<{ accepted: boolean; contexts: VisaApplicantContext[] } | null>(null);
+
+  const startInterview = async (
+    accepted: boolean,
+    applicantContexts: VisaApplicantContext[],
+    retryOfSessionId?: string,
+  ) => {
     if (!user) { navigate("/login"); return; }
+    lastSetupRef.current = { accepted, contexts: applicantContexts };
     if (!speech.isSupported) {
       setError("Voice mode requires Chrome, Edge, or Safari. This browser doesn't support speech recognition.");
       return;
@@ -228,6 +238,9 @@ export default function VisaInterviewPage() {
         disclaimerAccepted: accepted,
         applicantContexts,
         isReturningApplicant: applicantContexts.includes("previous_refusal"),
+        // Free restart after a broken session — the server validates the
+        // claim and skips the credit charge when it holds up.
+        ...(retryOfSessionId ? { retryOfSessionId } : {}),
       });
       const data = res.data as {
         sessionId: string;
@@ -418,6 +431,29 @@ export default function VisaInterviewPage() {
     speech.start();
   };
 
+  // Free restart after a fatal mid-interview failure (HeyGen media loss,
+  // dropped connection). Reuses the same disclaimer acceptance + applicant
+  // contexts and passes the dead session's id so the backend replaces it
+  // WITHOUT charging again. Only offered on paid sessions.
+  const handleFreeRestart = async () => {
+    const deadSessionId = sessionId;
+    const setup = lastSetupRef.current;
+    if (!deadSessionId || !setup) return;
+    speech.abort();
+    setPhase("intro");
+    setSessionId(null);
+    setMessages([]);
+    setLatestOfficer(undefined);
+    setPendingUpload(null);
+    setPendingUploadAfterSpeech(null);
+    setPendingEndAfterSpeech(false);
+    setPendingMicRecoveryAfterSpeech(false);
+    setFatalReason(null);
+    endingRef.current = false;
+    spokenOfficerIdsRef.current.clear();
+    await startInterview(setup.accepted, setup.contexts, deadSessionId);
+  };
+
   const reset = () => {
     speech.abort();
     setPhase("intro");
@@ -480,6 +516,8 @@ export default function VisaInterviewPage() {
           onAvatarTtsFailed={handleAvatarTtsFailed}
           onAvatarFallback={handleAvatarFallback}
           onMicRetry={handleMicRetry}
+          onFreeRestart={sessionKind === "paid" ? handleFreeRestart : undefined}
+          restarting={starting}
           onEnd={endInterview}
         />
 
@@ -558,23 +596,23 @@ export default function VisaInterviewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-blue-50/30 to-white text-slate-900 antialiased pb-20 relative overflow-hidden">
-      <div className="pointer-events-none absolute top-[-100px] right-[-100px] w-[440px] h-[440px] bg-blue-200/40 rounded-full blur-[120px]" aria-hidden />
+    <div className="min-h-screen bg-surface text-slate-900 antialiased pb-20 relative overflow-hidden">
+      <div className="pointer-events-none absolute top-[-100px] right-[-100px] w-[440px] h-[440px] bg-primary-200/40 rounded-full blur-[120px]" aria-hidden />
+      <div className="pointer-events-none absolute bottom-[-140px] left-[-140px] w-[400px] h-[400px] bg-sky-200/40 rounded-full blur-[120px]" aria-hidden />
+      <div className="pointer-events-none absolute left-[-60px] top-1/3 h-40 w-40 rounded-full border-[18px] border-primary-500/10" aria-hidden />
 
-      <header className="border-b border-slate-200 sticky top-0 z-40 bg-white/85 backdrop-blur supports-[backdrop-filter]:bg-white/70">
-        <div className="max-w-6xl mx-auto px-5 h-14 flex items-center gap-3">
-          <Link to="/app" className="w-9 h-9 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-700 transition-colors" aria-label="Back to dashboard">
-            <ArrowLeft size={15} />
-          </Link>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-[15px] font-bold leading-tight truncate">F-1 Visa Interview Practice</h1>
-            <p className="text-xs text-slate-500 truncate">{headerSubtitle}</p>
-          </div>
+      <AppHeader
+        title="F-1 Visa Interview Practice"
+        subtitle={headerSubtitle}
+        backTo="/app"
+        backLabel="Back to dashboard"
+        maxWidth="max-w-6xl"
+        action={
           <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 text-[11px] font-semibold border border-amber-200">
             <ShieldAlert size={11} /> Simulation only
           </span>
-        </div>
-      </header>
+        }
+      />
 
       <main className="relative max-w-5xl mx-auto px-5 py-6">
         {error && (
@@ -701,6 +739,7 @@ export default function VisaInterviewPage() {
 function FullScreenInterview({
   sessionId, latestOfficer, stage, ending, messageCount, fatalReason, error,
   onAvatarLive, onAvatarSpeakStarted, onAvatarSpeakEnded, onAvatarTtsFailed, onAvatarFallback, onMicRetry, onEnd,
+  onFreeRestart, restarting,
 }: {
   sessionId:            string;
   latestOfficer:        string | undefined;
@@ -715,14 +754,18 @@ function FullScreenInterview({
   onAvatarTtsFailed:    () => void;
   onAvatarFallback:     (reason: string) => void;
   onMicRetry:           () => void;
+  onFreeRestart?:       () => void;
+  restarting?:          boolean;
   onEnd:                () => Promise<void>;
 }) {
   return (
-    <div className="fixed inset-0 z-40 bg-slate-950 text-white overflow-hidden">
+    <div className="fixed inset-0 z-40 bg-ink text-white overflow-hidden">
       {/* Soft ambient glow behind the avatar — gives the dark background
           some life without distracting from the video. */}
-      <div className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80vmin] h-[80vmin] bg-blue-500/10 rounded-full blur-[120px]" aria-hidden />
-      <div className="pointer-events-none absolute bottom-0 right-0 w-[40vmin] h-[40vmin] bg-cyan-500/10 rounded-full blur-[100px]" aria-hidden />
+      <div className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80vmin] h-[80vmin] bg-primary-500/10 rounded-full blur-[120px]" aria-hidden />
+      <div className="pointer-events-none absolute bottom-0 right-0 w-[40vmin] h-[40vmin] bg-sky-500/10 rounded-full blur-[100px]" aria-hidden />
+      {/* Signature ring decor from the navy card language. */}
+      <div className="pointer-events-none absolute -right-10 -top-14 w-44 h-44 rounded-full border-[18px] border-primary-500/10" aria-hidden />
 
       {ending && <ReportBuildingOverlay />}
 
@@ -755,7 +798,7 @@ function FullScreenInterview({
           <ArrowLeft size={14} />
           <span className="hidden sm:inline">Dashboard</span>
         </Link>
-        <span className="pointer-events-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/15 backdrop-blur-md border border-amber-400/30 text-amber-200 text-[11px] font-bold tracking-widest uppercase">
+        <span className="pointer-events-auto inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/15 backdrop-blur-md border border-amber-400/30 text-amber-200 text-[11px] font-semibold tracking-eyebrow uppercase">
           <ShieldAlert size={11} /> Simulation
         </span>
       </div>
@@ -785,19 +828,36 @@ function FullScreenInterview({
             </p>
             <button
               onClick={onMicRetry}
-              className="inline-flex items-center gap-2 bg-amber-400 hover:bg-amber-300 text-amber-950 text-sm font-bold px-4 py-2.5 rounded-xl transition-colors active:scale-[0.99]"
+              className="inline-flex items-center gap-2 bg-amber-400 hover:bg-amber-300 text-amber-950 text-sm font-bold px-5 py-2.5 rounded-full transition-colors active:scale-[0.99]"
             >
               <Mic size={14} /> Retry microphone
             </button>
           </div>
         )}
 
-        {/* Fatal-error card — interview can't continue. Stops the user
-            from tapping End on an empty transcript. */}
+        {/* Fatal-error card — interview can't continue. Offers a FREE
+            restart: the backend replaces the broken session without
+            charging again, so the user never pays twice for one failure. */}
         {stage === "failed" && (
           <div className="pointer-events-auto max-w-md w-full bg-rose-500/15 backdrop-blur-md border border-rose-400/40 rounded-2xl px-5 py-4 text-sm text-rose-50 shadow-xl shadow-rose-900/30">
             <p className="font-bold mb-1.5">Interview cannot continue.</p>
-            <p className="leading-relaxed text-rose-100/90">{fatalReason ?? "The interview service is unavailable. Try again in a few minutes; your tokens will be refunded if no answers were recorded."}</p>
+            <p className="leading-relaxed text-rose-100/90">{fatalReason ?? "The interview service is unavailable. Try again in a few minutes."}</p>
+            {onFreeRestart && (
+              <>
+                <button
+                  type="button"
+                  onClick={onFreeRestart}
+                  disabled={restarting}
+                  className="mt-3.5 inline-flex w-full items-center justify-center gap-2 rounded-full bg-primary-500 px-5 py-3 text-sm font-bold text-white shadow-glow transition-colors hover:bg-primary-600 active:scale-[0.99] disabled:opacity-60"
+                >
+                  {restarting ? <Loader2 size={15} className="animate-spin" /> : <Mic size={14} />}
+                  {restarting ? "Restarting…" : "Restart interview — free"}
+                </button>
+                <p className="mt-2 text-center text-[11px] font-medium text-rose-100/70">
+                  You won't be charged again for this restart.
+                </p>
+              </>
+            )}
           </div>
         )}
 
@@ -812,7 +872,7 @@ function FullScreenInterview({
         <button
           onClick={onEnd}
           disabled={ending || messageCount === 0}
-          className="pointer-events-auto inline-flex items-center justify-center gap-2 bg-white text-slate-900 hover:bg-slate-100 disabled:bg-white/20 disabled:text-white/60 disabled:cursor-not-allowed text-sm font-bold px-5 py-3 rounded-2xl transition-all active:scale-[0.99] shadow-xl shadow-black/40"
+          className="pointer-events-auto inline-flex items-center justify-center gap-2 bg-primary-500 hover:bg-primary-600 text-white shadow-glow disabled:bg-white/20 disabled:text-white/60 disabled:shadow-none disabled:cursor-not-allowed text-sm font-bold px-6 py-3 rounded-full transition-all active:scale-[0.99]"
         >
           {ending ? <Loader2 size={14} className="animate-spin" /> : <StopCircle size={14} />}
           {ending ? "Scoring your interview…" : "End interview & get feedback"}
@@ -833,25 +893,25 @@ function BeautifulStatusPill({ stage }: { stage: ActiveStage }) {
   // plus EQ bars communicate "we hear you" before the user even speaks.
   if (stage === "listening") {
     return (
-      <div className="inline-flex items-center gap-3 pl-2 pr-5 py-2 rounded-full bg-emerald-500/15 backdrop-blur-xl border border-emerald-300/40 text-emerald-50 shadow-xl shadow-emerald-900/30">
+      <div className="inline-flex items-center gap-3 pl-2 pr-5 py-2 rounded-full bg-[#2E7D32]/25 backdrop-blur-xl border border-[#E8F5E9]/40 text-[#E8F5E9] shadow-xl shadow-black/30">
         {/* Mic chip with pulsing halo. The outer span animates a ping
             that radiates outward; the inner circle holds the icon. */}
         <span className="relative flex items-center justify-center w-9 h-9 flex-shrink-0">
-          <span className="absolute inset-0 rounded-full bg-emerald-400/40 animate-ping" />
-          <span className="absolute inset-0 rounded-full bg-emerald-400/20" />
-          <span className="relative w-7 h-7 rounded-full bg-gradient-to-br from-emerald-300 to-emerald-500 flex items-center justify-center shadow-lg shadow-emerald-500/40">
-            <Mic size={13} className="text-emerald-950" />
+          <span className="absolute inset-0 rounded-full bg-[#E8F5E9]/40 animate-ping" />
+          <span className="absolute inset-0 rounded-full bg-[#E8F5E9]/20" />
+          <span className="relative w-7 h-7 rounded-full bg-[#E8F5E9] flex items-center justify-center shadow-lg shadow-black/30">
+            <Mic size={13} className="text-[#2E7D32]" />
           </span>
         </span>
         <span className="text-sm font-bold tracking-tight">Listening</span>
         {/* EQ bars — five staggered vertical bars, each on its own
             scaleY animation delay so the dance looks organic. */}
         <span className="flex items-end gap-[3px] h-4 ml-0.5" aria-hidden>
-          <span className="w-[3px] h-full rounded-full bg-emerald-200/90 animate-audio-bar" />
-          <span className="w-[3px] h-full rounded-full bg-emerald-200/90 animate-audio-bar animate-audio-bar-delay-1" />
-          <span className="w-[3px] h-full rounded-full bg-emerald-200/90 animate-audio-bar animate-audio-bar-delay-2" />
-          <span className="w-[3px] h-full rounded-full bg-emerald-200/90 animate-audio-bar animate-audio-bar-delay-3" />
-          <span className="w-[3px] h-full rounded-full bg-emerald-200/90 animate-audio-bar animate-audio-bar-delay-4" />
+          <span className="w-[3px] h-full rounded-full bg-[#E8F5E9]/90 animate-audio-bar" />
+          <span className="w-[3px] h-full rounded-full bg-[#E8F5E9]/90 animate-audio-bar animate-audio-bar-delay-1" />
+          <span className="w-[3px] h-full rounded-full bg-[#E8F5E9]/90 animate-audio-bar animate-audio-bar-delay-2" />
+          <span className="w-[3px] h-full rounded-full bg-[#E8F5E9]/90 animate-audio-bar animate-audio-bar-delay-3" />
+          <span className="w-[3px] h-full rounded-full bg-[#E8F5E9]/90 animate-audio-bar animate-audio-bar-delay-4" />
         </span>
       </div>
     );
@@ -866,9 +926,9 @@ function BeautifulStatusPill({ stage }: { stage: ActiveStage }) {
       cls:   "bg-slate-500/15 border-slate-300/30 text-slate-100",
     },
     speaking: {
-      icon:  <Volume2 size={14} className="text-blue-200" />,
+      icon:  <Volume2 size={14} className="text-primary-200" />,
       label: "Officer is speaking",
-      cls:   "bg-blue-500/15 border-blue-300/40 text-blue-50",
+      cls:   "bg-primary-500/15 border-primary-300/40 text-primary-50",
     },
     processing: {
       icon:  <Loader2 size={13} className="animate-spin text-amber-200" />,
@@ -908,53 +968,47 @@ function BeautifulStatusPill({ stage }: { stage: ActiveStage }) {
 // Exported so it can be rendered in isolation for visual review; the page
 // only ever shows it while `ending` is true.
 //
-// Contrast was the actual problem here, not decoration. The card used
-// bg-white/[0.08] over a slate-950/88 backdrop, which measured 1.06:1
-// against its own overlay — the panel was effectively invisible as a
-// surface and leaned entirely on a 1.60:1 border to exist. A solid navy
-// card on a near-black overlay gets the border to 1.96:1 and reads as a
-// thing sitting above the video. Text sits far above AA: heading 15.9:1,
-// body 7.3:1, eyebrow 6.7:1.
-//
-// It also borrows the report's own type — Bricolage display, Plex Mono for
-// the eyebrow — so this screen and the one it hands off to look related.
+// System treatment: an ink scrim over the video with the standard white
+// rounded-card-lg dialog on top — the same vocabulary as every other modal
+// in the flow, and the highest-contrast surface available while scoring runs.
 // ─────────────────────────────────────────────────────────────────────────────
 export function ReportBuildingOverlay() {
   return (
     <div
-      className="absolute inset-0 z-30 flex items-center justify-center bg-[#01060f]/95 px-5 backdrop-blur-xl"
+      className="absolute inset-0 z-30 flex items-center justify-center bg-ink/80 px-5 backdrop-blur-xl"
       role="status"
       aria-live="polite"
     >
-      <div className="w-full max-w-md overflow-hidden rounded-[28px] border border-[#2f4c96] bg-[#0e2049] shadow-2xl shadow-black/70">
-        <div className="h-px w-full bg-gradient-to-r from-transparent via-[#6f86e8] to-transparent" aria-hidden />
+      <div className="relative w-full max-w-md overflow-hidden rounded-card-lg border border-slate-100 bg-white shadow-card">
+        {/* Signature ring decor from the card language. */}
+        <div aria-hidden className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full border-[18px] border-primary-500/20" />
 
-        <div className="px-7 py-8 text-center sm:px-9 sm:py-9">
+        <div className="relative px-7 py-8 text-center sm:px-9 sm:py-9">
           {/* One ring, one travelling arc. The previous version stacked three
               spinners — a static ring, a spinning border, and a Loader2 —
               turning at different rates inside the same 64px. */}
           <div className="relative mx-auto mb-6 h-14 w-14" aria-hidden>
-            <span className="absolute inset-0 rounded-full border-2 border-white/10" />
-            <span className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-[#8fa6e8]" />
-            <span className="absolute inset-[9px] rounded-full bg-[#6078d5]/15" />
+            <span className="absolute inset-0 rounded-full border-2 border-primary-100" />
+            <span className="absolute inset-0 animate-spin rounded-full border-2 border-transparent border-t-primary-500" />
+            <span className="absolute inset-[9px] rounded-full bg-primary-500/10" />
           </div>
 
-          <p className="font-utility text-[10px] uppercase tracking-[0.22em] text-[#8fa6e8]">
+          <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-slate-500">
             Interview complete
           </p>
-          <h2 className="mt-2.5 font-display text-[22px] font-bold leading-tight tracking-tight text-white">
+          <h2 className="mt-2.5 text-[22px] font-black leading-tight tracking-tight text-slate-900">
             Building your feedback report
           </h2>
-          <p className="mx-auto mt-2.5 max-w-[19rem] text-[13.5px] leading-relaxed text-white/65">
+          <p className="mx-auto mt-2.5 max-w-[19rem] text-[13.5px] leading-relaxed text-slate-500">
             Reviewing each answer against the question bank and calculating your performance scores.
           </p>
 
           {/* Indeterminate sweep. Scoring reports no progress, so a bar that
               sits at two-thirds and pulses claims a number it does not have. */}
-          <div className="relative mt-7 h-1 overflow-hidden rounded-full bg-white/10">
-            <div className="animate-report-sweep absolute inset-y-0 left-0 w-1/3 rounded-full bg-gradient-to-r from-[#6078d5] via-[#aebeff] to-[#6078d5]" />
+          <div className="relative mt-7 h-1 overflow-hidden rounded-full bg-slate-100">
+            <div className="animate-report-sweep absolute inset-y-0 left-0 w-1/3 rounded-full bg-gradient-to-r from-primary-500 via-primary-300 to-primary-500" />
           </div>
-          <p className="font-utility mt-3.5 text-[10px] uppercase tracking-[0.16em] text-white/35">
+          <p className="mt-3.5 text-[10px] font-semibold uppercase tracking-eyebrow text-slate-400">
             This usually takes a few seconds
           </p>
         </div>
@@ -973,23 +1027,25 @@ function PreviewEndModal({ open, onClose }: { open: boolean; onClose: () => void
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/60"
+      className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-ink/60 animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-sm w-full p-6 text-center"
+        className="relative overflow-hidden bg-white rounded-card-lg shadow-card border border-slate-100 max-w-sm w-full p-6 text-center"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="w-12 h-12 mx-auto mb-4 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+        <div aria-hidden className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full border-[16px] border-primary-100/70" />
+        <div className="relative w-12 h-12 mx-auto mb-4 rounded-2xl bg-[#E8F5E9] text-[#2E7D32] flex items-center justify-center">
           <Volume2 size={22} />
         </div>
-        <h2 className="text-lg font-black text-slate-900 mb-2">Your preview is up</h2>
+        <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-slate-500 mb-1">Free preview</p>
+        <h2 className="text-lg font-black tracking-tight text-slate-900 mb-2">Your preview is up</h2>
         <p className="text-sm text-slate-600 leading-relaxed mb-5">
           You just experienced a live AI consular interview. Top up 1,500 tokens to run a full 3-minute mock — Anna will probe deeper and you'll get your scored feedback across nine dimensions.
         </p>
         <Link
           to="/pricing"
-          className="w-full inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-2xl text-sm transition-colors mb-2"
+          className="w-full inline-flex items-center justify-center gap-2 bg-ink hover:bg-slate-800 text-white font-bold py-3 rounded-full text-sm transition-colors mb-2"
         >
           Top up to continue · 1,500 tokens
         </Link>
@@ -1014,23 +1070,25 @@ function PreviewCooldownModal({ open, onClose }: { open: boolean; onClose: () =>
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/60"
+      className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-ink/60 animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-sm w-full p-6 text-center"
+        className="relative overflow-hidden bg-white rounded-card-lg shadow-card border border-slate-100 max-w-sm w-full p-6 text-center"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="w-12 h-12 mx-auto mb-4 rounded-2xl bg-blue-100 text-blue-700 flex items-center justify-center">
+        <div aria-hidden className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full border-[16px] border-primary-100/70" />
+        <div className="relative w-12 h-12 mx-auto mb-4 rounded-2xl bg-primary-100 text-primary-700 flex items-center justify-center">
           <ShieldAlert size={22} />
         </div>
-        <h2 className="text-lg font-black text-slate-900 mb-2">Preview already used</h2>
+        <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-slate-500 mb-1">Free preview</p>
+        <h2 className="text-lg font-black tracking-tight text-slate-900 mb-2">Preview already used</h2>
         <p className="text-sm text-slate-600 leading-relaxed mb-5">
           You've already run your free preview in the last 7 days. Top up 1,500 tokens to start a full 3-minute mock interview with scored feedback.
         </p>
         <Link
           to="/pricing"
-          className="w-full inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-2xl text-sm transition-colors mb-2"
+          className="w-full inline-flex items-center justify-center gap-2 bg-ink hover:bg-slate-800 text-white font-bold py-3 rounded-full text-sm transition-colors mb-2"
         >
           Top up · 1,500 tokens
         </Link>
@@ -1049,26 +1107,28 @@ function AtCapacityModal({ open, onClose }: { open: boolean; onClose: () => void
   if (!open) return null;
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/60"
+      className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-ink/60 animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-3xl shadow-2xl border border-slate-200 max-w-sm w-full p-6 text-center"
+        className="relative overflow-hidden bg-white rounded-card-lg shadow-card border border-slate-100 max-w-sm w-full p-6 text-center"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="w-12 h-12 mx-auto mb-4 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center">
+        <div aria-hidden className="pointer-events-none absolute -right-10 -top-12 h-32 w-32 rounded-full border-[16px] border-primary-100/70" />
+        <div className="relative w-12 h-12 mx-auto mb-4 rounded-2xl bg-amber-100 text-amber-700 flex items-center justify-center">
           <ShieldAlert size={22} />
         </div>
-        <h2 className="text-lg font-black text-slate-900 mb-2">Interview rooms are full</h2>
+        <p className="text-[11px] font-semibold uppercase tracking-eyebrow text-slate-500 mb-1">Live rooms</p>
+        <h2 className="text-lg font-black tracking-tight text-slate-900 mb-2">Interview rooms are full</h2>
         <p className="text-sm text-slate-600 leading-relaxed mb-1">
           All our practice rooms are in use at the moment. Kindly check back shortly.
         </p>
-        <p className="text-xs text-emerald-700 font-bold mb-5">
+        <p className="text-xs text-[#2E7D32] font-bold mb-5">
           You haven't been charged — your tokens are safe.
         </p>
         <button
           onClick={onClose}
-          className="w-full inline-flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3 rounded-2xl text-sm transition-colors"
+          className="w-full inline-flex items-center justify-center gap-2 bg-ink hover:bg-slate-800 text-white font-bold py-3 rounded-full text-sm transition-colors"
         >
           Got it
         </button>

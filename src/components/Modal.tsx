@@ -95,7 +95,7 @@ export default function Modal({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 12, scale: 0.99 }}
             transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}
-            className={`flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-[28px] border border-slate-200 bg-white shadow-2xl outline-none sm:rounded-[28px] ${WIDTH[width]}`}
+            className={`flex max-h-[92vh] w-full flex-col overflow-hidden rounded-t-card border border-slate-200/70 bg-white shadow-card-hover outline-none sm:rounded-card ${WIDTH[width]}`}
           >
             <div className="flex items-start gap-3 border-b border-slate-100 px-6 py-4">
               <div className="min-w-0 flex-1">
@@ -106,7 +106,7 @@ export default function Modal({
                 type="button"
                 onClick={onClose}
                 aria-label="Close"
-                className="-mr-1.5 -mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6179d8]"
+                className="-mr-1.5 -mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
               >
                 <X size={17} />
               </button>

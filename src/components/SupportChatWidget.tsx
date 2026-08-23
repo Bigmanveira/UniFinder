@@ -348,20 +348,20 @@ export default function SupportChatWidget() {
   if (!launcherAvailable && !open) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-[90] font-sans sm:bottom-6 sm:right-6">
+    <div className="fixed right-4 z-[90] font-sans sm:right-6 bottom-4 sm:bottom-6">
       {open && (
         <section
           aria-label="College Ready support assistant"
-          className="mb-3 flex h-[min(680px,calc(100vh-6.5rem))] w-[calc(100vw-2rem)] max-w-[390px] flex-col overflow-hidden rounded-[28px] border border-primary-100 bg-white shadow-[0_28px_80px_rgba(30,58,138,0.22)]"
+          className="mb-3 flex h-[min(680px,calc(100vh-6.5rem))] w-[calc(100vw-2rem)] max-w-[390px] flex-col overflow-hidden rounded-card-lg border border-slate-200/70 bg-white shadow-card-hover"
         >
-          <header className="flex items-center justify-between bg-gradient-to-r from-primary-950 via-primary-900 to-primary-800 px-4 py-3.5 text-white">
+          <header className="flex items-center justify-between bg-ink px-4 py-3.5 text-white">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-primary-300 to-primary-600 shadow-lg shadow-primary-950/30">
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-primary-600 shadow-glow">
                 <MessageCircle size={20} />
               </div>
               <div className="min-w-0">
-                <h2 className="truncate text-sm font-black">College Ready Support</h2>
-                <p className="truncate text-[11px] font-medium text-slate-400">
+                <h2 className="truncate text-sm font-black tracking-tight">College Ready Support</h2>
+                <p className="truncate text-[11px] font-medium text-white/50">
                   App help and verified FAQs
                 </p>
               </div>
@@ -371,7 +371,7 @@ export default function SupportChatWidget() {
                 <button
                   type="button"
                   onClick={clearConversation}
-                  className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
+                  className="rounded-full p-2 text-white/50 transition-colors hover:bg-white/10 hover:text-white"
                   aria-label="Clear support conversation"
                   title="Clear conversation"
                 >
@@ -381,7 +381,7 @@ export default function SupportChatWidget() {
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-white/10 hover:text-white"
+                className="rounded-full p-2 text-white/50 transition-colors hover:bg-white/10 hover:text-white"
                 aria-label="Close support assistant"
               >
                 <X size={18} />
@@ -389,8 +389,8 @@ export default function SupportChatWidget() {
             </div>
           </header>
 
-          <div className="flex-1 overflow-y-auto bg-slate-50 px-3.5 py-4">
-            <div className="mb-4 rounded-2xl border border-primary-100 bg-white p-3.5 shadow-sm">
+          <div className="flex-1 overflow-y-auto bg-surface px-3.5 py-4">
+            <div className="mb-4 rounded-2xl border border-slate-200/70 bg-white p-3.5 shadow-sm">
               <div className="mb-1.5 flex items-center gap-2 text-primary-700">
                 <ShieldCheck size={15} />
                 <span className="text-[11px] font-black uppercase tracking-wider">Grounded support</span>
@@ -442,7 +442,7 @@ export default function SupportChatWidget() {
                       className={
                         message.role === "user"
                           ? "whitespace-pre-wrap rounded-2xl rounded-br-md bg-primary-600 px-3.5 py-2.5 text-[13px] font-medium leading-relaxed text-white"
-                          : "whitespace-pre-wrap rounded-2xl rounded-bl-md border border-slate-200 bg-white px-3.5 py-2.5 text-[13px] font-medium leading-relaxed text-slate-700 shadow-sm"
+                          : "whitespace-pre-wrap rounded-2xl rounded-bl-md bg-slate-100 px-3.5 py-2.5 text-[13px] font-medium leading-relaxed text-slate-700"
                       }
                     >
                       {message.content}
@@ -485,7 +485,7 @@ export default function SupportChatWidget() {
                   <div className="flex h-7 w-7 items-center justify-center rounded-xl bg-primary-100 text-primary-700">
                     <MessageCircle size={14} />
                   </div>
-                  <div className="flex items-center gap-2 rounded-2xl rounded-bl-md border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-500 shadow-sm">
+                  <div className="flex items-center gap-2 rounded-2xl rounded-bl-md bg-slate-100 px-3.5 py-2.5 text-xs font-bold text-slate-500">
                     <Loader2 size={14} className="animate-spin" /> Checking verified app information
                   </div>
                 </div>
@@ -533,7 +533,7 @@ export default function SupportChatWidget() {
               <button
                 type="submit"
                 disabled={!input.trim() || sending}
-                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-primary-600 text-white transition-colors hover:bg-primary-700 disabled:cursor-not-allowed disabled:opacity-40"
+                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-primary-500 text-white transition-colors hover:bg-primary-600 disabled:cursor-not-allowed disabled:opacity-40"
                 aria-label="Send support question"
               >
                 {sending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
@@ -552,7 +552,7 @@ export default function SupportChatWidget() {
           if (!open) setUnreadCount(0);
           setOpen((current) => !current);
         }}
-        className="relative ml-auto flex h-14 w-14 items-center justify-center gap-2 rounded-full border border-primary-400/20 bg-gradient-to-r from-primary-950 via-primary-900 to-primary-700 text-white shadow-[0_16px_40px_rgba(30,58,138,0.3)] transition-all hover:-translate-y-0.5 hover:shadow-[0_20px_48px_rgba(37,99,235,0.36)] sm:w-auto sm:px-4"
+        className="relative ml-auto flex h-14 w-14 items-center justify-center gap-2 rounded-full bg-ink text-white shadow-pillnav transition-all hover:-translate-y-0.5 hover:bg-slate-800 sm:w-auto sm:px-4"
         aria-label={open ? "Close support assistant" : `Open support assistant${unreadCount ? `, ${unreadCount} new message` : ""}`}
         aria-expanded={open}
       >

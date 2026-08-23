@@ -158,7 +158,7 @@ export default function WaitlistPage() {
     // when the browser chrome shows/hides. Falls back to h-screen on
     // older browsers. flex-col + overflow-hidden = no scroll anywhere.
     <div
-      className="h-screen flex flex-col relative overflow-hidden bg-slate-950 text-white font-sans selection:bg-primary-500 selection:text-white"
+      className="h-screen flex flex-col relative overflow-hidden bg-ink text-white font-sans selection:bg-primary-500 selection:text-white"
       style={{ height: "100dvh" }}
     >
 
@@ -194,7 +194,7 @@ export default function WaitlistPage() {
         className="absolute inset-0 z-[1] pointer-events-none"
         style={{
           background:
-            "linear-gradient(to right, rgba(2, 6, 23, 0.96) 0%, rgba(2, 6, 23, 0.85) 35%, rgba(2, 6, 23, 0.55) 65%, rgba(2, 6, 23, 0.35) 100%)",
+            "linear-gradient(to right, rgba(15, 23, 42, 0.96) 0%, rgba(15, 23, 42, 0.85) 35%, rgba(15, 23, 42, 0.55) 65%, rgba(15, 23, 42, 0.35) 100%)",
         }}
         aria-hidden
       />
@@ -202,15 +202,16 @@ export default function WaitlistPage() {
         className="absolute inset-0 z-[1] pointer-events-none md:hidden"
         style={{
           background:
-            "linear-gradient(to bottom, rgba(2, 6, 23, 0.45) 0%, rgba(2, 6, 23, 0.85) 60%, rgba(2, 6, 23, 0.97) 100%)",
+            "linear-gradient(to bottom, rgba(15, 23, 42, 0.45) 0%, rgba(15, 23, 42, 0.85) 60%, rgba(15, 23, 42, 0.97) 100%)",
         }}
         aria-hidden
       />
 
-      {/* Cyan glow blobs to echo the brand gradient. Desktop only — soft
-          blurs on mobile are paint-expensive on low-end GPUs. */}
-      <div className="hidden md:block absolute -top-32 -left-32 w-[480px] h-[480px] rounded-full bg-primary-600/25 blur-[140px] z-[1] pointer-events-none" aria-hidden />
-      <div className="hidden md:block absolute -bottom-40 left-1/4 w-[520px] h-[520px] rounded-full bg-accent-500/20 blur-[160px] z-[1] pointer-events-none" aria-hidden />
+      {/* Signature ink-hero decor — ring + primary glow orbs. Desktop only:
+          soft blurs on mobile are paint-expensive on low-end GPUs. */}
+      <div className="hidden md:block absolute -right-16 -top-24 w-72 h-72 rounded-full border-[24px] border-primary-500/15 z-[1] pointer-events-none" aria-hidden />
+      <div className="hidden md:block absolute -top-32 -left-32 w-[480px] h-[480px] rounded-full bg-primary-600/20 blur-[140px] z-[1] pointer-events-none" aria-hidden />
+      <div className="hidden md:block absolute -bottom-40 left-1/4 w-[520px] h-[520px] rounded-full bg-primary-500/15 blur-[160px] z-[1] pointer-events-none" aria-hidden />
 
       {/* ── Top bar: logo + socials ──────────────────────────────────────── */}
       <header className="relative z-10 shrink-0 px-5 sm:px-8 lg:px-12 pt-5 sm:pt-6 flex items-center justify-between">
@@ -236,9 +237,8 @@ export default function WaitlistPage() {
           </span>
         </Link>
 
-        {/* Social pill — the gradient-ring matches Padicash's WhatsApp button.
-            Single visual element, three icons inside. */}
-        <div className="relative inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-full bg-slate-900/70 backdrop-blur-md ring-1 ring-white/10 shadow-[0_0_18px_rgba(56,189,248,0.18)]">
+        {/* Social pill — single visual element, three icons inside. */}
+        <div className="relative inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-full bg-white/10 backdrop-blur-md ring-1 ring-white/15">
           <SocialIcon href={SOCIALS.instagram} label="Instagram"><InstagramGlyph /></SocialIcon>
           <SocialIcon href={SOCIALS.facebook}  label="Facebook"><FacebookGlyph /></SocialIcon>
           <SocialIcon href={SOCIALS.linkedin}  label="LinkedIn"><LinkedInGlyph /></SocialIcon>
@@ -263,9 +263,9 @@ export default function WaitlistPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.35 }}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/8 ring-1 ring-white/15 backdrop-blur-sm text-[10px] sm:text-[11px] font-black tracking-widest uppercase text-cyan-200 mb-4 sm:mb-5"
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 ring-1 ring-white/15 backdrop-blur-sm text-[11px] font-semibold tracking-eyebrow uppercase text-white/70 mb-4 sm:mb-5"
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                <span className="w-1.5 h-1.5 rounded-full bg-primary-400 animate-pulse" />
                 {slide.badge}
               </motion.div>
             </AnimatePresence>
@@ -285,7 +285,7 @@ export default function WaitlistPage() {
                 >
                   {slide.headlineTop}
                   <br />
-                  <span className="bg-gradient-to-br from-primary-400 via-cyan-300 to-accent-500 bg-clip-text text-transparent">
+                  <span className="text-primary-400">
                     {slide.headlineAccent}
                   </span>
                 </motion.h1>
@@ -302,7 +302,7 @@ export default function WaitlistPage() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -8 }}
                   transition={{ duration: 0.45, ease: "easeOut" }}
-                  className="text-sm sm:text-base text-slate-300 font-medium leading-relaxed"
+                  className="text-sm sm:text-base text-white/60 font-medium leading-relaxed"
                 >
                   {slide.subtitle}
                 </motion.p>
@@ -314,16 +314,16 @@ export default function WaitlistPage() {
               <motion.div
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="max-w-lg bg-emerald-500/10 ring-1 ring-emerald-400/30 backdrop-blur-md rounded-2xl p-5 sm:p-6"
+                className="max-w-lg bg-white text-slate-900 border border-slate-200/70 rounded-card shadow-card p-5 sm:p-6"
               >
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 rounded-full bg-emerald-400/20 text-emerald-300 flex items-center justify-center flex-shrink-0">
+                  <div className="w-10 h-10 rounded-full bg-primary-50 text-primary-600 flex items-center justify-center flex-shrink-0">
                     <Check size={20} />
                   </div>
                   <div>
-                    <p className="text-base sm:text-lg font-bold mb-0.5">You're on the list.</p>
-                    <p className="text-sm text-slate-300 leading-relaxed">
-                      We'll email <span className="font-bold text-white">{email}</span> the moment access opens. No spam in between.
+                    <p className="text-base sm:text-lg font-black tracking-tight mb-0.5">You're on the list.</p>
+                    <p className="text-sm text-slate-500 font-medium leading-relaxed">
+                      We'll email <span className="font-bold text-slate-900">{email}</span> the moment access opens. No spam in between.
                     </p>
                   </div>
                 </div>
@@ -331,7 +331,7 @@ export default function WaitlistPage() {
             ) : (
               <form
                 onSubmit={handleSubmit}
-                className="max-w-lg space-y-3"
+                className="max-w-lg bg-white border border-slate-200/70 rounded-card shadow-card p-4 sm:p-5 space-y-3"
               >
                 <div className="flex flex-col sm:flex-row gap-2.5">
                   <div className="relative flex-1">
@@ -341,13 +341,13 @@ export default function WaitlistPage() {
                       onChange={(e) => setEmail(e.target.value)}
                       required
                       placeholder="mail@johndoe.com"
-                      className="w-full bg-slate-900/60 backdrop-blur-sm ring-1 ring-white/10 hover:ring-white/20 focus:ring-cyan-400/60 rounded-2xl px-5 py-4 text-white placeholder:text-slate-500 font-medium focus:outline-none focus:bg-slate-900/80 transition-all"
+                      className="w-full bg-white border border-slate-200 rounded-full px-5 py-3.5 text-sm text-slate-900 placeholder:text-slate-400 font-medium outline-none transition focus:border-primary-500 focus:ring-2 focus:ring-primary-100"
                     />
                   </div>
                   <button
                     type="submit"
                     disabled={status.kind === "submitting"}
-                    className="relative inline-flex items-center justify-center gap-2 px-6 py-4 rounded-2xl font-bold text-white bg-gradient-to-br from-primary-500 to-primary-700 hover:from-primary-400 hover:to-primary-600 transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed shadow-[0_0_28px_rgba(56,189,248,0.4)] ring-1 ring-cyan-300/50"
+                    className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-full text-sm font-bold text-white bg-primary-500 hover:bg-primary-600 shadow-glow transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                   >
                     {status.kind === "submitting" ? "Saving…" : (
                       <>Join waitlist <ArrowRight size={16} /></>
@@ -356,13 +356,13 @@ export default function WaitlistPage() {
                 </div>
 
                 {status.kind === "error" && (
-                  <div className="flex items-start gap-2 text-xs font-semibold text-rose-300 leading-relaxed">
+                  <div className="flex items-start gap-2 text-xs font-semibold text-rose-600 leading-relaxed">
                     <AlertTriangle size={13} className="mt-0.5 flex-shrink-0" />
                     <span>{status.message}</span>
                   </div>
                 )}
 
-                <p className="text-[11px] text-slate-400 leading-relaxed pt-1">
+                <p className="text-[11px] font-medium text-slate-400 leading-relaxed px-1">
                   We'll email you once. Unsubscribe with one click. No marketing list resale.
                 </p>
               </form>
@@ -408,7 +408,7 @@ function SocialIcon({
       target="_blank"
       rel="noopener noreferrer"
       aria-label={label}
-      className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-cyan-300/40 flex items-center justify-center text-white transition-all hover:scale-105 active:scale-95"
+      className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/15 ring-1 ring-white/10 hover:ring-white/30 flex items-center justify-center text-white transition-all hover:scale-105 active:scale-95"
     >
       {children}
     </a>
