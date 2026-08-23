@@ -428,3 +428,13 @@
     .landing-visa-frame img, .landing-product-card img { transition: none; }
   }
 }
+
+@layer utilities {
+  /* Loading placeholders: every content photo paints a warm block the
+     instant layout happens, so images never leave blank holes while the
+     network catches up (the "vanishing elements" on slow mobile). */
+  .cr-landing img,
+  img[loading="lazy"] {
+    background-color: #E6E4DD;
+  }
+}

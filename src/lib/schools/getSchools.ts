@@ -219,12 +219,45 @@ export function getFieldMatchScore(school: School, fieldLower: string): { score:
 // ─────────────────────────────────────────────────────────────
 const _schoolsCache = new Map<string, Promise<School[]>>();
 
+// Session-storage layer under the in-memory cache: the schools collection is
+// ~6,200 docs (megabytes over the wire) and changes rarely, so a page reload
+// or revisit within the same browser session must NOT re-download it — that
+// full fetch was the biggest "slow load" on mobile. Stored with a version
+// prefix so a schema change can invalidate old payloads.
+const SS_PREFIX = "cr-schools-v1:";
+
+function readSessionCache(cacheKey: string): School[] | null {
+  try {
+    const raw = sessionStorage.getItem(SS_PREFIX + cacheKey);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) && parsed.length > 0 ? (parsed as School[]) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeSessionCache(cacheKey: string, schools: School[]): void {
+  try {
+    sessionStorage.setItem(SS_PREFIX + cacheKey, JSON.stringify(schools));
+  } catch {
+    // Quota exceeded / private mode — the in-memory cache still applies.
+  }
+}
+
 export async function getActiveSchools(
   degreeLevel?: "undergraduate" | "graduate"
 ): Promise<School[]> {
   const cacheKey = degreeLevel ?? "all";
   const cached = _schoolsCache.get(cacheKey);
   if (cached) return cached;
+
+  const fromSession = readSessionCache(cacheKey);
+  if (fromSession) {
+    const resolved = Promise.resolve(fromSession);
+    _schoolsCache.set(cacheKey, resolved);
+    return resolved;
+  }
 
   const promise = (async () => {
     try {
@@ -245,6 +278,7 @@ export async function getActiveSchools(
       }
 
       filtered.sort((a, b) => a.name.localeCompare(b.name));
+      writeSessionCache(cacheKey, filtered);
       return filtered;
     } catch (error) {
       // On failure, drop the cached promise so the next caller retries.

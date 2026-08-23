@@ -11,8 +11,15 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <!-- Landing hero photography is served from Unsplash — warm the
-         connection so the first image starts downloading immediately. -->
+         connection AND preload the mobile-size hero so it downloads in
+         parallel with the JS instead of after the app boots. -->
     <link rel="preconnect" href="https://images.unsplash.com" />
+    <link
+      rel="preload"
+      as="image"
+      media="(max-width: 768px)"
+      href="https://images.unsplash.com/photo-1607237138185-eedd9c632b0b?auto=format&fit=crop&w=640&q=80"
+    />
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet" />
     <title>CollegeReady — Study Abroad Planning, Matching & Visa Practice</title>
     <meta name="description" content="Build a verified school shortlist, follow a personalised study-abroad roadmap, and rehearse your F-1 visa interview." />
