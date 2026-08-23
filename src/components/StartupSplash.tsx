@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import SplashScreen from "./SplashScreen";
 
@@ -21,6 +21,13 @@ export default function StartupSplash() {
   const [minTimeElapsed, setMinTimeElapsed] = useState(splashAlreadyShown);
   const [fading, setFading] = useState(false);
   const [gone, setGone] = useState(splashAlreadyShown);
+  // Guards the fade sequence so it starts exactly once. CRITICAL: the
+  // effect below must depend ONLY on `done` — a previous version also
+  // depended on `fading`, so setFading(true) re-ran the effect, whose
+  // cleanup cancelled the unmount timer. The invisible full-screen
+  // overlay then stayed mounted forever, swallowing every click on the
+  // page underneath.
+  const fadeStartedRef = useRef(false);
 
   useEffect(() => {
     if (splashAlreadyShown) return;
@@ -31,18 +38,21 @@ export default function StartupSplash() {
   const done = minTimeElapsed && !authLoading;
 
   useEffect(() => {
-    if (!done || gone || fading) return;
+    if (!done || fadeStartedRef.current) return;
+    fadeStartedRef.current = true;
     splashAlreadyShown = true;
     setFading(true);
     const timer = setTimeout(() => setGone(true), FADE_MS);
     return () => clearTimeout(timer);
-  }, [done, gone, fading]);
+  }, [done]);
 
   if (gone) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[100] transition-opacity ease-out"
+      // pointer-events-none the moment the fade starts — even if unmounting
+      // were ever delayed again, the page underneath stays clickable.
+      className={`fixed inset-0 z-[100] transition-opacity ease-out ${fading ? "pointer-events-none" : ""}`}
       style={{ transitionDuration: `${FADE_MS}ms`, opacity: fading ? 0 : 1 }}
     >
       <SplashScreen />
