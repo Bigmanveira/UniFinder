@@ -6,7 +6,6 @@ import { MaintenanceGate } from "./components/MaintenanceGate";
 import { AccountStatusGate } from "./components/AccountStatusGate";
 import SupportChatWidget from "./components/SupportChatWidget";
 import SplashScreen from "./components/SplashScreen";
-import StartupSplash from "./components/StartupSplash";
 import BrandLogo from "./components/BrandLogo";
 
 // Landing is eager so the very first paint doesn't wait on an extra
@@ -59,7 +58,7 @@ const WaitlistPage       = lazy(() => import("./pages/WaitlistPage"));
 const WAITLIST_MODE = import.meta.env.VITE_WAITLIST_MODE === "true";
 
 // Lightweight Suspense fallback for lazy route chunks after startup. The
-// full branded splash (StartupSplash) only plays once at cold start; this
+// gate splashes (ProtectedRoute/AccountStatusGate) cover auth loading; this
 // stays minimal so in-app navigations never replay a 1.2s hold.
 function PageLoader() {
   return (
@@ -106,7 +105,7 @@ function App() {
     <AuthProvider>
       <BrowserRouter>
         <ScrollToTopOnNavigation />
-        <StartupSplash />
+
         <Suspense fallback={<PageLoader />}>
           <Routes>
             {/* Public Routes that ALWAYS stay live — marketing + legal
