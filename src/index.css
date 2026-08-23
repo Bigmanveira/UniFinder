@@ -430,10 +430,11 @@
 }
 
 @layer utilities {
-  /* Loading placeholders: every content photo paints a warm block the
-     instant layout happens, so images never leave blank holes while the
-     network catches up (the "vanishing elements" on slow mobile). */
-  .cr-landing img,
+  /* Loading placeholders: content PHOTOS paint a warm block the instant
+     layout happens, so images never leave blank holes while the network
+     catches up. Scoped to lazy-loaded photos only — transparent-PNG UI
+     images (the logo glyph!) must never get a background painted under
+     them. */
   img[loading="lazy"] {
     background-color: #E6E4DD;
   }
