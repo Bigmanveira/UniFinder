@@ -189,6 +189,8 @@ export default function LandingPage() {
               <div className="relative ml-auto h-[420px] w-[86%] overflow-hidden rounded-card-lg shadow-card-hover sm:h-[500px] sm:w-[82%]">
                 <img
                   src={PHOTOS.campus.src}
+                  srcSet={`${PHOTOS.campus.src.replace("w=1600", "w=640")} 640w, ${PHOTOS.campus.src.replace("w=1600", "w=1024")} 1024w, ${PHOTOS.campus.src} 1600w`}
+                  sizes="(max-width: 640px) 90vw, (max-width: 1024px) 60vw, 640px"
                   alt={PHOTOS.campus.alt}
                   className="absolute inset-0 h-full w-full object-cover"
                   decoding="async"

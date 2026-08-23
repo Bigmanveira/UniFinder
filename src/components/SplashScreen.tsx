@@ -1,15 +1,14 @@
 import { useEffect, useState } from "react";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import BrandLogo from "./BrandLogo";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SplashScreen — full-screen branded loading surface: animated logo badge,
 // an indeterminate progress sweep, and rotating study-abroad facts.
 //
-// Pure visual — it renders for as long as it is mounted. Timing (minimum
-// display, fade-out, show-once) lives in StartupSplash. Also used directly
-// as the loading branch of the auth gates so nothing unbranded ever flashes
-// underneath the startup overlay.
+// Pure CSS animation on purpose: this renders during the app's very first
+// paint, so it must not pull framer-motion (~40 KB gz) into the entry
+// chunk. Timing (minimum display, fade-out, show-once) lives in
+// StartupSplash.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const FACTS = [
@@ -28,7 +27,6 @@ const FACTS = [
 const FACT_INTERVAL_MS = 2500;
 
 export default function SplashScreen() {
-  const reduceMotion = useReducedMotion();
   const [factIndex, setFactIndex] = useState(0);
 
   useEffect(() => {
@@ -40,6 +38,18 @@ export default function SplashScreen() {
 
   return (
     <div className="fixed inset-0 z-[100] bg-ink flex flex-col items-center justify-center overflow-hidden">
+      {/* Local keyframes — scoped here so the entry CSS stays tiny. All
+          honor prefers-reduced-motion below. */}
+      <style>{`
+        @keyframes crSplashPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+        @keyframes crSplashSweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(300%); } }
+        @keyframes crSplashIn { from { opacity: 0; transform: scale(0.6); } to { opacity: 1; transform: scale(1); } }
+        @media (prefers-reduced-motion: reduce) {
+          .cr-splash-logo, .cr-splash-sweep { animation: none !important; }
+          .cr-splash-sweep { width: 100%; opacity: 0.45; transform: none; }
+        }
+      `}</style>
+
       {/* Decorative ring + glow orbs, matching the dark Card decor language */}
       <div aria-hidden className="pointer-events-none absolute inset-0">
         <div className="absolute -right-16 -top-20 w-72 h-72 rounded-full border-[24px] border-primary-500/10" />
@@ -50,56 +60,31 @@ export default function SplashScreen() {
       <div className="relative flex flex-col items-center px-8">
         {/* Animated logo: scale-in, then a gentle breathing pulse with glow */}
         <div className="relative mb-10">
+          <div aria-hidden className="absolute inset-0 -m-6 rounded-full bg-primary-500/30 blur-2xl" />
           <div
-            aria-hidden
-            className="absolute inset-0 -m-6 rounded-full bg-primary-500/30 blur-2xl"
-          />
-          {reduceMotion ? (
-            <div className="relative">
-              <BrandLogo size="lg" tone="light" iconOnly asLink={false} />
-            </div>
-          ) : (
-            <motion.div
-              className="relative"
-              initial={{ scale: 0.6, opacity: 0 }}
-              animate={{ scale: [1, 1.06, 1], opacity: 1 }}
-              transition={{
-                opacity: { duration: 0.4, ease: "easeOut" },
-                scale: { duration: 2, repeat: Infinity, ease: "easeInOut", delay: 0.4 },
-              }}
-            >
-              <BrandLogo size="lg" tone="light" iconOnly asLink={false} />
-            </motion.div>
-          )}
+            className="cr-splash-logo relative"
+            style={{ animation: "crSplashIn 0.4s ease-out, crSplashPulse 2s ease-in-out 0.4s infinite" }}
+          >
+            <BrandLogo size="lg" tone="light" iconOnly asLink={false} />
+          </div>
         </div>
 
         {/* Loading widget: thin indeterminate sweep bar */}
         <div className="w-40 h-1 rounded-full bg-white/10 overflow-hidden mb-8" role="progressbar" aria-label="Loading">
-          {reduceMotion ? (
-            <div className="h-full w-full bg-primary-400/45 rounded-full" />
-          ) : (
-            <motion.div
-              className="h-full w-1/3 bg-primary-400 rounded-full"
-              animate={{ x: ["-100%", "300%"] }}
-              transition={{ duration: 1.4, repeat: Infinity, ease: "easeInOut" }}
-            />
-          )}
+          <div
+            className="cr-splash-sweep h-full w-1/3 bg-primary-400 rounded-full"
+            style={{ animation: "crSplashSweep 1.4s ease-in-out infinite" }}
+          />
         </div>
 
-        {/* Rotating facts */}
+        {/* Rotating facts — key remount retriggers the entry animation */}
         <div className="h-10 flex items-start justify-center max-w-xs" aria-live="polite">
-          <AnimatePresence mode="wait">
-            <motion.p
-              key={factIndex}
-              initial={reduceMotion ? { opacity: 1 } : { opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: -8 }}
-              transition={{ duration: reduceMotion ? 0 : 0.3 }}
-              className="text-sm font-medium text-white/60 text-center leading-snug"
-            >
-              {FACTS[factIndex]}
-            </motion.p>
-          </AnimatePresence>
+          <p
+            key={factIndex}
+            className="animate-fade-in-up text-sm font-medium text-white/60 text-center leading-snug"
+          >
+            {FACTS[factIndex]}
+          </p>
         </div>
       </div>
     </div>
