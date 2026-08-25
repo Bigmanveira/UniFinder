@@ -55,15 +55,18 @@ export default function GenerationLoader({ mode }: { mode: CvMode }) {
   // Cross-fade between status lines. 1.6s per line; the FADE out
   // lasts 250ms before we swap text + fade back in.
   useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
     const interval = setInterval(() => {
       setVisible(false);
-      const timeout = setTimeout(() => {
+      timeout = setTimeout(() => {
         setStageIndex((i) => (i + 1) % lines.length);
         setVisible(true);
       }, 250);
-      return () => clearTimeout(timeout);
     }, 1_600);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      if (timeout !== undefined) clearTimeout(timeout);
+    };
   }, [lines.length]);
 
   const stageLabel = mode === "build" ? "Building" : mode === "convert" ? "Converting" : "Reviewing";
@@ -75,7 +78,7 @@ export default function GenerationLoader({ mode }: { mode: CvMode }) {
             pen icon — motion carries the "working" signal, the icon stays
             calm. Halo pulse kept for depth. */}
         <div className="relative mb-7">
-          <div className="absolute inset-[-12px] rounded-full bg-primary-500/15 blur-2xl animate-pulse" aria-hidden />
+          <div className="absolute inset-[-12px] rounded-full bg-[radial-gradient(closest-side,rgba(59,130,246,0.15),transparent_70%)] animate-pulse" aria-hidden />
           <div
             aria-hidden
             className="absolute inset-[-7px] rounded-full border-[3px] border-primary-100 border-t-primary-500 animate-spin"

@@ -54,7 +54,7 @@ export default function CvStudioPage() {
       <section className="relative max-w-5xl mx-auto px-5 pt-14 sm:pt-20 pb-10 sm:pb-14 text-center">
         <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-white border border-slate-200/70 shadow-sm mb-7">
           <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full rounded-full bg-primary-500 opacity-75 animate-ping" />
+            <span className="absolute inline-flex h-full w-full rounded-full bg-primary-500 opacity-75 animate-ping motion-reduce:animate-none" />
             <span className="relative inline-flex rounded-full h-2 w-2 bg-primary-600" />
           </span>
           <Eyebrow className="text-slate-700">CV Studio · New</Eyebrow>
@@ -158,7 +158,7 @@ function ToolHeroTile({
     >
       {/* Signature ring + orb decor */}
       <div aria-hidden className="absolute -right-8 -top-10 w-36 h-36 rounded-full border-[18px] border-primary-500/20" />
-      <div aria-hidden className="absolute -right-6 top-8 w-48 h-48 rounded-full bg-primary-500/15 blur-3xl" />
+      <div aria-hidden className="absolute -right-6 top-8 w-48 h-48 rounded-full bg-[radial-gradient(closest-side,rgba(59,130,246,0.15),transparent_70%)]" />
 
       <div className="relative flex flex-col h-full">
         <div className="flex items-center justify-between mb-6">

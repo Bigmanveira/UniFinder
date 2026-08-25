@@ -1,6 +1,8 @@
-import { collection, query, where, getDocs } from "firebase/firestore";
-import { db } from "../firebase";
 import type { School } from "../../types";
+
+// Firebase is imported dynamically ONLY in the Firestore fallback path —
+// the primary data source is the static /schools-v1.json bundle, so most
+// sessions never need the Firestore SDK for school data at all.
 
 // ─────────────────────────────────────────────────────────────
 // Two-year / non-degree-granting institution patterns
@@ -245,6 +247,35 @@ function writeSessionCache(cacheKey: string, schools: School[]): void {
   }
 }
 
+// Primary source: the static schools bundle exported at deploy time by
+// scripts/exportSchoolsJson.mjs. One brotli-compressed CDN file (~250 KB
+// over the wire) replaces streaming ~6,200 Firestore docs (multi-MB) on
+// every first visit — the single biggest mobile "slow load" in the app.
+// Falls back to the live Firestore query if the file is missing, corrupt,
+// or the deploy predates the exporter, so matching can never break.
+async function fetchSchools(): Promise<School[]> {
+  try {
+    const resp = await fetch("/schools-v1.json");
+    if (resp.ok) {
+      const data = (await resp.json()) as School[];
+      if (Array.isArray(data) && data.length > 0) return data;
+    }
+  } catch {
+    // Network/parse failure — fall through to Firestore.
+  }
+
+  const [{ collection, query, where, getDocs }, { db }] = await Promise.all([
+    import("firebase/firestore"),
+    import("../firebase"),
+  ]);
+  const snapshot = await getDocs(query(collection(db, "schools"), where("status", "==", "active")));
+  const schools: School[] = [];
+  snapshot.forEach((doc) => {
+    schools.push(doc.data() as School);
+  });
+  return schools;
+}
+
 export async function getActiveSchools(
   degreeLevel?: "undergraduate" | "graduate"
 ): Promise<School[]> {
@@ -261,14 +292,7 @@ export async function getActiveSchools(
 
   const promise = (async () => {
     try {
-      const schoolsRef = collection(db, "schools");
-      const q = query(schoolsRef, where("status", "==", "active"));
-      const snapshot = await getDocs(q);
-
-      const schools: School[] = [];
-      snapshot.forEach((doc) => {
-        schools.push(doc.data() as School);
-      });
+      const schools = await fetchSchools();
 
       let filtered = schools;
 

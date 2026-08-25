@@ -231,11 +231,21 @@ export default function SupportChatWidget() {
       return;
     }
 
+    // Fire-once: the launcher only ever transitions hidden → visible, so the
+    // listener detaches at the threshold instead of calling setState on every
+    // scroll frame for the rest of the landing session.
+    const threshold = Math.min(window.innerHeight * 0.7, 560);
+    if (window.scrollY > threshold) {
+      setLandingLauncherReady(true);
+      return;
+    }
+    setLandingLauncherReady(false);
     const updateLauncherVisibility = () => {
-      const threshold = Math.min(window.innerHeight * 0.7, 560);
-      setLandingLauncherReady(window.scrollY > threshold);
+      if (window.scrollY > threshold) {
+        setLandingLauncherReady(true);
+        window.removeEventListener("scroll", updateLauncherVisibility);
+      }
     };
-    updateLauncherVisibility();
     window.addEventListener("scroll", updateLauncherVisibility, { passive: true });
     return () => window.removeEventListener("scroll", updateLauncherVisibility);
   }, [location.pathname]);

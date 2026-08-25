@@ -36,10 +36,21 @@ export default function HomeScreen() {
   const [searchParams, setSearchParams] = useSearchParams();
   const railRef = useRef<HTMLDivElement>(null);
   const [railPage, setRailPage] = useState(0);
+  // rAF-coalesced: onScroll fires every frame of a touch fling, and this
+  // screen consumes useAppData(), so an unguarded setState per event was
+  // re-rendering the whole subtree at 60–120 Hz on phones. One read per
+  // frame, and setRailPage's identity-bail skips renders when the dot
+  // index hasn't changed.
+  const railTickRef = useRef(false);
   const handleRailScroll = () => {
-    const el = railRef.current;
-    if (!el) return;
-    setRailPage(Math.max(0, Math.round(el.scrollLeft / RAIL_STRIDE)));
+    if (railTickRef.current) return;
+    railTickRef.current = true;
+    requestAnimationFrame(() => {
+      railTickRef.current = false;
+      const el = railRef.current;
+      if (!el) return;
+      setRailPage(Math.max(0, Math.round(el.scrollLeft / RAIL_STRIDE)));
+    });
   };
   const {
     credits, isFounder, matchReports, interviewReports, savedSchools,

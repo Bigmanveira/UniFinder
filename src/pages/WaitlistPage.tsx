@@ -52,9 +52,14 @@ const SLIDES: Array<{
    *  bias the crop upward to keep her in frame on portrait-mobile screens. */
   objectPosition?: string;
   duration:       number;
+  /** Intrinsic dimensions — lets the browser reserve decode work correctly. */
+  width:          number;
+  height:         number;
 }> = [
   {
     image:          "/anna.webp",
+    width:          1280,
+    height:         720,
     alt:            "Anna, the AI consular officer practising an F-1 interview",
     badge:          "Live AI Consular Officer",
     headlineTop:    "Match your college.",
@@ -65,6 +70,8 @@ const SLIDES: Array<{
   },
   {
     image:          "https://images.unsplash.com/photo-1607237138185-eedd9c632b0b?auto=format&fit=crop&w=1600&q=80",
+    width:          1600,
+    height:         1067,
     alt:            "Stanford University campus archway",
     badge:          "Verified College Matches",
     headlineTop:    "Real colleges.",
@@ -74,6 +81,8 @@ const SLIDES: Array<{
   },
   {
     image:          "https://images.unsplash.com/photo-1541339907198-e08756dedf3f?auto=format&fit=crop&w=1600&q=80",
+    width:          1600,
+    height:         1067,
     alt:            "Students walking through a sunlit campus",
     badge:          "Personalised AI Reasoning",
     headlineTop:    "Clear reasons.",
@@ -172,6 +181,8 @@ export default function WaitlistPage() {
             key={s.image}
             src={s.image}
             alt=""
+            width={s.width}
+            height={s.height}
             decoding="async"
             loading={i === 0 ? "eager" : "lazy"}
             className="absolute inset-0 w-full h-full object-cover"
@@ -210,8 +221,8 @@ export default function WaitlistPage() {
       {/* Signature ink-hero decor — ring + primary glow orbs. Desktop only:
           soft blurs on mobile are paint-expensive on low-end GPUs. */}
       <div className="hidden md:block absolute -right-16 -top-24 w-72 h-72 rounded-full border-[24px] border-primary-500/15 z-[1] pointer-events-none" aria-hidden />
-      <div className="hidden md:block absolute -top-32 -left-32 w-[480px] h-[480px] rounded-full bg-primary-600/20 blur-[140px] z-[1] pointer-events-none" aria-hidden />
-      <div className="hidden md:block absolute -bottom-40 left-1/4 w-[520px] h-[520px] rounded-full bg-primary-500/15 blur-[160px] z-[1] pointer-events-none" aria-hidden />
+      <div className="hidden md:block absolute -top-32 -left-32 w-[480px] h-[480px] rounded-full bg-[radial-gradient(closest-side,rgba(37,99,235,0.2),transparent_70%)] z-[1] pointer-events-none" aria-hidden />
+      <div className="hidden md:block absolute -bottom-40 left-1/4 w-[520px] h-[520px] rounded-full bg-[radial-gradient(closest-side,rgba(59,130,246,0.15),transparent_70%)] z-[1] pointer-events-none" aria-hidden />
 
       {/* ── Top bar: logo + socials ──────────────────────────────────────── */}
       <header className="relative z-10 shrink-0 px-5 sm:px-8 lg:px-12 pt-5 sm:pt-6 flex items-center justify-between">
@@ -227,6 +238,9 @@ export default function WaitlistPage() {
               src={webLogo}
               alt=""
               aria-hidden
+              width={500}
+              height={500}
+              decoding="async"
               className="w-full h-full object-contain scale-[1.55] translate-y-[2px] select-none"
               style={{ filter: "brightness(0) invert(1)" }}
               draggable={false}

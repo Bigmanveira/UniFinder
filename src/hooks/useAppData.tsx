@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import { db } from "../lib/firebase";
@@ -133,34 +133,42 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
     };
   }, [user]);
 
-  const handleSignOut = async () => {
+  const handleSignOut = useCallback(async () => {
     // signOutWithAudit writes a user_sign_out event to /userAuditLogs first,
     // then resolves the actual Firebase signOut. Audit failure is swallowed
     // inside the helper so a Firestore hiccup can never block sign-out.
     await signOutWithAudit();
     navigate("/");
-  };
+  }, [navigate]);
 
   const emailHandle = user?.email ? user.email.split("@")[0] : "Student";
   const username = userProfile?.displayName?.trim() || emailHandle;
   const avatarURL = userProfile?.photoURL ?? null;
 
+  // Memoized so consumers only re-render when a value they read actually
+  // changed — six live Firestore listeners feed this provider, and a fresh
+  // object identity per render was cascading every snapshot into a full
+  // shell + screen re-render on mobile.
+  const value = useMemo<AppData>(
+    () => ({
+      credits,
+      isFounder,
+      matchReports,
+      interviewReports,
+      savedSchools,
+      studyRoadmap,
+      studyRoadmapLoaded,
+      userProfile,
+      username,
+      avatarURL,
+      handleSignOut,
+    }),
+    [credits, isFounder, matchReports, interviewReports, savedSchools,
+     studyRoadmap, studyRoadmapLoaded, userProfile, username, avatarURL, handleSignOut],
+  );
+
   return (
-    <AppDataContext.Provider
-      value={{
-        credits,
-        isFounder,
-        matchReports,
-        interviewReports,
-        savedSchools,
-        studyRoadmap,
-        studyRoadmapLoaded,
-        userProfile,
-        username,
-        avatarURL,
-        handleSignOut,
-      }}
-    >
+    <AppDataContext.Provider value={value}>
       {children}
     </AppDataContext.Provider>
   );

@@ -260,9 +260,9 @@ function Dashboard({
           gradient delivers depth without making the page feel like a
           chatbot. */}
       <div className="absolute inset-0 -z-10 overflow-hidden pointer-events-none" aria-hidden>
-        <div className="absolute -top-40 -right-40 w-[640px] h-[640px] rounded-full blur-[160px] bg-gradient-to-br from-slate-300/35 via-slate-200/15 to-transparent" />
-        <div className="absolute top-1/3 -left-40 w-[520px] h-[520px] rounded-full blur-[160px] bg-gradient-to-br from-stone-200/40 via-slate-100/20 to-transparent" />
-        <div className="absolute -bottom-40 right-1/4 w-[560px] h-[560px] rounded-full blur-[160px] bg-gradient-to-tr from-slate-200/30 via-white/0 to-transparent" />
+        <div className="absolute -top-40 -right-40 w-[640px] h-[640px] rounded-full bg-[radial-gradient(closest-side,rgba(203,213,225,0.35),rgba(226,232,240,0.15)_45%,transparent_70%)]" />
+        <div className="absolute top-1/3 -left-40 w-[520px] h-[520px] rounded-full bg-[radial-gradient(closest-side,rgba(231,229,228,0.4),rgba(241,245,249,0.2)_45%,transparent_70%)]" />
+        <div className="absolute -bottom-40 right-1/4 w-[560px] h-[560px] rounded-full bg-[radial-gradient(closest-side,rgba(226,232,240,0.3),transparent_70%)]" />
       </div>
 
       {/* Persistent stage marker rides in the sticky header's action slot, so
@@ -402,7 +402,7 @@ function Hero({
     >
       {/* Soft brand-blue wash anchored to the upper-right of the hero so
           the eye reads "progress" without the whole card being tinted. */}
-      <div className="pointer-events-none absolute -top-20 -right-20 w-72 h-72 rounded-full blur-3xl bg-gradient-to-br from-primary-100/60 to-transparent" aria-hidden />
+      <div className="pointer-events-none absolute -top-20 -right-20 w-72 h-72 rounded-full bg-[radial-gradient(closest-side,rgba(219,234,254,0.6),transparent_70%)]" aria-hidden />
       <div className="flex items-center gap-2">
         <Eyebrow tone="primary">
           Stage {stageIndex + 1} of 6
@@ -734,7 +734,7 @@ function NextStageBanner({
   return (
     <section className="bg-ink text-white rounded-card-lg overflow-hidden p-6 sm:p-7 relative">
       <div aria-hidden className="pointer-events-none absolute -right-8 -top-10 w-36 h-36 rounded-full border-[18px] border-primary-500/20" />
-      <div aria-hidden className="pointer-events-none absolute -right-6 top-8 w-48 h-48 rounded-full bg-primary-500/15 blur-3xl" />
+      <div aria-hidden className="pointer-events-none absolute -right-6 top-8 w-48 h-48 rounded-full bg-[radial-gradient(closest-side,rgba(59,130,246,0.15),transparent_70%)]" />
       <div className="relative flex flex-col sm:flex-row sm:items-center gap-4">
         <div className="w-11 h-11 rounded-2xl bg-white/15 backdrop-blur-md flex items-center justify-center flex-shrink-0">
           <CheckCircle2 size={22} className="text-white" />

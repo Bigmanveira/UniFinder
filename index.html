@@ -20,7 +20,19 @@
       media="(max-width: 768px)"
       href="https://images.unsplash.com/photo-1607237138185-eedd9c632b0b?auto=format&fit=crop&w=640&q=80"
     />
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet" />
+    <!-- Fonts load asynchronously (media="print" swap trick): the Google
+         Fonts CSS is two render-blocking round-trips on cold mobile
+         connections, and display=swap already guarantees readable system
+         text until the webfonts arrive — so nothing should block on it. -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap"
+      rel="stylesheet"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript>
+      <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet" />
+    </noscript>
     <title>CollegeReady — Study Abroad Planning, Matching & Visa Practice</title>
     <meta name="description" content="Build a verified school shortlist, follow a personalised study-abroad roadmap, and rehearse your F-1 visa interview." />
     <meta name="theme-color" content="#0f172a" />

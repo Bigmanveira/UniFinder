@@ -1,6 +1,8 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
 import { reportClientError } from "../lib/clientErrorReporter";
-import webLogo from "../assets/weblogo.png";
+// Small logo variant: this component is in the ENTRY bundle (mounted from
+// main.tsx), so it must not drag the 49 KB full-size PNG into first paint.
+import webLogo from "../assets/weblogo-160.png";
 
 interface Props {
   children: ReactNode;

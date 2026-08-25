@@ -19,15 +19,17 @@ const AuthContext = createContext<AuthContextType>({
 });
 
 // ── Idle-timeout config ───────────────────────────────────────────────────────
-// Sign the user out after 15 minutes of no input. Resets on any user-driven
-// event (pointer move, key press, touch). We use both pointer and touch
-// listeners so mobile users count as active when they're tapping the screen.
+// Sign the user out after 15 minutes of no input. Resets on user-driven
+// events. Deliberately does NOT listen to `pointermove`/`scroll`: those fire
+// 60–120×/s during a touch fling, and re-arming a timer on every frame was a
+// measurable mobile scroll cost. `pointerdown`/`touchstart`/`keydown` already
+// prove presence — you can't scroll without touching the screen first.
 const IDLE_TIMEOUT_MS = 15 * 60 * 1000;
-// Activity events that should reset the idle timer. `visibilitychange` covers
-// "tab brought back to focus"; `keydown` covers desktop typing; pointer/touch
-// cover everything else.
+// A 15-minute window doesn't need sub-second resolution, so resets are also
+// rate-limited to once per 5 s.
+const IDLE_RESET_THROTTLE_MS = 5_000;
 const ACTIVITY_EVENTS: (keyof DocumentEventMap)[] = [
-  "pointerdown", "pointermove", "keydown", "touchstart", "scroll", "visibilitychange",
+  "pointerdown", "keydown", "touchstart", "visibilitychange",
 ];
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
@@ -73,7 +75,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     if (!user) return;
 
+    let lastReset = 0;
     const resetTimer = () => {
+      const now = Date.now();
+      if (now - lastReset < IDLE_RESET_THROTTLE_MS) return;
+      lastReset = now;
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       idleTimerRef.current = setTimeout(() => {
         console.log("[auth] 15min idle — signing out");

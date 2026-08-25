@@ -29,7 +29,7 @@ type BucketKey = "all" | "reach" | "target" | "safety";
 // Vetted decorative campus photo (visually verified in production) — used only
 // as a heavily blurred, low-opacity backdrop strip behind the page content.
 const CAMPUS_BACKDROP =
-  "https://images.unsplash.com/photo-1607237138185-eedd9c632b0b?auto=format&fit=crop&w=1600&q=80";
+  "https://images.unsplash.com/photo-1607237138185-eedd9c632b0b?auto=format&fit=crop&w=64&q=50&blur=200";
 
 const STUDY_TIPS = [
   "Most U.S. graduate programs review applications on a rolling basis — the earlier you apply, the better your funding odds.",
@@ -180,7 +180,7 @@ export default function LockedPreviewPage() {
   useEffect(() => {
     if (!unlocking) { setUnlockElapsed(0); setTipIndex(0); return; }
     const start = Date.now();
-    const elapsedId = setInterval(() => setUnlockElapsed(Math.floor((Date.now() - start) / 1000)), 250);
+    const elapsedId = setInterval(() => setUnlockElapsed(Math.floor((Date.now() - start) / 1000)), 1000);
     const tipId = setInterval(() => setTipIndex(i => (i + 1) % STUDY_TIPS.length), 5000);
     return () => { clearInterval(elapsedId); clearInterval(tipId); };
   }, [unlocking]);
@@ -234,11 +234,11 @@ export default function LockedPreviewPage() {
           soft blurred orbs, and the navy ring motif. All aria-hidden +
           pointer-events-none; content contrast always wins. */}
       <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[420px] overflow-hidden">
-        <img src={CAMPUS_BACKDROP} alt="" className="h-full w-full object-cover opacity-10 blur-2xl" />
+        <img src={CAMPUS_BACKDROP} alt="" aria-hidden loading="lazy" decoding="async" width={64} height={43} className="h-full w-full object-cover opacity-10" />
         <div className="absolute inset-0 bg-gradient-to-b from-surface/40 via-surface/70 to-surface" />
       </div>
-      <div className="pointer-events-none absolute top-[-80px] right-[-120px] w-[420px] h-[420px] bg-primary-200/40 rounded-full blur-[120px]" aria-hidden />
-      <div className="pointer-events-none absolute top-[180px] left-[-100px] w-[360px] h-[360px] bg-sky-200/50 rounded-full blur-[130px]" aria-hidden />
+      <div className="pointer-events-none absolute top-[-80px] right-[-120px] w-[420px] h-[420px] bg-[radial-gradient(closest-side,rgba(191,219,254,0.4),transparent_70%)] rounded-full" aria-hidden />
+      <div className="pointer-events-none absolute top-[180px] left-[-100px] w-[360px] h-[360px] bg-[radial-gradient(closest-side,rgba(186,230,253,0.5),transparent_70%)] rounded-full" aria-hidden />
       <div aria-hidden className="pointer-events-none absolute right-[-70px] top-[260px] hidden h-56 w-56 rounded-full border-[24px] border-primary-500/10 lg:block" />
       <div aria-hidden className="pointer-events-none absolute left-[-60px] bottom-[180px] hidden h-44 w-44 rounded-full border-[18px] border-primary-500/10 xl:block" />
 
@@ -530,13 +530,13 @@ function UnlockDock({
           >
             {/* Subtle background blooms inside the card */}
             <div aria-hidden className="absolute -right-8 -top-10 w-36 h-36 rounded-full border-[18px] border-primary-500/20 pointer-events-none" />
-            <div className="absolute -top-12 -right-12 w-48 h-48 bg-primary-500/25 rounded-full blur-[90px] pointer-events-none" />
-            <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-sky-500/20 rounded-full blur-[90px] pointer-events-none" />
+            <div className="absolute -top-12 -right-12 w-48 h-48 bg-[radial-gradient(closest-side,rgba(59,130,246,0.25),transparent_70%)] rounded-full pointer-events-none" />
+            <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-[radial-gradient(closest-side,rgba(14,165,233,0.2),transparent_70%)] rounded-full pointer-events-none" />
 
             <div className="relative px-6 py-7 text-center">
               {/* Hero spinner with pulsing ring */}
               <div className="relative w-20 h-20 mx-auto mb-5">
-                <div className="absolute inset-0 rounded-full bg-primary-500/20 animate-ping" style={{ animationDuration: "2s" }} />
+                <div className="absolute inset-0 rounded-full bg-primary-500/20 animate-ping motion-reduce:animate-none" style={{ animationDuration: "2s" }} />
                 <div className="absolute inset-1 rounded-full border-[3px] border-white/15" />
                 <div className="absolute inset-1 rounded-full border-[3px] border-t-primary-400 border-r-transparent border-b-transparent border-l-transparent animate-spin" style={{ animationDuration: "1.4s" }} />
                 <div className="absolute inset-0 m-auto w-10 h-10 flex items-center justify-center">

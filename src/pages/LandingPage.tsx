@@ -68,15 +68,15 @@ const PHOTOS = {
     alt: "Red-brick university hall overlooking a wide campus lawn on a sunny day",
   },
   studying: {
-    src: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=900&q=80",
+    src: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=640&q=80",
     alt: "Three students laughing together while working on laptops at a shared table",
   },
   graduation: {
-    src: "https://images.unsplash.com/photo-1523580846011-d3a5bc25702b?auto=format&fit=crop&w=900&q=80",
+    src: "https://images.unsplash.com/photo-1523580846011-d3a5bc25702b?auto=format&fit=crop&w=640&q=80",
     alt: "Graduate in cap and gown facing the crowd at a graduation ceremony",
   },
   takeoff: {
-    src: "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=900&q=80",
+    src: "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=640&q=80",
     alt: "Airplane wing above the clouds at sunset, seen from a window seat",
   },
 } as const;
@@ -100,7 +100,7 @@ export default function LandingPage() {
 
       {/* ── Floating glass pill navbar ─────────────────────────────────── */}
       <header className="fixed inset-x-0 top-0 z-50 px-3 pt-3 sm:px-5 sm:pt-4">
-        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between rounded-full border border-slate-200/70 bg-white/85 px-4 shadow-card backdrop-blur-xl sm:px-5">
+        <div className="mx-auto flex h-14 max-w-5xl items-center justify-between rounded-full border border-slate-200/70 bg-white/95 px-4 shadow-card sm:px-5 md:bg-white/85 md:backdrop-blur-xl">
           <BrandLogo size="sm" />
           <nav className="hidden items-center gap-6 lg:flex" aria-label="Primary">
             <a href="#how-it-works" className="text-sm font-bold text-slate-500 transition-colors hover:text-slate-900">How it works</a>
@@ -133,8 +133,8 @@ export default function LandingPage() {
         <section className="relative overflow-hidden px-5 pb-16 pt-28 sm:pt-36 lg:pb-24">
           {/* Soft primary-tinted background field */}
           <div aria-hidden className="pointer-events-none absolute inset-0">
-            <div className="absolute -left-32 top-10 h-[420px] w-[420px] rounded-full bg-primary-200/40 blur-[120px]" />
-            <div className="absolute -right-40 top-64 h-[460px] w-[460px] rounded-full bg-sky-200/50 blur-[130px]" />
+            <div className="absolute -left-32 top-10 h-[420px] w-[420px] rounded-full bg-[radial-gradient(closest-side,rgba(191,219,254,0.4),transparent_70%)]" />
+            <div className="absolute -right-40 top-64 h-[460px] w-[460px] rounded-full bg-[radial-gradient(closest-side,rgba(186,230,253,0.5),transparent_70%)]" />
             <div className="absolute right-[10%] top-20 hidden h-40 w-40 rounded-full border-[16px] border-primary-500/10 lg:block" />
           </div>
 
@@ -192,13 +192,15 @@ export default function LandingPage() {
                   srcSet={`${PHOTOS.campus.src.replace("w=1600", "w=640")} 640w, ${PHOTOS.campus.src.replace("w=1600", "w=1024")} 1024w, ${PHOTOS.campus.src} 1600w`}
                   sizes="(max-width: 640px) 90vw, (max-width: 1024px) 60vw, 640px"
                   alt={PHOTOS.campus.alt}
+                  width={1600}
+                  height={1067}
                   className="absolute inset-0 h-full w-full object-cover"
                   decoding="async"
                   fetchPriority="high"
                 />
                 <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-ink/70 via-ink/10 to-transparent" />
                 {/* Floating chip: directory proof */}
-                <span className="absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-full border border-white/30 bg-white/20 px-3 py-1.5 text-[10px] font-black uppercase tracking-eyebrow text-white backdrop-blur-md">
+                <span className="absolute right-4 top-4 inline-flex items-center gap-1.5 rounded-full border border-white/30 bg-white/40 px-3 py-1.5 text-[10px] font-black uppercase tracking-eyebrow text-white md:bg-white/20 md:backdrop-blur-md">
                   <BadgeCheck size={12} aria-hidden />
                   6,000+ schools
                 </span>
@@ -372,6 +374,8 @@ export default function LandingPage() {
                       <img
                         src={step.photo.src}
                         alt={step.photo.alt}
+                        width={640}
+                        height={427}
                         className="absolute inset-0 h-full w-full object-cover"
                         loading="lazy"
                         decoding="async"
@@ -438,12 +442,14 @@ export default function LandingPage() {
                     <img
                       src="/anna.webp"
                       alt="Officer Anna, the AI visa interview officer"
+                      width={1280}
+                      height={720}
                       className="absolute inset-0 h-full w-full object-cover object-top"
                       loading="lazy"
                       decoding="async"
                     />
                     <div aria-hidden className="absolute inset-0 bg-gradient-to-t from-ink/70 via-transparent to-transparent" />
-                    <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-rose-500/20 px-2.5 py-1 text-[10px] font-black text-rose-200 backdrop-blur-md">
+                    <span className="absolute right-3 top-3 inline-flex items-center gap-1.5 rounded-full bg-rose-500/40 px-2.5 py-1 text-[10px] font-black text-rose-200 md:bg-rose-500/20 md:backdrop-blur-md">
                       <span aria-hidden className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose-400" />
                       REC
                     </span>

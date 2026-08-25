@@ -202,9 +202,9 @@ export default function GuestMatchWizard() {
           gutters. Purely visual: aria-hidden, no pointer events, clipped so
           nothing can cause horizontal overflow. */}
       <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-40 top-[-140px] h-[440px] w-[440px] rounded-full bg-primary-200/40 blur-[120px]" />
-        <div className="absolute -right-32 bottom-[-160px] h-[480px] w-[480px] rounded-full bg-sky-200/50 blur-[130px]" />
-        <div className="absolute right-[-60px] top-1/2 h-72 w-72 -translate-y-1/2 rounded-full bg-primary-200/40 blur-[120px]" />
+        <div className="absolute -left-40 top-[-140px] h-[440px] w-[440px] rounded-full bg-[radial-gradient(closest-side,rgba(191,219,254,0.4),transparent_70%)]" />
+        <div className="absolute -right-32 bottom-[-160px] h-[480px] w-[480px] rounded-full bg-[radial-gradient(closest-side,rgba(186,230,253,0.5),transparent_70%)]" />
+        <div className="absolute right-[-60px] top-1/2 h-72 w-72 -translate-y-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(191,219,254,0.4),transparent_70%)]" />
         <div className="hidden lg:block absolute left-[calc(50%-560px)] top-24 h-36 w-36 rounded-full border-[18px] border-primary-500/20" />
         <div className="hidden lg:block absolute right-[calc(50%-580px)] bottom-28 h-44 w-44 rounded-full border-[18px] border-primary-500/10" />
       </div>

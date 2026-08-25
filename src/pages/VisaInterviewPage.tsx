@@ -597,8 +597,8 @@ export default function VisaInterviewPage() {
 
   return (
     <div className="min-h-screen bg-surface text-slate-900 antialiased pb-20 relative overflow-hidden">
-      <div className="pointer-events-none absolute top-[-100px] right-[-100px] w-[440px] h-[440px] bg-primary-200/40 rounded-full blur-[120px]" aria-hidden />
-      <div className="pointer-events-none absolute bottom-[-140px] left-[-140px] w-[400px] h-[400px] bg-sky-200/40 rounded-full blur-[120px]" aria-hidden />
+      <div className="pointer-events-none absolute top-[-100px] right-[-100px] w-[440px] h-[440px] bg-[radial-gradient(closest-side,rgba(191,219,254,0.4),transparent_70%)] rounded-full" aria-hidden />
+      <div className="pointer-events-none absolute bottom-[-140px] left-[-140px] w-[400px] h-[400px] bg-[radial-gradient(closest-side,rgba(186,230,253,0.4),transparent_70%)] rounded-full" aria-hidden />
       <div className="pointer-events-none absolute left-[-60px] top-1/3 h-40 w-40 rounded-full border-[18px] border-primary-500/10" aria-hidden />
 
       <AppHeader
@@ -762,8 +762,8 @@ function FullScreenInterview({
     <div className="fixed inset-0 z-40 bg-ink text-white overflow-hidden">
       {/* Soft ambient glow behind the avatar — gives the dark background
           some life without distracting from the video. */}
-      <div className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80vmin] h-[80vmin] bg-primary-500/10 rounded-full blur-[120px]" aria-hidden />
-      <div className="pointer-events-none absolute bottom-0 right-0 w-[40vmin] h-[40vmin] bg-sky-500/10 rounded-full blur-[100px]" aria-hidden />
+      <div className="pointer-events-none absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[80vmin] h-[80vmin] bg-[radial-gradient(closest-side,rgba(59,130,246,0.1),transparent_70%)] rounded-full" aria-hidden />
+      <div className="pointer-events-none absolute bottom-0 right-0 w-[40vmin] h-[40vmin] bg-[radial-gradient(closest-side,rgba(14,165,233,0.1),transparent_70%)] rounded-full" aria-hidden />
       {/* Signature ring decor from the navy card language. */}
       <div className="pointer-events-none absolute -right-10 -top-14 w-44 h-44 rounded-full border-[18px] border-primary-500/10" aria-hidden />
 
@@ -897,7 +897,7 @@ function BeautifulStatusPill({ stage }: { stage: ActiveStage }) {
         {/* Mic chip with pulsing halo. The outer span animates a ping
             that radiates outward; the inner circle holds the icon. */}
         <span className="relative flex items-center justify-center w-9 h-9 flex-shrink-0">
-          <span className="absolute inset-0 rounded-full bg-[#E8F5E9]/40 animate-ping" />
+          <span className="absolute inset-0 rounded-full bg-[#E8F5E9]/40 animate-ping motion-reduce:animate-none" />
           <span className="absolute inset-0 rounded-full bg-[#E8F5E9]/20" />
           <span className="relative w-7 h-7 rounded-full bg-[#E8F5E9] flex items-center justify-center shadow-lg shadow-black/30">
             <Mic size={13} className="text-[#2E7D32]" />

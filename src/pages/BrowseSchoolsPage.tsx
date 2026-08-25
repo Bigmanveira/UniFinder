@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { getActiveSchools } from "../lib/schools/getSchools";
 import type { School } from "../types";
@@ -56,16 +56,25 @@ export default function BrowseSchoolsPage() {
     return Array.from(set).sort();
   }, [schools]);
 
-  // Apply filters
+  // Apply filters. The query is deferred so each keystroke's input update
+  // stays instant while the 6,200-row filter runs at lower priority, and
+  // lowercase names are precomputed once per dataset instead of per keypress.
+  const deferredQuery = useDeferredValue(query);
+  const indexed = useMemo(
+    () => schools.map((s) => ({ s, nameLower: s.name.toLowerCase() })),
+    [schools],
+  );
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return schools.filter(s => {
-      if (q && !s.name.toLowerCase().includes(q)) return false;
-      if (stateF && s.state !== stateF) return false;
-      if (ownerF && s.ownership !== ownerF) return false;
-      return true;
-    });
-  }, [schools, query, stateF, ownerF]);
+    const q = deferredQuery.trim().toLowerCase();
+    const out: School[] = [];
+    for (const { s, nameLower } of indexed) {
+      if (q && !nameLower.includes(q)) continue;
+      if (stateF && s.state !== stateF) continue;
+      if (ownerF && s.ownership !== ownerF) continue;
+      out.push(s);
+    }
+    return out;
+  }, [indexed, deferredQuery, stateF, ownerF]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage   = Math.min(page, totalPages - 1);

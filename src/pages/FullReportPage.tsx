@@ -26,7 +26,7 @@ import { formatTokens } from "../lib/tokens";
 // Vetted decorative campus photo (visually verified in production) — used only
 // as a heavily blurred, low-opacity backdrop strip behind the page content.
 const CAMPUS_BACKDROP =
-  "https://images.unsplash.com/photo-1607237138185-eedd9c632b0b?auto=format&fit=crop&w=1600&q=80";
+  "https://images.unsplash.com/photo-1607237138185-eedd9c632b0b?auto=format&fit=crop&w=64&q=50&blur=200";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SchoolLogo — small circular logo badge with graceful Clearbit → favicon
@@ -728,11 +728,11 @@ export default function FullReportPage() {
           soft blurred orbs, and the navy ring motif. All aria-hidden +
           pointer-events-none; content contrast always wins. */}
       <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-[420px] overflow-hidden">
-        <img src={CAMPUS_BACKDROP} alt="" className="h-full w-full object-cover opacity-10 blur-2xl" />
+        <img src={CAMPUS_BACKDROP} alt="" aria-hidden loading="lazy" decoding="async" width={64} height={43} className="h-full w-full object-cover opacity-10" />
         <div className="absolute inset-0 bg-gradient-to-b from-surface/40 via-surface/70 to-surface" />
       </div>
-      <div className="pointer-events-none absolute top-[-100px] right-[-100px] w-[440px] h-[440px] bg-primary-200/40 rounded-full blur-[120px]" aria-hidden />
-      <div className="pointer-events-none absolute top-[120px] left-[-120px] w-[380px] h-[380px] bg-sky-200/50 rounded-full blur-[130px]" aria-hidden />
+      <div className="pointer-events-none absolute top-[-100px] right-[-100px] w-[440px] h-[440px] bg-[radial-gradient(closest-side,rgba(191,219,254,0.4),transparent_70%)] rounded-full" aria-hidden />
+      <div className="pointer-events-none absolute top-[120px] left-[-120px] w-[380px] h-[380px] bg-[radial-gradient(closest-side,rgba(186,230,253,0.5),transparent_70%)] rounded-full" aria-hidden />
       <div aria-hidden className="pointer-events-none absolute right-[-70px] top-[230px] hidden h-56 w-56 rounded-full border-[24px] border-primary-500/10 lg:block" />
       <div aria-hidden className="pointer-events-none absolute left-[-60px] bottom-[140px] hidden h-44 w-44 rounded-full border-[18px] border-primary-500/10 xl:block" />
 
@@ -838,8 +838,8 @@ export default function FullReportPage() {
             className="group w-full text-left bg-ink text-white rounded-card-lg p-6 sm:p-7 relative overflow-hidden hover:shadow-xl hover:shadow-slate-900/20 transition-shadow"
           >
             <div aria-hidden className="absolute -right-8 -top-10 w-36 h-36 rounded-full border-[18px] border-primary-500/20" />
-            <div aria-hidden className="absolute -right-6 top-8 w-48 h-48 rounded-full bg-primary-500/15 blur-3xl" />
-            <div className="absolute -bottom-12 -left-12 w-40 h-40 bg-sky-500/15 rounded-full blur-3xl" aria-hidden />
+            <div aria-hidden className="absolute -right-6 top-8 w-48 h-48 rounded-full bg-[radial-gradient(closest-side,rgba(59,130,246,0.15),transparent_70%)]" />
+            <div className="absolute -bottom-12 -left-12 w-40 h-40 bg-[radial-gradient(closest-side,rgba(14,165,233,0.15),transparent_70%)] rounded-full" aria-hidden />
             <div className="relative flex items-center gap-4">
               <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/15 flex items-center justify-center text-white flex-shrink-0">
                 <Map size={20} className="text-amber-300" />

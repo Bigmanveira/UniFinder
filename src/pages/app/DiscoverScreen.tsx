@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Award,
@@ -61,26 +61,45 @@ export default function DiscoverScreen() {
     return () => { mounted = false; };
   }, []);
 
+  // Deferred query: keeps each keystroke's input update instant and lets the
+  // 6,200-row filter run at lower priority. Without this, every character
+  // typed filtered the full directory synchronously — the "search feels
+  // frozen" symptom on phones.
+  const deferredQuery = useDeferredValue(queryText);
+
   // Distinct states present in the live dataset, alphabetised.
   const states = useMemo(() => {
     if (!schools) return [];
     return [...new Set(schools.map((s) => s.state).filter((v): v is string => !!v))].sort();
   }, [schools]);
 
-  const filtered = useMemo(() => {
+  // Search index precomputed ONCE per dataset: one lowercase haystack per
+  // school, so a keystroke costs 6,200 `includes` calls instead of 6,200
+  // template-string builds + toLowerCase allocations.
+  const indexed = useMemo(() => {
     if (!schools) return [];
-    const q = queryText.trim().toLowerCase();
-    return schools.filter((s) => {
-      if (q && !`${s.name} ${s.city ?? ""} ${s.state ?? ""}`.toLowerCase().includes(q)) return false;
-      if (stateFilter !== "all" && s.state !== stateFilter) return false;
-      if (ownership !== "all" && !(s.ownership ?? "").toLowerCase().includes(ownership.toLowerCase())) return false;
+    return schools.map((s) => ({
+      s,
+      key: `${s.name} ${s.city ?? ""} ${s.state ?? ""}`.toLowerCase(),
+    }));
+  }, [schools]);
+
+  const filtered = useMemo(() => {
+    const q = deferredQuery.trim().toLowerCase();
+    const own = ownership.toLowerCase();
+    const out: School[] = [];
+    for (const { s, key } of indexed) {
+      if (q && !key.includes(q)) continue;
+      if (stateFilter !== "all" && s.state !== stateFilter) continue;
+      if (ownership !== "all" && !(s.ownership ?? "").toLowerCase().includes(own)) continue;
       if (maxTuition != null) {
         const tuition = s.outOfStateTuition ?? s.inStateTuition;
-        if (tuition == null || tuition > maxTuition) return false;
+        if (tuition == null || tuition > maxTuition) continue;
       }
-      return true;
-    });
-  }, [schools, queryText, stateFilter, ownership, maxTuition]);
+      out.push(s);
+    }
+    return out;
+  }, [indexed, deferredQuery, stateFilter, ownership, maxTuition]);
 
   const filtersActive = stateFilter !== "all" || ownership !== "all" || maxTuition != null || queryText.trim() !== "";
   const resetFilters = () => {
@@ -243,13 +262,15 @@ export default function DiscoverScreen() {
 
         {schools === null && !error && (
           <div className="space-y-3">
-            {[0, 1, 2, 3].map((i) => <div key={i} className="h-28 animate-pulse rounded-card bg-white shadow-card" />)}
+            {[0, 1, 2, 3].map((i) => <div key={i} className="h-28 animate-pulse rounded-card bg-white shadow-sm" />)}
           </div>
         )}
 
         <div className="space-y-3">
+          {/* shadow-sm, not shadow-card: a 32px-blur shadow on every row in
+              a long scroll list is a real rasterization cost on phones. */}
           {shown.map((s) => (
-            <article key={s.unitId} className="rounded-card border border-slate-100 bg-white p-4 shadow-card">
+            <article key={s.unitId} className="rounded-card border border-slate-100 bg-white p-4 shadow-sm">
               <div className="mb-1.5 flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <h3 className="truncate text-base font-black">{s.name}</h3>
@@ -315,7 +336,7 @@ function SelectPill({
   return (
     <label
       className={`relative flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full px-3.5 py-2 text-xs font-bold transition-colors ${
-        active ? "bg-ink text-white" : "border border-slate-100 bg-white text-slate-900 shadow-card"
+        active ? "bg-ink text-white" : "border border-slate-100 bg-white text-slate-900 shadow-sm"
       }`}
     >
       {active && current ? current.label : label}

@@ -1,5 +1,7 @@
 import { Link } from "react-router-dom";
-import webLogo from "../assets/weblogo.png";
+// 160px version (4.6 KB vs 49 KB for the 500px original) — BrandLogo never
+// renders larger than ~48px, so 160px covers 3x-DPR screens with room over.
+import webLogo from "../assets/weblogo-160.png";
 import { useAuth } from "../hooks/useAuth";
 
 // ─────────────────────────────────────────────────────────────────────────────

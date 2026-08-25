@@ -1,6 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import { AnimatePresence, motion } from "framer-motion";
 import {
   Bookmark, Compass, FileText, FolderOpen, GraduationCap, Home,
   LogOut, Map, Mic, UserRound, Wallet, X,
@@ -92,7 +91,10 @@ function TopBar() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b border-slate-100 bg-surface/85 backdrop-blur-xl">
+      {/* Opaque on mobile: backdrop-filter re-blurs the page on every scroll
+          frame, which was a measurable jank source on phones. Desktop GPUs
+          keep the glass look. */}
+      <header className="sticky top-0 z-40 border-b border-slate-100 bg-surface md:bg-surface/85 md:backdrop-blur-xl">
         {/* Symmetric bar: hamburger — centred wordmark — profile */}
         <div className="mx-auto grid h-16 max-w-5xl grid-cols-[1fr_auto_1fr] items-center px-4 sm:px-6">
           <div className="justify-self-start">
@@ -127,26 +129,31 @@ function TopBar() {
         </div>
       </header>
 
-      {/* Navigation drawer */}
-      <AnimatePresence>
-        {open && (
-          <>
-            <motion.div
-              key="backdrop"
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              onClick={() => setOpen(false)}
-              className="fixed inset-0 z-50 bg-ink/40"
-              aria-hidden
-            />
-            <motion.aside
-              key="drawer"
-              initial={{ x: "-100%" }} animate={{ x: 0 }} exit={{ x: "-100%" }}
-              transition={{ type: "spring", stiffness: 320, damping: 34 }}
-              role="dialog"
-              aria-modal="true"
-              aria-label="Navigation"
-              className="fixed bottom-0 left-0 top-0 z-50 flex w-[84%] max-w-xs flex-col bg-white shadow-2xl"
-            >
+      {/* Navigation drawer — pure CSS transitions. This used to be the only
+          framer-motion consumer inside the app shell, which pulled the whole
+          ~120 KB motion chunk onto every /app route before first paint. A
+          transform + opacity transition composites on the GPU and costs
+          nothing when closed. `inert` keeps the closed drawer out of the tab
+          order and accessibility tree. */}
+      <div
+        onClick={() => setOpen(false)}
+        aria-hidden
+        className={cn(
+          "fixed inset-0 z-50 bg-ink/40 transition-opacity duration-200",
+          open ? "opacity-100" : "pointer-events-none opacity-0",
+        )}
+      />
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-label="Navigation"
+        inert={!open}
+        className={cn(
+          "fixed bottom-0 left-0 top-0 z-50 flex w-[84%] max-w-xs flex-col bg-white shadow-2xl",
+          "transition-transform duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
+          open ? "translate-x-0" : "-translate-x-full",
+        )}
+      >
               <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
                 <BrandLogo size="sm" />
                 <button
@@ -194,10 +201,7 @@ function TopBar() {
                   <LogOut size={15} /> Sign out
                 </button>
               </div>
-            </motion.aside>
-          </>
-        )}
-      </AnimatePresence>
+      </aside>
     </>
   );
 }
